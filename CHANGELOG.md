@@ -20,6 +20,7 @@
 - 2026-06-22 14:35：Day 0 frontmatter 重标为"素材 v0" + MEMORY §8.3.2 "AI 不绕过 wizard" + §9 双轨机制
 - 2026-06-22 15:20：**阶段 1.2 完成**：wanx-v1 异步图片生成接入 LLM Gateway。root cause = 原 `/compatible-mode/v1/images/generations` 404（API Key 不支持同步），正确路径 = `X-Dashscope-Async: enable` 异步 submit+poll。E2E 测试通过：wanx-v1 200（1 图），gpt-image-2 200（不变）。llm-gateway-provider push ac8f3f9 + aef7040。**注意**：PRD §2.3 写的 "Wanx2.1-t2i-plus" 已弃用，修订为 wanx-v1。
 - 2026-06-22 15:40：**阶段 1.3 完成**：图模矩阵文档同步。将 MEMORY.md / PRD.md / WORKSPACE_MEMORY.md 中所有 "Wanx2.1-t2i-plus" 替换为 "wanx-v1（异步 X-Dashscope-Async）"，共修正 9 处。video-ops push 187a22f。
+- 2026-06-22 16:00：**阶段 2.1 完成**：Backlog 拆解，`docs/BACKLOG.md` 创建完成，8 Epic / 34 items，4 Sprint 规划建议，commit 63f953a。
 
 ---
 

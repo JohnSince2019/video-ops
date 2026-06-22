@@ -1,7 +1,7 @@
 # video-ops Roadmap（实施路径图）
 
-> **文档状态**：草案 v0.2.0（2026-06-22 15:25，**阶段 1.2 完成**：wanx-v1 async 图片生成接入 + DoD 全部通过）
-> **最后更新**：2026-06-22 15:25
+> **文档状态**：草案 v0.3.0（2026-06-22 16:00，**阶段 1.3 完成**，**阶段 2.1 完成**）
+> **最后更新**：2026-06-22 16:00
 > **维护者**：John
 > **依赖**：PRD v1.0（已拍板）、WORKSPACE_MEMORY.md（§4.1 video-ops 状态）
 > **新仓库**：https://github.com/JohnSince2019/video-ops.git
@@ -166,9 +166,8 @@ out/
 | 项 | 说明 |
 |------|------|
 | 输入 | PRD v1.0 + WORKSPACE_MEMORY §4.1 列出的 17 条决策 |
-| 产出 | `video-ops/docs/BACKLOG.md`（新建） |
-| DoD | 每个 user story 拆分成 ≥ 3 个独立 issue 颗粒（Dev / QA / Doc 三视角） |
-| 拆分原则 | 每个 issue ≤ 2 人天；依赖关系显式标注（blocks / blocked by） |
+| 产出 | `video-ops/docs/BACKLOG.md`（新建）✅ |
+| DoD | ✅ **2026-06-22 16:00 通过**：8 Epic / 34 items，4 Sprint 规划建议，commit 63f953a |
 
 ### 2.2 Linear 导入
 
