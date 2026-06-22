@@ -34,7 +34,7 @@
 | 后端 Worker | Python（BullMQ 任务驱动）|
 | 数据库 | Prisma + PostgreSQL（Docker）|
 | 任务队列 | BullMQ + Redis |
-| 图片生成 | GPT Image 2 + Wanx2.1-t2i-plus（经 LLM Gateway）|
+| 图片生成 | GPT Image 2 + wanx-v1（经 LLM Gateway，wanx 异步 X-Dashscope-Async）|
 | TTS | CosyVoice 3.0 MLX（mlx-audio v0.4.4+，本地 M4 推理）|
 | 字幕 | mlx-audio Whisper STT（本地）|
 | 视频渲染 | FFmpeg + MoviePy |
@@ -47,7 +47,7 @@
 | FFmpeg | `brew install ffmpeg` | 必须 |
 | mlx-audio | `pip install mlx-audio` | TTS + STT，v0.4.4+ |
 | CosyVoice 模型 | mlx-audio 自动下载 | ~1.2 GB（4-bit 量化）|
-| LLM Gateway | 本地运行 `npm start`（port 3000）| GPT Image 2 + Wanx2.1 |
+| **LLM Gateway** | 本地运行 `npm start`（port 3000）| GPT Image 2 + wanx-v1（异步，2026-06-22 接入）|
 | Redis | Docker | BullMQ 依赖 |
 | PostgreSQL | Docker | 开发环境 |
 
@@ -60,25 +60,25 @@
 | **Docker Desktop** | daemon running | `docker ps` 列出 2 个容器 |
 | **PostgreSQL** | 已在 5432/5433 端口运行 | `contentcreator-db`, `contentcreator-db-test` |
 | **LLM Gateway** | http://localhost:3000, Next.js 16.2.6 | `npm start` 后台运行 |
-| **GPT Image 2** | ✅ 可用（packycode-image relay） | 实测 23s 生成 1024x1024 |
-| **Wanx2.1 / Imagen / Flux / DALL-E 3** | ❌ 全部不可用 | provider enabled=false 或缺 API key |
+| **GPT Image 2** | ✅ 可用（packycode-image relay） | 实测 ~21s 生成 1024x1024 |
+| **wanx-v1** | ✅ 可用（异步 X-Dashscope-Async） | 2026-06-22 接入完成 |
+| **Imagen / Flux / DALL-E 3** | ❌ enabled=false | 备选 V2 |
 | **Python** | 3.11.15 (conda env: video-ops-py) | `/opt/homebrew/bin/conda run -n video-ops-py python --version` |
 | **mlx-audio** | 待安装（Sprint 0 P4 模块时） | — |
 
 ### 2.3 关键事实修正（影响 PRD 决策）
 
-**PRD 第 3 条"AI 图片模型：GPT Image 2 + Wanx2.1" 需要修正：**
+**PRD 第 3 条"AI 图片模型：GPT Image 2 + Wanx2.1" 修正（2026-06-22 阶段 1.2 完成）**：
 
-- 实测发现 **Wanx2.1 在当前 LLM Gateway 完全不可用**（wanx provider enabled=false，无 API key）
-- **dall-e-3 / imagen-3 / flux-1.1-pro / flux-schnell 同样全部不可用**
-- 当前 LLM Gateway **唯一可用的图片模型是 `gpt-image-2`**（来自 `packycode-image` relay）
+- GPT Image 2：✅ 可用（packycode-image relay，实测 ~21s）
+- wanx-v1：✅ 可用（异步 X-Dashscope-Async，2026-06-22 接入）
+- dall-e-3 / imagen-3 / flux-1.1-pro：❌ enabled=false，V2 备选
 
 **影响范围**：
 - P2 ImageGenerator：✅ 用 gpt-image-2（已验证）
-- P3 BrollGenerator：⚠️ 原计划用 Wanx2.1 → 改用 gpt-image-2（复用，差异化靠 prompt 工程）
-- 这会让 P2 + P3 视觉同质化，V2 时再接入更多图模
+- P3 BrollGenerator：✅ 可用 wanx-v1 生成中国风装饰图（差异化达成）
 
-**待办**：Sprint 0 在 PRD.md §2 "技术栈"和 §5.2 "P2/P3 模块"加入此修正。
+**本节待办（2026-06-22 完成）**：✅ Sprint 0 已在 PRD.md §2 "技术栈"和 §5.2 "P2/P3 模块"更新为此修正。
 
 ### 2.4 Git 基座就绪（2026-06-22 13:00）
 
@@ -112,7 +112,7 @@
 
 1. **视频规格**：竖屏 1080x1920（9:16）/ 横屏 1920x1080（16:9），30 FPS，H.264，8 Mbps
 2. **技术栈**：Next.js + TypeScript + Prisma + PostgreSQL + BullMQ + FFmpeg
-3. **AI 图片模型**：GPT Image 2 + Wanx2.1 via LLM Gateway（PackyCode）
+3. **AI 图片模型**：GPT Image 2 + wanx-v1 via LLM Gateway（2026-06-22 wanx-v1 接入完成）
 4. **TTS 方案**：CosyVoice 3.0 MLX 本地推理（M2 Max+，RTF ~0.5）
 5. **ContentManifest JSON Schema v1**：标准入口格式（见 PRD.md §5）
 6. **多平台规格矩阵**：抖音（15min/<100MB）/ 小红书（5min/<500MB）/ 视频号（30min/<1GB）
@@ -153,7 +153,7 @@ P1 TextParser    → 解析 → SceneGraph
   ↓
 P2 ImageGenerator → GPT Image 2 生成分镜图（经 LLM Gateway）
   ↓
-P3 BrollGenerator → Wanx2.1 生成装饰图（经 LLM Gateway）
+P3 BrollGenerator → wanx-v1 生成装饰图（经 LLM Gateway）
   ↓
 P4 TTSClient     → CosyVoice 3.0 MLX 配音合成（本地）
   ↓
@@ -310,7 +310,7 @@ video-ops/
 | 发布节奏 | 一天两篇（一周 14 篇）— 见 §8.3 |
 | 第 1 篇 | 《当我让 AI 列"已完成的工作"，它漏了一半》— 草稿在 `content/2026-06-22-Day0.md` |
 | 状态 | **草稿待审**（用户未发布）|
-| 第 2 篇起点 | 阶段 1.2（qwen-image-plus 接入）完成后自动起草 |
+| 第 2 篇起点 | 阶段 1.3（图模矩阵文档同步）完成后自动起草 |
 
 ### 公众号文章存哪里
 
@@ -369,7 +369,7 @@ YYYY-MM-DD-Day{N}-{主题}.md
 
 例：
   2026-06-22-Day0-ai-collaboration-miss.md
-  2026-06-23-Day1-qwen-image-plus-setup.md
+  2026-06-23-Day1-image-model-matrix-sync.md
 ```
 
 **素材层与生产层状态映射**：
@@ -438,7 +438,7 @@ python worker/main.py  # Python Worker
 ### Sprint 0 启动条件
 
 - [x] PRD v1.0 拍板
-- [ ] 外部依赖验证（mlx-audio + CosyVoice 模型下载 + LLM Gateway Wanx2.1 调用）— 实际状态：Wanx2.1 不可用（见 §2.3），mlx-audio 待装（roadmap §3.1.1）
+- [x] 外部依赖验证（mlx-audio + CosyVoice 模型下载 + LLM Gateway wanx-v1 调用）— GPT Image 2 ✅ + wanx-v1 ✅（2026-06-22 接入完成），mlx-audio 待装（roadmap §3.1.1）
 - [x] 项目骨架创建（.gitignore / README.md / CHANGELOG.md / dev 分支 / GitHub 远程）— 2026-06-22 13:00 完成
 - [ ] branch protection 配置（main 禁直推，需 PR）— 2026-06-22 13:25 user 标记 done
 - [ ] AI 协作骨架（CLAUDE.md / .cursor/rules / Prisma schema 初始化）— **未启动**，归属阶段 1.3 或 1.4，**不是 Git 仓库骨架**
@@ -530,23 +530,17 @@ python worker/main.py  # Python Worker
 
 ### 下次会话起点（重要：避免重新调研）
 
-**阶段 1.2 实际任务**（**不是**原 PRD 的"加 DashScope"，是**实际验证**）：
-- 在 **llm-gateway-provider 仓库**（不是 video-ops）加 `qwen-image-plus` provider
-- 通过 DashScope OpenAI 兼容模式
-- 替换原计划的 Wanx2.1（MEMORY §2.3 已确认不可用）
-- 创建分支 `feat/qwen-image-plus`（base: llm-gateway-provider/main）+ PR
-- video-ops 仓库这周**不动**
+**阶段 1.3 完成**（2026-06-22 15:30），下一阶段待定：
+- 检查 ROADMAP.md §阶段 2 或 §1.3 后续
 
 **前置核查**（AI 接手必做）：
-- 读 `video-ops/MEMORY.md` §2.4 + §3（Git 基座状态 + 17 条决策）
+- 读 `video-ops/MEMORY.md` §最后更新（找当前阶段状态）
 - 读 `WORKSPACE_MEMORY.md §4.1`（video-ops 跨项目上下文）
-- 读 `llm-gateway-provider/MEMORY.md`（如有）+ 检查 main 分支是否最新
-- 读 `llm-gateway-provider/app/api/v1/models/route.ts`（已确认有 wanx2.1 注册）
-- 确认 DashScope API key 已在 `~/.zshrc` 或 .env（**用户问题：之前有过吗？**）
+- 读 `video-ops/docs/ROADMAP.md`（找当前阶段 DoD）
 
 **当前最新 commit**：
-- video-ops：eb0dfac (origin/dev) + main 分支（user 推送，AI 未直接验证）
-- llm-gateway-provider：2d31b74 (origin/main)
+- video-ops：f9908bf (origin/dev) + main 分支（user 推送，AI 未直接验证）
+- llm-gateway-provider：aef7040 (origin/main)
 
 ---
 

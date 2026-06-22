@@ -81,7 +81,7 @@ AI 自动处理（文案解析 → 图片生成 → TTS 配音 → 组装 → �
 | 语言 | TypeScript + Python | Next.js 前端 + Python Worker |
 | 数据库 | Prisma + PostgreSQL | 本地 Docker 开发，SaaS 迁移仅改 datasource url |
 | 任务队列 | BullMQ + Redis | 必须（渲染分钟级，不能同步阻塞）|
-| 图片生成 | GPT Image 2 + Wanx2.1-t2i-plus | 经 LLM Gateway（PackyCode）调用 |
+| 图片生成 | GPT Image 2 + wanx-v1（异步 X-Dashscope-Async）| 经 LLM Gateway（PackyCode）调用 |
 | TTS | CosyVoice 3.0 MLX（mlx-audio）| 本地 M4 推理，支持零样本音色克隆 |
 | 字幕 | mlx-audio Whisper STT | 同 mlx-audio 库，TTS/STT 一套 |
 | 视频渲染 | FFmpeg + MoviePy | 本地 M4，不依赖 GPU |
@@ -160,7 +160,7 @@ P1 TextParser    → 解析 ContentManifest → SceneGraph
   ↓
 P2 ImageGenerator → GPT Image 2 生成分镜图
   ↓
-P3 BrollGenerator → Wanx2.1 生成装饰图
+P3 BrollGenerator → wanx-v1 生成装饰图
   ↓
 P4 TTSClient     → CosyVoice 3.0 MLX 配音合成
   ↓
@@ -183,7 +183,7 @@ OUTPUT（MP4 + 封面 + 元数据 + 合规报告）
 |------|------|------|------|------|
 | P1 | TextParser | — | ContentManifest | SceneGraph |
 | P2 | ImageGenerator | GPT Image 2（Gateway）| SceneGraph.visual_hint | `assets/generated/*.png` |
-| P3 | BrollGenerator | Wanx2.1（Gateway）| scene_id | `assets/generated/broll/*.png` |
+| P3 | BrollGenerator | wanx-v1（Gateway，异步）| scene_id | `assets/generated/broll/*.png` |
 | P4 | TTSClient | CosyVoice 3.0 MLX（本地）| SceneGraph.narration + 参考音频 | `assets/audio/narration.wav` |
 | P5 | LipsyncEngine | — | TTS 音频 + AI 图片 | `assets/video/frames/`（延后）|
 | P6 | VideoAssembler | — | SceneGraph + assets | `assets/video/assembled.mp4` |
@@ -329,7 +329,7 @@ model Job {
 | FFmpeg | latest | `brew install ffmpeg` | 必须 |
 | mlx-audio | v0.4.4+ | `pip install mlx-audio` | TTS + STT |
 | CosyVoice 模型 | 4-bit MLX | mlx-audio 自动下载 | ~1.2 GB |
-| LLM Gateway | — | 本地运行 PackyCode | GPT Image 2 + Wanx2.1 |
+| LLM Gateway | — | 本地运行 PackyCode | GPT Image 2 + wanx-v1 |
 | Redis | latest | Docker | BullMQ 依赖 |
 | PostgreSQL | 16+ | Docker | 开发环境 |
 
