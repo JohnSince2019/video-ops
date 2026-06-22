@@ -1,14 +1,15 @@
 # video-ops Roadmap（实施路径图）
 
-> **文档状态**：草案 v0.1.6（2026-06-22 14:35，**双轨并存机制确认**：素材层 video-ops/content/ + 生产层 ContentOps wizard 10 步）
-> **最后更新**：2026-06-22 14:35
+> **文档状态**：草案 v0.1.7（2026-06-22 14:50，**事实纠正**：阶段 1.2 接 Wanx2.1-t2i-plus 不是 qwen-image-plus）
+> **最后更新**：2026-06-22 14:50
 > **维护者**：John
 > **依赖**：PRD v1.0（已拍板）、WORKSPACE_MEMORY.md（§4.1 video-ops 状态）
 > **新仓库**：https://github.com/JohnSince2019/video-ops.git
->   - dev：2092585 feat(content): 公众号系列 Day 0 草稿 + 每日沉淀节奏
+>   - dev：339a9d7 docs: 公众号双轨并存机制 + AI 不绕过 ContentOps wizard
 >   - main：已推送（user 标记 done；AI 未直接验证）
 > **公众号系列**：《AI 图文短视频自动混剪系统开发与变现实录》— 2026-06-22 13:45 激活
 > **生产方式**：双轨并存（素材层 + ContentOps wizard 生产层）
+> **gateway 源码**：独立项目 `/Users/john/Desktop/AI/Solutions/llm-gateway-provider/`，**不在 video-ops 仓库**
 
 ---
 
@@ -118,20 +119,26 @@ coverage/
 out/
 ```
 
-### 1.2 LLM Gateway 接入 DashScope
+### 1.2 LLM Gateway 接入 Wanx2.1-t2i-plus
 
 | 项 | 说明 |
 |------|------|
-| 输入 | 1.1 完成；已知 `qwen-image-plus / qwen-image / z-image-turbo` 同步端点可用 |
-| 产出 | `llm-gateway-provider/app/api/auto/images/generations/route.ts` 新增 dashscope 分支；新 provider 配置完成 |
-| DoD | 端到端测试两个用例都通过（gpt-image-2 不受影响 + qwen-image-plus 出图成功） |
+| 输入 | 1.1 完成；**已知 `wanx2.1-t2i-plus` 在 Gateway 中已可用**（localhost:3000 `/api/v1/models` 实测 owned_by: wanx） |
+| 产出 | `llm-gateway-provider/app/api/auto/images/generations/route.ts` 新增 wanx 分支；新 provider 配置完成 |
+| DoD | 端到端测试两个用例都通过（gpt-image-2 不受影响 + wanx2.1-t2i-plus 出图成功） |
 | 改动量 | route.ts 新增 ~30 行；不改任何现有 provider 的逻辑 |
-| 风险 | 现有 packycode-image 的 priority 数值可能与新 dashscope 冲突；Prisma `type` 字段枚举可能限制新值 |
-| commit 策略 | 拆 2 个 commit：`feat(gateway): add dashscope multimodal sync provider` + `chore(gateway): register dashscope provider` |
+| 风险 | 现有 packycode-image 的 priority 数值可能与新 wanx 冲突；Prisma `type` 字段枚举可能限制新值 |
+| commit 策略 | 拆 2 个 commit：`feat(gateway): add wanx multimodal sync provider` + `chore(gateway): register wanx provider` |
 
-**新增代码定位**（仅参考，最终以源码为准）：
-- `callImageSync()` 函数：在 `gemini-imagen` 分支**并列**新增 `dashscope` 分支
-- `normalizeImageResponse()` 函数：在 `gemini-imagen` 分支**并列**新增 `dashscope` 响应解析
+**代码定位（已核实 2026-06-22 14:50）**：
+- gateway 源码在 `/Users/john/Desktop/AI/Solutions/llm-gateway-provider/`（不是 video-ops 仓库，是独立项目）
+- 主文件路径：`app/api/auto/images/generations/route.ts`（待 ls 验证）
+- **不在 video-ops 仓库内**——这次改动需要跨仓库操作（gateway 是独立项目）
+
+**注意（2026-06-22 14:50 AI 错误纠正）**：
+- 之前 ROADMAP §1.2 写"DashScope 接入 qwen-image-plus"是 AI 未核实就写的
+- 经实测 Gateway `/api/v1/models` 不含 qwen-image-plus，也不含 DashScope provider
+- 真正可用的是 **Wanx2.1-t2i-plus**（与 PRD §2.3 一致）
 
 **关键约束**：
 - baseUrl 填 `https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation`
@@ -460,3 +467,4 @@ scope: gateway / worker / web / docs / infra
 - v0.1.4 (2026-06-22 13:25)：**会话收尾沉淀**。MEMORY.md 新增 2026-06-22 13:25 时戳会录（4 个工作段 + 5 个可复用经验 + 下次会话起点）。微信公众号系列挂起（5 个 TODO cancelled）。本阶段 1.1 闭环：**dev 已推送（eb0dfac），main 已推送（user 标记 done，AI 未直接验证）**，进入阶段 1.2 准备
 - v0.1.5 (2026-06-22 13:45)：**公众号系列激活 + Day 0 草稿 + 每日沉淀节奏**。MEMORY.md 新增 §8.3 每日沉淀约定（4 步 SOP，触发词"今天就这样了"）+ §9 公众号系列状态表；起草第 1 篇草稿 `content/2026-06-22-Day0.md`（《当我让 AI 列"已完成的工作"，它漏了一半》，约 1800 字，待用户审）；CHANGELOG.md 也需同步更新
 - v0.1.6 (2026-06-22 14:35)：**双轨并存机制确认 + AI 错误纠正**。MEMORY.md 新增 §8.3.2 "AI 不绕过 ContentOps wizard" + §9 "双轨并存机制"（素材层 video-ops/content/ + 生产层 ContentOps wizard s1-s10）；Day 0 草稿 frontmatter 重标为"素材 v0（仅存档，非发布版）"；CHANGELOG.md 同步更新。**AI 错误纠正**：未读 contentops-briefing.mdc 就动手写（违反 MEMORY §8.2）
+- v0.1.7 (2026-06-22 14:50)：**事实纠正**。CHANGELOG + ROADMAP §1.2 修正：原"qwen-image-plus / DashScope"是 AI 未核实就写的。实测 localhost:3000 `/api/v1/models`：`wanx2.1-t2i-plus` owned_by: wanx，**Wanx2.1 可用**（与 PRD §2.3 一致）。ROADMAP §1.2 重写为"接入 Wanx2.1-t2i-plus"。AI 错误：今天已违反 MEMORY §8.2 共 5 次
