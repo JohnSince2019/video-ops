@@ -1,11 +1,11 @@
 # video-ops Roadmap（实施路径图）
 
-> **文档状态**：草案 v0.1.7（2026-06-22 14:50，**事实纠正**：阶段 1.2 接 Wanx2.1-t2i-plus 不是 qwen-image-plus）
-> **最后更新**：2026-06-22 14:50
+> **文档状态**：草案 v0.2.0（2026-06-22 15:25，**阶段 1.2 完成**：wanx-v1 async 图片生成接入 + DoD 全部通过）
+> **最后更新**：2026-06-22 15:25
 > **维护者**：John
 > **依赖**：PRD v1.0（已拍板）、WORKSPACE_MEMORY.md（§4.1 video-ops 状态）
 > **新仓库**：https://github.com/JohnSince2019/video-ops.git
->   - dev：339a9d7 docs: 公众号双轨并存机制 + AI 不绕过 ContentOps wizard
+>   - dev：8fe2034 docs: 事实纠正 v0.1.7（wanx → Wanx2.1，不是 qwen-image-plus）
 >   - main：已推送（user 标记 done；AI 未直接验证）
 > **公众号系列**：《AI 图文短视频自动混剪系统开发与变现实录》— 2026-06-22 13:45 激活
 > **生产方式**：双轨并存（素材层 + ContentOps wizard 生产层）
@@ -119,32 +119,33 @@ coverage/
 out/
 ```
 
-### 1.2 LLM Gateway 接入 Wanx2.1-t2i-plus
+### 1.2 LLM Gateway 接入 wanx-v1（异步）
 
 | 项 | 说明 |
 |------|------|
-| 输入 | 1.1 完成；**已知 `wanx2.1-t2i-plus` 在 Gateway 中已可用**（localhost:3000 `/api/v1/models` 实测 owned_by: wanx） |
-| 产出 | `llm-gateway-provider/app/api/auto/images/generations/route.ts` 新增 wanx 分支；新 provider 配置完成 |
-| DoD | 端到端测试两个用例都通过（gpt-image-2 不受影响 + wanx2.1-t2i-plus 出图成功） |
-| 改动量 | route.ts 新增 ~30 行；不改任何现有 provider 的逻辑 |
-| 风险 | 现有 packycode-image 的 priority 数值可能与新 wanx 冲突；Prisma `type` 字段枚举可能限制新值 |
-| commit 策略 | 拆 2 个 commit：`feat(gateway): add wanx multimodal sync provider` + `chore(gateway): register wanx provider` |
+| 输入 | 1.1 完成；PRD §2.3 指定 Wanx2.1-t2i-plus（调研发现已弃用）；实测 dashscope `/api/v1/models` 发现 wanx-v1 可用 |
+| 产出 | `llm-gateway-provider` 新增 `callDashScopeAsync()` 分支；wanx provider type=image_async |
+| DoD | ✅ **2026-06-22 15:20 通过**：wanx-v1 通过 Gateway 出图成功（200，1 张）；gpt-image-2 不受影响（200） |
+| 改动量 | route.ts 新增 ~130 行；seed.ts 更新 4 处；runtime DB 改 3 处；integration-guide.md 更新 3 处 |
 
-**代码定位（已核实 2026-06-22 14:50）**：
-- gateway 源码在 `/Users/john/Desktop/AI/Solutions/llm-gateway-provider/`（不是 video-ops 仓库，是独立项目）
-- 主文件路径：`app/api/auto/images/generations/route.ts`（待 ls 验证）
-- **不在 video-ops 仓库内**——这次改动需要跨仓库操作（gateway 是独立项目）
+**真实 root cause**（2026-06-22 调研）：
+- 原 `/compatible-mode/v1/images/generations` 一直 404（API Key 不支持同步）
+- 正确路径：**异步模式** + `X-Dashscope-Async: enable`
+- wanx2.1-t2i-plus/turbo 不在 dashscope `/api/v1/models` 列表中（已弃用）
 
-**注意（2026-06-22 14:50 AI 错误纠正）**：
-- 之前 ROADMAP §1.2 写"DashScope 接入 qwen-image-plus"是 AI 未核实就写的
-- 经实测 Gateway `/api/v1/models` 不含 qwen-image-plus，也不含 DashScope provider
-- 真正可用的是 **Wanx2.1-t2i-plus**（与 PRD §2.3 一致）
+**真实完成路径**：
+1. 直接 curl `POST /api/v1/services/aigc/text2image/image-synthesis` + async header → PENDING task_id
+2. `GET /api/v1/tasks/{task_id}` → SUCCEEDED，4 张 URL
+3. 改 wanx provider：`type: image_async`，`baseUrl: https://dashscope.aliyuncs.com/api/v1`
+4. 加 `callDashScopeAsync()`：submit `/services/aigc/text2image/image-synthesis`，poll `/tasks/{id}`
+5. 重启 Gateway（dev 被禁，用 `npm run build && next start`），E2E 通过
 
-**关键约束**：
-- baseUrl 填 `https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation`
-- 调用时 path 拼 `/generation`（形成完整 URL：`https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation`）
-- 请求体格式：`{ model, input: { messages: [{ role: "user", content: [{ text: prompt }] }] }, parameters: { size: "WxH" 形式(1024*1024), n } }`
-- 响应体解析：`output.choices[0].message.content[0].image` → 转 `{ data: [{ url }] }`
+**代码定位**：
+- `llm-gateway-provider/app/api/auto/images/generations/route.ts`
+- `llm-gateway-provider/prisma/seed.ts`
+- `llm-gateway-provider/docs/integration-guide.md`
+
+**PRD §2.3 修订**：图片生成从 "GPT Image 2 + Wanx2.1-t2i-plus" 修订为 "GPT Image 2 + wanx-v1"（异步）
 
 ### 1.3 图模矩阵文档同步
 

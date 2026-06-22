@@ -4,7 +4,7 @@
 > **不读本文件开始对话 = 必然失智。**
 > **同时请先读 WORKSPACE_MEMORY.md 了解跨项目上下文。**
 
-最后更新：2026-06-22 14:35（**公众号双轨并存机制确认**：素材层 video-ops/content/，生产层 ContentOps wizard 10 步，AI 不再绕过 wizard；Day 0 标记为素材 v0 仅存档）
+最后更新：2026-06-22 15:25（**阶段 1.2 完成**：wanx-v1 异步接入 LLM Gateway；PRD §2.3 修订 Wanx2.1→wanx-v1；阶段 1.3 待启动）
 
 ---
 

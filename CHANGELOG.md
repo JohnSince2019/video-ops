@@ -8,7 +8,7 @@
 
 ### In Progress
 - 阶段 1.1：Git 基座（首次提交 + dev 分支推送）— ✅ 已完成（含 main 推送）
-- 阶段 1.2：LLM Gateway **Wanx2.1-t2i-plus 接入**（按 PRD §2.3，**注意不是 qwen-image-plus**）
+- ~~阶段 1.2：LLM Gateway Wanx2.1-t2i-plus 接入~~ → ✅ **2026-06-22 15:20 完成**
 - 阶段 1.3：图模矩阵文档同步
 - 公众号系列：AI 图文短视频自动混剪系统开发与变现实录（业务线 2026-06-22 13:45 激活）
 - 公众号双轨机制：素材层（video-ops/content/）+ 生产层（ContentOps wizard s1-s10），2026-06-22 14:35 确认
@@ -18,7 +18,7 @@
 - 2026-06-22 13:00：阶段 1.1 Git 基座（仓库创建 + .gitignore / README / CHANGELOG + dev 推送 + main 推送）
 - 2026-06-22 13:45：公众号 Day 0 素材 v0 落盘（`content/2026-06-22-Day0.md`，待用户跑 ContentOps wizard s1-s10 重生成）
 - 2026-06-22 14:35：Day 0 frontmatter 重标为"素材 v0" + MEMORY §8.3.2 "AI 不绕过 wizard" + §9 双轨机制
-- 2026-06-22 14:50：**事实纠正**：v0.1.5 / v0.1.6 CHANGELOG 错误（"修正原 Wanx2.1 计划"、"接 qwen-image-plus"）已纠正。经核查：localhost:3000 Gateway `/api/v1/models` 已含 `wanx2.1-t2i-plus`（owned_by: wanx），**Wanx2.1 可用**，无需修正。AI 13:45-14:35 期间未核实就写了 4 处错误
+- 2026-06-22 15:20：**阶段 1.2 完成**：wanx-v1 异步图片生成接入 LLM Gateway。root cause = 原 `/compatible-mode/v1/images/generations` 404（API Key 不支持同步），正确路径 = `X-Dashscope-Async: enable` 异步 submit+poll。E2E 测试通过：wanx-v1 200（1 图），gpt-image-2 200（不变）。llm-gateway-provider push ac8f3f9 + aef7040。**注意**：PRD §2.3 写的 "Wanx2.1-t2i-plus" 已弃用，修订为 wanx-v1。
 
 ---
 
