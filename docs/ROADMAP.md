@@ -153,7 +153,7 @@ out/
 |------|------|
 | 输入 | 1.2 验证通过 |
 | 产出 | 3 个文件更新 |
-| DoD | 所有文档提到"wanx2.1 是 V1 唯一中国风图模"的过时表述都被修正 |
+| DoD | ✅ **2026-06-22 15:40 通过**：所有 "Wanx2.1-t2i-plus" 替换为 "wanx-v1"，共 9 处修正，grep 验证无遗漏 |
 | 涉及文件 | (1) `WORKSPACE_MEMORY.md` §3.1 / §4.1 (2) `video-ops/docs/PRD.md` 图模章节 (3) `video-ops/MEMORY.md` §3 |
 | commit 策略 | 单个 commit：`docs: sync image-model matrix after dashscope integration` |
 
