@@ -10,6 +10,9 @@
 - 阶段 1.1：Git 基座（首次提交 + dev 分支推送）— ✅ 已完成（含 main 推送）
 - ~~阶段 1.2：LLM Gateway Wanx2.1-t2i-plus 接入~~ → ✅ **2026-06-22 15:20 完成**
 - ~~阶段 1.3：图模矩阵文档同步~~ → ✅ **2026-06-22 15:40 完成**
+- 阶段 2.2：Linear 导入 → ✅ **2026-06-22 19:00 完成**（39 issues / 5 Cycles / 3 Milestones）
+- 阶段 2.3：Milestone 配置 → ✅ **2026-06-22 19:00 完成**（3 Milestones 创建 + 39 issues 全量关联）
+- 项目管理文档：Sprint 执行计划 + Milestone 进度追踪 → ✅ **2026-06-22 19:20 完成**（`project-manager/milestones/`）
 - 公众号系列：AI 图文短视频自动混剪系统开发与变现实录（业务线 2026-06-22 13:45 激活）
 - 公众号双轨机制：素材层（video-ops/content/）+ 生产层（ContentOps wizard s1-s10），2026-06-22 14:35 确认
 

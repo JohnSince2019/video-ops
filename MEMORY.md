@@ -4,7 +4,7 @@
 > **不读本文件开始对话 = 必然失智。**
 > **同时请先读 WORKSPACE_MEMORY.md 了解跨项目上下文。**
 
-最后更新：2026-06-22 15:25（**阶段 1.2 完成**：wanx-v1 异步接入 LLM Gateway；PRD §2.3 修订 Wanx2.1→wanx-v1；阶段 1.3 待启动）
+最后更新：2026-06-22 19:20（阶段 2.2 完成：Linear 39 issues 导入；阶段 2.3 完成：3 Milestones 创建 + 全部关联；project-manager/milestones/ 文档完成）
 
 ---
 
