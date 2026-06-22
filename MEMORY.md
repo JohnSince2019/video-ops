@@ -4,7 +4,7 @@
 > **不读本文件开始对话 = 必然失智。**
 > **同时请先读 WORKSPACE_MEMORY.md 了解跨项目上下文。**
 
-最后更新：2026-06-22 13:00（Sprint 0 启动前，**阶段 1.1 Git 基座完成**，env baseline 7 项已就绪，PRD v1.0 已拍板，Q1-Q7 全部确认）
+最后更新：2026-06-22 13:25（**Sprint 0 进行中**：阶段 1.1 Git 基座完成，dev 推送，main 推送+保护已 done，阶段 1.2 待启动）
 
 ---
 
@@ -295,8 +295,115 @@ python worker/main.py  # Python Worker
 ### Sprint 0 启动条件
 
 - [x] PRD v1.0 拍板
-- [ ] 外部依赖验证（mlx-audio + CosyVoice 模型下载 + LLM Gateway Wanx2.1 调用）
-- [ ] 项目骨架创建（CLAUDE.md / .gitignore / .cursor/rules / Prisma schema 初始化）
+- [ ] 外部依赖验证（mlx-audio + CosyVoice 模型下载 + LLM Gateway Wanx2.1 调用）— 实际状态：Wanx2.1 不可用（见 §2.3），mlx-audio 待装（roadmap §3.1.1）
+- [x] 项目骨架创建（.gitignore / README.md / CHANGELOG.md / dev 分支 / GitHub 远程）— 2026-06-22 13:00 完成
+- [ ] branch protection 配置（main 禁直推，需 PR）— 2026-06-22 13:25 user 标记 done
+- [ ] AI 协作骨架（CLAUDE.md / .cursor/rules / Prisma schema 初始化）— **未启动**，归属阶段 1.3 或 1.4，**不是 Git 仓库骨架**
+
+---
+
+## 2026-06-22 13:25：阶段 1.1 Git 基座收尾 + roadmap 全量回填
+
+### 本次会话做了什么（4 个工作段）
+
+#### 工作段 1：roadmap 全量回填遗漏
+
+用户提问："roadmap 中是否漏掉我们已经完成的修复 FFmpeg 和 Python 环境等任务？"
+
+**真相查证**（不是凭印象）：
+- 读 `MEMORY.md §2.2`：2026-06-22 已验证 7 项环境基线
+- 读 `WORKSPACE_MEMORY.md` + `PRD.md`：确认外部引用
+
+**roadmap v0.1 漏掉的 3 块**：
+1. 已完成 7 项环境基线（FFmpeg/Python/Docker/PostgreSQL/Gateway/gpt-image-2）未记录
+2. mlx-audio 安装任务完全缺失（PRD P4 阻塞依赖）
+3. §3.1 "docker-compose up" 与事实矛盾（PostgreSQL 已在 5432/5433 跑）
+
+**修正动作**：
+- 新增 §0.5 起点状态快照（已就绪 7 + 待补齐 3 + 关键事实修正）
+- 新增 §3.1.1 mlx-audio 安装任务
+- §3.1 DoD 改为"验证现有容器 + 补 backup"
+- §3.3 风险行加 mlx
+- roadmap 升 v0.1.2
+
+#### 工作段 2：微信公众号系列挂起
+
+用户提出："把开发 video-ops 过程做成公众号系列：AI 图文短视频自动混剪系统开发与变现实录"。
+
+**AI 提议 5 层架构**（内容资产 / 生产工具 / 视频载体 / 元叙事 / 商业变现）+ 4 个核心机会 + 4 个风险预警。
+
+**用户 4 项决策**：
+| 维度 | 决策 |
+|------|------|
+| 终极目标 | 品牌沉淀（非直接变现） |
+| 发布节奏 | 一周两篇 |
+| 起篇 | 动机文 |
+| AI 角色 | 按 SOP 全力执行 |
+
+**用户后续说"先暂停，回到 roadmap"**——5 个相关 TODO 全部 cancelled，业务线挂起。
+**教训**：构想可以大讨论，**TOC 必须是 roadmap 当前阶段**。分心是最大的失败模式。
+
+#### 工作段 3：阶段 1.1 Git 基座
+
+**5 个关键决策**（经用户确认）：
+| 决策 | 选择 |
+|------|------|
+| 仓库边界 | 仅 video-ops 独立仓（不 monorepo） |
+| 远程协议 | HTTPS + macOS Keychain（**非 SSH**）|
+| git 身份 | global（user.name=JohnSince2019, user.email=johnsince2019@gmail.com） |
+| 仓库创建 | Web UI（用户手操 30 秒）|
+| 仓库地址 | https://github.com/JohnSince2019/video-ops.git |
+
+**真相查证关键节点**：
+- 用户原话"我之前推送过 ContentOps，没提供任何凭证" → AI 假设 SSH
+- 核查 `~/.ssh/` → **无任何 key**（理论 SSH 必败）
+- 核查 `llm-gateway-provider/.git/config` → 实际是 HTTPS 远程
+- 验证 `git ls-remote https://...` → **exit 0，Keychain 凭证命中**
+- 修正方案：放弃 SSH，**继续用 HTTPS + Keychain 缓存的 PAT**
+
+**执行 7 步**：
+1. `git config --global user.name/email` ✅
+2. 用户 Web UI 创建 GitHub 空仓 ✅
+3. `git ls-remote` 验证可访问 ✅
+4. 创建 3 个文件：.gitignore（通用 Node/Python/IDE/ML 模板）/ README.md / CHANGELOG.md ✅
+5. `git init` + `git add` + `git commit -m "chore: project init"` → **82746bd** ✅
+6. `git checkout -b dev` + `git remote add origin` ✅
+7. `git push -u origin dev` → 推送成功，Keychain 自动通过 ✅
+
+**额外 commit**：
+- `eb0dfac docs: 记录阶段 1.1 Git 基座完成`（MEMORY §2.4 + ROADMAP 升 v0.1.3）
+
+#### 工作段 4：用户报 "done" 完成 main 保护 + 推送
+
+用户报告 branch protection 配置完成、main 已推送。AI 无从直接核查（**这是信任点，下次会话可让用户截图确认**）。
+
+### 本次会话沉淀的 5 个可复用经验
+
+1. **"已完成的事必须显式记录"**：roadmap v0.1 漏了 7 项环境基线，是典型的"开发日志失忆"——已用 §0.5 起点状态快照纠正
+2. **"用户记忆不等于系统状态"**：用户说"没提供凭证" ≠ 实际机制。永远以 `git ls-remote` 实测为准
+3. **"猜测时停下来核查"**：SSH key 不存在时**没有继续假设**而是切 HTTPS 方案，节省了 5 分钟
+4. **"业务大讨论 TOC 必须回到 roadmap"**：公众号系列讨论后用户主动拉回，AI 立即 TODO 取消+挂起
+5. **"跨会话的协作约定必须写在 MEMORY"**：今天加了"任何代码改动当天必须 commit" + "MEMORY/CHANGELOG 同步"（§2.4 AI 协作约定子节）
+
+### 下次会话起点（重要：避免重新调研）
+
+**阶段 1.2 实际任务**（**不是**原 PRD 的"加 DashScope"，是**实际验证**）：
+- 在 **llm-gateway-provider 仓库**（不是 video-ops）加 `qwen-image-plus` provider
+- 通过 DashScope OpenAI 兼容模式
+- 替换原计划的 Wanx2.1（MEMORY §2.3 已确认不可用）
+- 创建分支 `feat/qwen-image-plus`（base: llm-gateway-provider/main）+ PR
+- video-ops 仓库这周**不动**
+
+**前置核查**（AI 接手必做）：
+- 读 `video-ops/MEMORY.md` §2.4 + §3（Git 基座状态 + 17 条决策）
+- 读 `WORKSPACE_MEMORY.md §4.1`（video-ops 跨项目上下文）
+- 读 `llm-gateway-provider/MEMORY.md`（如有）+ 检查 main 分支是否最新
+- 读 `llm-gateway-provider/app/api/v1/models/route.ts`（已确认有 wanx2.1 注册）
+- 确认 DashScope API key 已在 `~/.zshrc` 或 .env（**用户问题：之前有过吗？**）
+
+**当前最新 commit**：
+- video-ops：eb0dfac (origin/dev) + main 分支（user 推送，AI 未直接验证）
+- llm-gateway-provider：2d31b74 (origin/main)
 
 ---
 
