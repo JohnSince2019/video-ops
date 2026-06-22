@@ -1,9 +1,10 @@
 # video-ops Roadmap（实施路径图）
 
-> **文档状态**：草案 v0.1（2026-06-22 起草，待 Sprint 0 结束后回填实际数据）
-> **最后更新**：2026-06-22
+> **文档状态**：草案 v0.1.3（2026-06-22 13:00，**阶段 1.1 Git 基座完成**）
+> **最后更新**：2026-06-22 13:00
 > **维护者**：John
 > **依赖**：PRD v1.0（已拍板）、WORKSPACE_MEMORY.md（§4.1 video-ops 状态）
+> **新仓库**：https://github.com/JohnSince2019/video-ops.git（首次 commit 82746bd）
 
 ---
 
@@ -451,3 +452,4 @@ scope: gateway / worker / web / docs / infra
 - v0.1 (2026-06-22 12:39)：初始草案，待 Sprint 0 结束后回填实际数据
 - v0.1.1 (2026-06-22 12:40)：§5 / §7.3 / §9 / §10 / R6 多处基于"指南缺失"错误前提；**已修正**：定位到 `/Users/john/.cursor/plans/新项目_ai_安全开发指南_78e7994e.plan.md` 源文件，按 9 阶段重排阶段 4；§11 记录经验教训
 - v0.1.2 (2026-06-22 12:45)：**全量回填已完成的 7 项环境基线**。新增 §0.5 起点状态快照（FFmpeg/Python/Docker/PostgreSQL/Gateway/gpt-image-2/CosyVoice 模型）；新增 §3.1.1 mlx-audio 安装任务（v0.1 漏掉，PRD P4 阻塞依赖）；§3.1 修正"docker-compose up"为"验证现有容器 + 补 backup"；§3.3 风险行加 mlx；R1/R2/R3 风险登记已根据 §0.5 重新评估概率
+- v0.1.3 (2026-06-22 13:00)：**阶段 1.1 Git 基座完成**。仓库 https://github.com/JohnSince2019/video-ops.git 首次 commit 82746bd（6 files / 1367 insertions），dev 分支已推送 origin，main 分支等待 Web UI 配置保护规则后再推送。MEMORY.md §2.4 新增 Git 基座状态表 + AI 协作约定

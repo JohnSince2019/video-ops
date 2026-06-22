@@ -4,7 +4,7 @@
 > **不读本文件开始对话 = 必然失智。**
 > **同时请先读 WORKSPACE_MEMORY.md 了解跨项目上下文。**
 
-最后更新：2026-06-22（Sprint 0 启动前，PRD v1.0 已拍板，Q1-Q7 全部确认）
+最后更新：2026-06-22 13:00（Sprint 0 启动前，**阶段 1.1 Git 基座完成**，env baseline 7 项已就绪，PRD v1.0 已拍板，Q1-Q7 全部确认）
 
 ---
 
@@ -79,6 +79,28 @@
 - 这会让 P2 + P3 视觉同质化，V2 时再接入更多图模
 
 **待办**：Sprint 0 在 PRD.md §2 "技术栈"和 §5.2 "P2/P3 模块"加入此修正。
+
+### 2.4 Git 基座就绪（2026-06-22 13:00）
+
+| 项 | 状态 | 验证 |
+|---|------|------|
+| 仓库 | https://github.com/JohnSince2019/video-ops.git | `git ls-remote` HEAD 命中 82746bd |
+| 本地分支 | `main` + `dev` | `git branch -vv` |
+| 远程分支 | `dev` 已推送 | `git push -u origin dev` exit 0 |
+| 凭证机制 | HTTPS + macOS Keychain 缓存 PAT | `git ls-remote` 无需交互 |
+| .gitignore | 通用模板（Node/Python/IDE/调试/ML 模型）| 已提交 |
+| README.md | 项目说明 + 技术栈 + 状态指针 | 已提交 |
+| CHANGELOG.md | Keep a Changelog 格式 | 已提交 |
+| main 保护 | **未配置**（Web UI 操作）| 待办 |
+| main 推送 | **未推送**（等保护配置完）| 待办 |
+
+**首次 commit hash**：`82746bd chore: project init`（6 files / 1367 insertions）
+
+**AI 协作约定（本节新增）**：
+- 任何代码改动**当天必须 commit**（指南 §1.4）
+- commit message 走 Conventional Commits：`feat / fix / docs / chore / refactor / test`
+- dev 分支可直接 push；main 分支必须 PR
+- MEMORY.md / CHANGELOG.md 与代码同步更新
 
 ---
 
