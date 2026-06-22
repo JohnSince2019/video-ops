@@ -1,13 +1,14 @@
 # video-ops Roadmap（实施路径图）
 
-> **文档状态**：草案 v0.1.5（2026-06-22 13:45，**公众号系列激活 + Day 0 草稿 + 每日沉淀节奏**）
-> **最后更新**：2026-06-22 13:45
+> **文档状态**：草案 v0.1.6（2026-06-22 14:35，**双轨并存机制确认**：素材层 video-ops/content/ + 生产层 ContentOps wizard 10 步）
+> **最后更新**：2026-06-22 14:35
 > **维护者**：John
 > **依赖**：PRD v1.0（已拍板）、WORKSPACE_MEMORY.md（§4.1 video-ops 状态）
 > **新仓库**：https://github.com/JohnSince2019/video-ops.git
->   - dev：52597ae docs: 沉淀本次会话进度到 MEMORY
+>   - dev：2092585 feat(content): 公众号系列 Day 0 草稿 + 每日沉淀节奏
 >   - main：已推送（user 标记 done；AI 未直接验证）
 > **公众号系列**：《AI 图文短视频自动混剪系统开发与变现实录》— 2026-06-22 13:45 激活
+> **生产方式**：双轨并存（素材层 + ContentOps wizard 生产层）
 
 ---
 
@@ -458,3 +459,4 @@ scope: gateway / worker / web / docs / infra
 - v0.1.3 (2026-06-22 13:00)：**阶段 1.1 Git 基座完成**。仓库 https://github.com/JohnSince2019/video-ops.git 首次 commit 82746bd（6 files / 1367 insertions），dev 分支已推送 origin，main 分支等待 Web UI 配置保护规则后再推送。MEMORY.md §2.4 新增 Git 基座状态表 + AI 协作约定
 - v0.1.4 (2026-06-22 13:25)：**会话收尾沉淀**。MEMORY.md 新增 2026-06-22 13:25 时戳会录（4 个工作段 + 5 个可复用经验 + 下次会话起点）。微信公众号系列挂起（5 个 TODO cancelled）。本阶段 1.1 闭环：**dev 已推送（eb0dfac），main 已推送（user 标记 done，AI 未直接验证）**，进入阶段 1.2 准备
 - v0.1.5 (2026-06-22 13:45)：**公众号系列激活 + Day 0 草稿 + 每日沉淀节奏**。MEMORY.md 新增 §8.3 每日沉淀约定（4 步 SOP，触发词"今天就这样了"）+ §9 公众号系列状态表；起草第 1 篇草稿 `content/2026-06-22-Day0.md`（《当我让 AI 列"已完成的工作"，它漏了一半》，约 1800 字，待用户审）；CHANGELOG.md 也需同步更新
+- v0.1.6 (2026-06-22 14:35)：**双轨并存机制确认 + AI 错误纠正**。MEMORY.md 新增 §8.3.2 "AI 不绕过 ContentOps wizard" + §9 "双轨并存机制"（素材层 video-ops/content/ + 生产层 ContentOps wizard s1-s10）；Day 0 草稿 frontmatter 重标为"素材 v0（仅存档，非发布版）"；CHANGELOG.md 同步更新。**AI 错误纠正**：未读 contentops-briefing.mdc 就动手写（违反 MEMORY §8.2）

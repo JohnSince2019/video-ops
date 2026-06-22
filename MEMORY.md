@@ -4,7 +4,7 @@
 > **不读本文件开始对话 = 必然失智。**
 > **同时请先读 WORKSPACE_MEMORY.md 了解跨项目上下文。**
 
-最后更新：2026-06-22 13:25（**Sprint 0 进行中**：阶段 1.1 Git 基座完成，dev 推送，main 推送+保护已 done，阶段 1.2 待启动）
+最后更新：2026-06-22 14:35（**公众号双轨并存机制确认**：素材层 video-ops/content/，生产层 ContentOps wizard 10 步，AI 不再绕过 wizard；Day 0 标记为素材 v0 仅存档）
 
 ---
 
@@ -261,6 +261,34 @@ video-ops/
 - **AI 不替你发布**（用户审核前不动手推公众号）
 - **TOC 优先级**：roadmap 当前阶段 > 公众号 > 业务讨论
 - **不要在 roadmap 进行中发"蓝图文"**：等 Sprint 结束再发"进度文"
+- **AI 不绕过 ContentOps wizard**（§8.3.2）：所有公众号发布必须经 wizard s1-s10 流程
+
+**AI 不绕过 ContentOps wizard**（§8.3.2 — **新增 2026-06-22 14:35**）：
+
+> **AI 在素材层（video-ops/content/）起草"素材 v0"是允许的。**
+> **AI 永远不能在生产层（ContentOps wizard）替代用户跑 wizard。**
+> **AI 永远不能直接把"素材 v0"标为"已发布"。**
+
+原因：
+1. ContentOps wizard 是**用户驱动的 10 步流程**，AI 无法替代 UI 操作
+2. wizard 每步有 stepEvaluatorPrompts（key 从 2 开始，见 ContentOps briefing §3.2）评估质量
+3. AI 跳过评估 = 跳过质量门 = 损害"品牌沉淀"目标
+4. AI 不能访问 localhost:3002（ContentOps briefing §AI 不能做 #1）
+
+**正确流程**：
+```
+1. AI 起草素材 v0 → video-ops/content/YYYY-MM-DD-主题.md
+2. AI 提示用户："素材 v0 已就绪，请复制到 ContentOps wizard Step 1"
+3. 用户在 UI 跑 wizard s1-s10（AI 不能替代）
+4. AI 收到"已发布"信号后，更新素材 status: 素材 v0 → 素材 v2（已发布）
+```
+
+**反例**（AI 今天犯的错误，已记录在 Day 0 素材 v0 frontmatter）：
+```
+❌ AI 直接写"我替你写好了，可以直接发"
+❌ AI 把素材 status 标为"草稿（待审）"而非"素材 v0（仅存档）"
+❌ AI 没提示"需走 ContentOps wizard"
+```
 
 **为什么不写进 MEMORY 容易丢**：
 - 公众号节奏最常见的失败模式是"承诺 → 拖延 → 死"
@@ -308,6 +336,49 @@ status: 草稿/已发布
 target_word_count: 字数
 ---
 ```
+
+### 双轨并存机制（**新增 2026-06-22 14:35**）
+
+> 公众号系列**不绕过 ContentOps wizard**。但 AI 起草的素材**不能直接发布**。
+
+| 层 | 位置 | 职责 | 谁写 |
+|---|------|------|------|
+| **素材层** | `video-ops/content/YYYY-MM-DD-主题.md` | 记录原始事件 / 关键细节 / 待组织材料 | AI 起草（草稿） |
+| **生产层** | ContentOps wizard（s1-s10） | 10 步分步骤生成 + 评估 + 发布 | 用户在 UI 跑 wizard |
+
+**素材 → 生产的转化流程**：
+
+```
+素材 v0（video-ops/content/）
+    ↓ 用户把素材内容复制到 ContentOps wizard Step 1（素材收集）
+    ↓ wizard 10 步分步生成（s1→s10）
+    ↓ 每步通过 evaluateStep 评估（key=stepIdx+2，参见 ContentOps briefing §3）
+    ↓ s10 发布到微信公众号
+```
+
+**为什么不让 AI 直接写发布版**：
+1. ContentOps prompt v3.0 有**活人感/散文风/江湖气/啊哈瞬间/暗线**5 大创作基因（ContentOps briefing §Prompt 版本现状），AI 单次生成无法达到
+2. wizard 的 stepEvaluatorPrompts **强制 6 维评估 + 3 大硬规则**（ContentOps briefing §v2.0）
+3. 缺评估 = 缺质量保证 = 公众号读者体验崩塌
+4. AI 跳过 wizard = 跳过质量门 = 损害品牌（与"品牌沉淀"目标冲突）
+
+**素材层文件命名规范**（强制）：
+
+```
+YYYY-MM-DD-Day{N}-{主题}.md
+
+例：
+  2026-06-22-Day0-ai-collaboration-miss.md
+  2026-06-23-Day1-qwen-image-plus-setup.md
+```
+
+**素材层与生产层状态映射**：
+
+| 素材层 status | 生产层 production_status | 含义 |
+|--------------|--------------------------|------|
+| 素材 v0 | 未启动 | AI 起草完毕，未进 wizard |
+| 素材 v1 | 进行中 | 用户正在跑 wizard sN |
+| 素材 v2 | 已发布 | 已发到公众号，保留素材作为历史 |
 
 ### 公众号系列与 roadmap 的关系
 
