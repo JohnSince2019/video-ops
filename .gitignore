@@ -1,0 +1,97 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing & Coverage
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+__debug__/
+debug-*.ts
+debug-*.js
+!debug-index.ts
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+conda-env/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+mlx_audio_cache/
+models/*.bin
+models/*.safetensors
+!models/.gitkeep
+
+# ML Models (large)
+*.pt
+*.pth
+*.onnx
+*.gguf
+*.mlx
+checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.cursor/
+*.iml
+
+# Backups
+*.backup
+*.bak
+*.tmp
+*.orig
+
+# Secrets baseline (指南阶段六)
+.secrets.baseline
+.gitleaks.toml
+
+# Local-only state
+.local/
+.tmp/
+.cache/
