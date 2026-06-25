@@ -1,21 +1,21 @@
 import { Queue } from "bullmq";
-import { redis } from "../redis";
 
 export const VIDEO_JOB_QUEUE_NAME = "video-jobs";
 
-export const videoJobQueue = new Queue(VIDEO_JOB_QUEUE_NAME, {
-  connection: redis,
-  defaultJobOptions: {
-    attempts: 3,
-    removeOnComplete: true,
-    removeOnFail: false,
-    backoff: {
-      type: "exponential",
-      delay: 5000,
+export function createVideoJobQueue() {
+  return new Queue(VIDEO_JOB_QUEUE_NAME, {
+    connection: {
+      host: process.env.REDIS_HOST ?? "127.0.0.1",
+      port: Number(process.env.REDIS_PORT ?? 6379),
     },
-  },
-});
-
-export async function closeVideoJobQueue() {
-  await videoJobQueue.close();
+    defaultJobOptions: {
+      attempts: 3,
+      removeOnComplete: true,
+      removeOnFail: false,
+      backoff: {
+        type: "exponential",
+        delay: 5000,
+      },
+    },
+  });
 }

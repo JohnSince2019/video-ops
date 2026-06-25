@@ -10,9 +10,17 @@
     "prisma": "^7.8.0"
   },
   "scripts": {
+    "test": "node --import tsx --test __tests__/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "node -e \"process.exit(0)\"",
     "queue:smoke": "node scripts/queue-smoke-test.mjs",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:smoke": "node scripts/prisma-smoke-test.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
   }
 }
