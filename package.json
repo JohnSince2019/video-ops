@@ -15,6 +15,7 @@
     "lint": "node -e \"process.exit(0)\"",
     "dev": "node --import tsx server.mjs",
     "queue:smoke": "node scripts/queue-smoke-test.mjs",
+    "idempotency:smoke": "node --import tsx scripts/idempotency-smoke.mjs",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:smoke": "node scripts/prisma-smoke-test.mjs"
