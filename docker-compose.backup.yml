@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: video-ops-postgres-backup
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: video_ops
+      POSTGRES_USER: john
+      POSTGRES_PASSWORD: john
+    ports:
+      - "5432:5432"
+    volumes:
+      - video_ops_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: video-ops-redis-backup
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - video_ops_redis_data:/data
+
+volumes:
+  video_ops_postgres_data:
+  video_ops_redis_data:

@@ -199,7 +199,7 @@ out/
 | 项 | 说明 |
 |------|------|
 | 产出 | `video-ops/{api,worker,web}` 三模块拆分（或单 Next.js monorepo 二选一） |
-| DoD | (1) `docker ps` 验证 PostgreSQL/Redis 已运行（**复用现有容器，**见 §0.5 起点快照） (2) `which ffmpeg` exit 0 (3) `conda run -n video-ops-py python --version` 报 3.11.15 (4) `docker-compose.backup.yml` 已创建（指南 §8） |
+| DoD | (1) `docker ps` 验证 PostgreSQL/Redis 已运行（**复用现有容器，**见 §0.5 起点快照） (2) `which ffmpeg` exit 0 (3) `conda run -n video-ops-py python --version` 报 3.11.15 (4) `docker-compose.backup.yml` 已创建（见 `video-ops/docker-compose.backup.yml`） |
 | 待决定 | 复用 ContentOps 的 Next.js 还是新建？决策记录到 MEMORY.md |
 | 风险 | Python Worker 涉及 mlx-audio + CosyVoice MLX 等重型依赖；CosyVoice 首次启动下载 ~1.2 GB 模型，CI 镜像需排除 |
 | **回填** | ~~"docker-compose up" 端到端启动~~ → 改为"验证现有容器健康 + 补 backup 配置"（因 PostgreSQL/Redis 已在跑，见 §0.5） |
