@@ -1,5 +1,14 @@
 {
   "dependencies": {
-    "@linear/sdk": "^86.0.0"
+    "@linear/sdk": "^86.0.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "pg": "^8.22.0",
+    "prisma": "^7.8.0"
+  },
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "prisma:smoke": "node scripts/prisma-smoke-test.mjs"
   }
 }

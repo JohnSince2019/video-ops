@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum JobState {
+  QUEUED
+  PARSING
+  AI_PROCESSING
+  ASSEMBLING
+  RENDERING
+  POST_PROCESSING
+  COMPLETED
+  FAILED
+  INTERRUPTED
+}
+
+enum RenderProfile {
+  draft
+  standard
+  high_quality
+}
+
+model ContentManifest {
+  id            String   @id @default(cuid())
+  title         String
+  manifestHash  String   @unique
+  rawJson       Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  jobs          RenderJob[]
+  scenes        Scene[]
+
+  @@index([title])
+}
+
+model Scene {
+  id              String   @id @default(cuid())
+  manifestId      String
+  sceneHash       String   @unique
+  sceneIndex      Int
+  narration       String
+  visualHint      String?
+  durationMs      Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  manifest        ContentManifest @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  assets          Asset[]
+
+  @@index([manifestId, sceneIndex])
+}
+
+model Asset {
+  id              String   @id @default(cuid())
+  sceneId         String?
+  assetType       String
+  provider        String?
+  url             String?
+  localPath       String?
+  checksum        String?  @unique
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  scene           Scene?   @relation(fields: [sceneId], references: [id], onDelete: SetNull)
+
+  @@index([sceneId, assetType])
+}
+
+model RenderJob {
+  id              String        @id @default(cuid())
+  manifestId      String
+  ownerTokenHash  String
+  state           JobState      @default(QUEUED)
+  renderProfile   RenderProfile @default(standard)
+  lastCheckpoint  Json?
+  costEstimateUsd Float         @default(0)
+  gptImageCalls   Int           @default(0)
+  wanxCalls       Int           @default(0)
+  ttsDurationSecs Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  startedAt       DateTime?
+  completedAt     DateTime?
+  manifest        ContentManifest @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  outputs         OutputBundle[]
+  errors          JobErrorLog[]
+
+  @@index([manifestId, ownerTokenHash])
+  @@index([state])
+}
+
+model OutputBundle {
+  id              String   @id @default(cuid())
+  jobId           String
+  mp4Path         String?
+  coverPath       String?
+  metadataPath    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  job             RenderJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+}
+
+model JobErrorLog {
+  id              String   @id @default(cuid())
+  jobId           String
+  stepName        String
+  errorMessage    String
+  errorStack      String?
+  retryCount      Int      @default(0)
+  createdAt       DateTime @default(now())
+  job             RenderJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, stepName])
+}
