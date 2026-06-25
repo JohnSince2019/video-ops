@@ -13,6 +13,7 @@
     "test": "node --import tsx --test __tests__/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "node -e \"process.exit(0)\"",
+    "dev": "node --import tsx server.mjs",
     "queue:smoke": "node scripts/queue-smoke-test.mjs",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
