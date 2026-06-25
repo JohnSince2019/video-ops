@@ -1,7 +1,7 @@
 # Milestone 状态追踪
 
 > **用途**：快速查看各 Milestone / Sprint 的实时进度，作为每日 check-in 的主参考。
-> **维护方式**：完成 issue 后用 Linear Web UI 标记 completed，此文件按周更新。
+> **维护方式**：以 Linear 作为唯一进度源，本文件仅做本地镜像与阅读参考。
 
 ---
 
@@ -9,8 +9,8 @@
 
 **Sprint**：Sprint 0
 **目标日期**：2026-06-27
-**总 Issues**：14 | **已完成**：0 / 14
-**总 SP**：11.0 | **已完成 SP**：0.0
+**总 Issues**：14 | **已完成**：3 / 14
+**总 SP**：11.0 | **已完成 SP**：3.0
 
 ---
 
@@ -18,12 +18,12 @@
 
 | # | Linear | 标题 | P | SP | 状态 | 推进顺序 |
 |---|--------|------|---|----|------|---------|
-| 1 | JOH-40 | Prisma + PostgreSQL：数据库 Schema 初始化 | P1 | 1.0 | 🔵 In Progress | 1st |
-| 2 | JOH-22 | BullMQ + Redis：任务队列初始化 | P1 | 1.0 | ⬜ Todo | 2nd |
+| 1 | JOH-40 | Prisma + PostgreSQL：数据库 Schema 初始化 | P1 | 1.0 | ✅ Completed | 1st |
+| 2 | JOH-22 | BullMQ + Redis：任务队列初始化 | P1 | 1.0 | ✅ Completed | 2nd |
 | 3 | JOH-37 | owner token 隔离：X-Owner-Token header + DB hash | P1 | 0.5 | ⬜ Todo | 3rd |
-| 4 | JOH-23 | JobState：状态机（7 个状态流转） | P1 | 1.0 | ⬜ Todo | 4th |
+| 4 | JOH-23 | JobState：状态机（7 个状态流转） | P1 | 1.0 | ✅ Completed | 4th |
 | 5 | JOH-42 | GitHub Actions CI：lint + type-check + test + 覆盖率 >= 60% | P1 | 1.0 | ⬜ Todo | 5th |
-| 6 | JOH-24 | SSE 实时推送：任务进度 WebSocket | P2 | 1.0 | ⬜ Todo | 6th |
+| 6 | JOH-24 | SSE 实时推送：任务进度 WebSocket | P2 | 1.0 | 🔵 In Progress | 6th |
 | 7 | JOH-25 | 断点续跑：manifestHash + ownerToken 幂等检查 | P2 | 1.0 | ⬜ Todo | 7th |
 | 8 | JOH-26 | 成本估算：API 调用计数 + usd 估算 | P2 | 1.0 | ⬜ Todo | 8th |
 | 9 | JOH-27 | 队列积压保护：50 任务上限 + 内存 12GB 阈值 | P2 | 0.5 | ⬜ Todo | 9th |
@@ -105,7 +105,7 @@
 
 | Milestone | Sprint | Issues | Done | SP Total | SP Done | 目标日期 | 状态 |
 |-----------|--------|--------|------|---------|---------|---------|------|
-| M0 - Foundation | Sprint 0 | 14 | 0 | 11.0 | 0.0 | 2026-06-27 | 🔵 进行中 |
+| M0 - Foundation | Sprint 0 | 14 | 3 | 11.0 | 3.0 | 2026-06-27 | 🔵 进行中 |
 | M1 - Core Pipeline | Sprint 1 | 13 | 0 | 13.5 | 0.0 | — | ⬜ 未开始 |
 | M1 - Core Pipeline | Sprint 2 | 7 | 0 | 6.5 | 0.0 | — | ⌛ 等待 |
 | M2 - Product | Sprint 3 | 5 | 0 | 4.5 | 0.0 | 2026-08-22 | ⬜ 未开始 |

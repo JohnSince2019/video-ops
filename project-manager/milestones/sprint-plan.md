@@ -2,7 +2,7 @@
 
 > **用途**：PM 主控面板，解决 Linear 序号（JOH-40 / JOH-22）看不出推进顺序的问题。
 > **数据来源**：Linear API（2026-06-22 19:20）
-> **维护方式**：每完成一个 issue 后更新 `is`（In Sprint）、`status` 列；新增 issue 后在此文件追加。
+> **维护方式**：以 Linear 为唯一进度源，本文件只保留推荐顺序与本地镜像说明。
 
 ---
 
@@ -75,16 +75,16 @@ JOH-16 (VideoAssembler) ←───────────────┘
 
 | # | Linear | 标题 | P | SP | 状态 | 推进原因 | 依赖 |
 |---|--------|------|---|----|------|---------|------|
-| 1 | JOH-40 | Prisma + PostgreSQL：数据库 Schema 初始化 | P1 | 1.0 | 🔵 In Progress | 所有模块都依赖 Schema；JobState / Asset / JobErrorLog 表必须先建 | 无 |
+| 1 | JOH-40 | Prisma + PostgreSQL：数据库 Schema 初始化 | P1 | 1.0 | ✅ Completed | 所有模块都依赖 Schema；JobState / Asset / JobErrorLog 表必须先建 | 无 |
 | 2 | JOH-37 | owner token 隔离：X-Owner-Token header + DB hash | P1 | 0.5 | ⬜ Todo | Auth 模块，Schema 建好后立刻做；不影响关键路径宽度 | JOH-40 |
-| 3 | JOH-22 | BullMQ + Redis：任务队列初始化 | P1 | 1.0 | ⬜ Todo | 整个 Worker 调度核心；其余队列相关 tasks（JOH-23/24/25/26/27）全依赖它 | JOH-40 |
+| 3 | JOH-22 | BullMQ + Redis：任务队列初始化 | P1 | 1.0 | ✅ Completed | 整个 Worker 调度核心；其余队列相关 tasks（JOH-23/24/25/26/27）全依赖它 | JOH-40 |
 
 ### 阶段 0.2 · 队列上层（依赖 JOH-22）
 
 | # | Linear | 标题 | P | SP | 状态 | 推进原因 | 依赖 |
 |---|--------|------|---|----|------|---------|------|
-| 4 | JOH-23 | JobState：状态机（7 个状态流转） | P1 | 1.0 | ⬜ Todo | JobState 表 + 状态流转逻辑；断点续跑的基础 | JOH-22 |
-| 5 | JOH-24 | SSE 实时推送：任务进度 WebSocket | P2 | 1.0 | ⬜ Todo | 用户体验层；队列就绪后做，不卡关键路径 | JOH-22 |
+| 4 | JOH-23 | JobState：状态机（7 个状态流转） | P1 | 1.0 | ✅ Completed | JobState 表 + 状态流转逻辑；断点续跑的基础 | JOH-22 |
+| 5 | JOH-24 | SSE 实时推送：任务进度 WebSocket | P2 | 1.0 | 🔵 In Progress | 用户体验层；队列就绪后做，不卡关键路径 | JOH-22 |
 | 6 | JOH-25 | 断点续跑：manifestHash + ownerToken 幂等检查 | P2 | 1.0 | ⬜ Todo | 依赖 JobState 状态机；队列重跑逻辑 | JOH-23 |
 | 7 | JOH-26 | 成本估算：API 调用计数 + usd 估算 | P2 | 1.0 | ⬜ Todo | 独立模块；队列就绪后可并行做 | JOH-22 |
 | 8 | JOH-27 | 队列积压保护：50 任务上限 + 内存 12GB 阈值 | P2 | 0.5 | ⬜ Todo | 资源保护；队列初始化后立刻做 | JOH-22 |
