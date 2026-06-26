@@ -10,8 +10,8 @@
 
 | Milestone | Sprint | Issues | Total SP | 目标日期 | 状态 |
 |-----------|--------|--------|---------|---------|------|
-| M0 - Foundation | Sprint 0 | 14 | 11.0 | 2026-06-27 | 🔵 进行中 |
-| M1 - Core Pipeline | Sprint 1 | 13 | 13.5 | — | ⬜ 未开始 |
+| M0 - Foundation | Sprint 0 | 14 | 11.0 | 2026-06-27 | ✅ 已完成 |
+| M1 - Core Pipeline | Sprint 1 | 13 | 13.5 | — | 🔵 进行中 |
 | M1 - Core Pipeline | Sprint 2 | 7 | 6.5 | — | ⌛ 等待 |
 | M2 - Product | Sprint 3 | 5 | 4.5 | 2026-08-22 | ⬜ 未开始 |
 | **合计** | | **39** | **35.5 SP** | | |
@@ -76,7 +76,7 @@ JOH-16 (VideoAssembler) ←───────────────┘
 | # | Linear | 标题 | P | SP | 状态 | 推进原因 | 依赖 |
 |---|--------|------|---|----|------|---------|------|
 | 1 | JOH-40 | Prisma + PostgreSQL：数据库 Schema 初始化 | P1 | 1.0 | ✅ Completed | 所有模块都依赖 Schema；JobState / Asset / JobErrorLog 表必须先建 | 无 |
-| 2 | JOH-37 | owner token 隔离：X-Owner-Token header + DB hash | P1 | 0.5 | ⬜ Todo | Auth 模块，Schema 建好后立刻做；不影响关键路径宽度 | JOH-40 |
+| 2 | JOH-37 | owner token 隔离：X-Owner-Token header + DB hash | P1 | 0.5 | ✅ Completed | Auth 模块，Schema 建好后立刻做；不影响关键路径宽度 | JOH-40 |
 | 3 | JOH-22 | BullMQ + Redis：任务队列初始化 | P1 | 1.0 | ✅ Completed | 整个 Worker 调度核心；其余队列相关 tasks（JOH-23/24/25/26/27）全依赖它 | JOH-40 |
 
 ### 阶段 0.2 · 队列上层（依赖 JOH-22）
@@ -84,21 +84,21 @@ JOH-16 (VideoAssembler) ←───────────────┘
 | # | Linear | 标题 | P | SP | 状态 | 推进原因 | 依赖 |
 |---|--------|------|---|----|------|---------|------|
 | 4 | JOH-23 | JobState：状态机（7 个状态流转） | P1 | 1.0 | ✅ Completed | JobState 表 + 状态流转逻辑；断点续跑的基础 | JOH-22 |
-| 5 | JOH-24 | SSE 实时推送：任务进度 WebSocket | P2 | 1.0 | 🔵 In Progress | 用户体验层；队列就绪后做，不卡关键路径 | JOH-22 |
-| 6 | JOH-25 | 断点续跑：manifestHash + ownerToken 幂等检查 | P2 | 1.0 | ⬜ Todo | 依赖 JobState 状态机；队列重跑逻辑 | JOH-23 |
-| 7 | JOH-26 | 成本估算：API 调用计数 + usd 估算 | P2 | 1.0 | ⬜ Todo | 独立模块；队列就绪后可并行做 | JOH-22 |
-| 8 | JOH-27 | 队列积压保护：50 任务上限 + 内存 12GB 阈值 | P2 | 0.5 | ⬜ Todo | 资源保护；队列初始化后立刻做 | JOH-22 |
-| 9 | JOH-38 | Upstash Redis Rate Limiting（20 req/min/IP） | P2 | 0.5 | ⬜ Todo | 安全防护；队列积压保护之后做 | JOH-27 |
+| 5 | JOH-24 | SSE 实时推送：任务进度 WebSocket | P2 | 1.0 | ✅ Completed | 用户体验层；队列就绪后做，不卡关键路径 | JOH-22 |
+| 6 | JOH-25 | 断点续跑：manifestHash + ownerToken 幂等检查 | P2 | 1.0 | ✅ Completed | 依赖 JobState 状态机；队列重跑逻辑 | JOH-23 |
+| 7 | JOH-26 | 成本估算：API 调用计数 + usd 估算 | P2 | 1.0 | ✅ Completed | 独立模块；队列就绪后可并行做 | JOH-22 |
+| 8 | JOH-27 | 队列积压保护：50 任务上限 + 内存 12GB 阈值 | P2 | 0.5 | ✅ Completed | 资源保护；队列初始化后立刻做 | JOH-22 |
+| 9 | JOH-38 | Upstash Redis Rate Limiting（20 req/min/IP） | P2 | 0.5 | ✅ Completed | 安全防护；队列积压保护之后做 | JOH-27 |
 
 ### 阶段 0.3 · 安全 + CI（可与 0.1-0.2 并行，不卡关键路径）
 
 | # | Linear | 标题 | P | SP | 状态 | 推进原因 | 依赖 |
 |---|--------|------|---|----|------|---------|------|
-| 10 | JOH-42 | GitHub Actions CI：lint + type-check + test + 覆盖率 >= 60% | P1 | 1.0 | ⬜ Todo | 不依赖任何模块，随时可做；CI 跑通后每次 commit 自动检查 | 无 |
-| 11 | JOH-41 | Docker：Redis + PostgreSQL 开发环境 docker-compose | P1 | 0.5 | ⬜ Todo | 复用现有容器（已在跑）；只需补 backup 配置 | 无 |
-| 12 | JOH-39 | 合规检查：正则 + 关键词黑名单（Worker 端执行） | P2 | 1.0 | ⬜ Todo | 内容安全；独立模块，可与任何阶段并行 | 无 |
-| 13 | JOH-43 | GitHub Actions：secret-scan.yml 密钥泄露扫描 | P2 | 0.5 | ⬜ Todo | CI 完成后追加；与 JOH-42 同一套 workflow | JOH-42 |
-| 14 | JOH-44 | GitHub Actions：release.yml main 合并构建发布 | P2 | 0.5 | ⬜ Todo | CI 完成后追加；与 JOH-42 同一套 workflow | JOH-42 |
+| 10 | JOH-42 | GitHub Actions CI：lint + type-check + test + 覆盖率 >= 60% | P1 | 1.0 | ✅ Completed | 不依赖任何模块，随时可做；CI 跑通后每次 commit 自动检查 | 无 |
+| 11 | JOH-41 | Docker：Redis + PostgreSQL 开发环境 docker-compose | P1 | 0.5 | ✅ Completed | 复用现有容器（已在跑）；只需补 backup 配置 | 无 |
+| 12 | JOH-39 | 合规检查：正则 + 关键词黑名单（Worker 端执行） | P2 | 1.0 | ✅ Completed | 内容安全；独立模块，可与任何阶段并行 | 无 |
+| 13 | JOH-43 | GitHub Actions：secret-scan.yml 密钥泄露扫描 | P2 | 0.5 | ✅ Completed | CI 完成后追加；与 JOH-42 同一套 workflow | JOH-42 |
+| 14 | JOH-44 | GitHub Actions：release.yml main 合并构建发布 | P2 | 0.5 | ✅ Completed | CI 完成后追加；与 JOH-42 同一套 workflow | JOH-42 |
 
 ---
 
@@ -106,13 +106,13 @@ JOH-16 (VideoAssembler) ←───────────────┘
 
 **目标**：端到端可生成 mp4（文案 → 图片 → 配音 → 合成）。
 **前置**：Sprint 0 完成（JOH-40 / JOH-22 / JOH-23 必须完成）。
-**总 SP**：13.5 | **完成**：0 / 13
+**总 SP**：13.5 | **完成**：1 / 13
 
 ### 阶段 1.1 · 内容解析（关键路径头部）
 
 | # | Linear | 标题 | P | SP | 状态 | 推进原因 | 依赖 |
 |---|--------|------|---|----|------|---------|------|
-| 15 | JOH-10 | Schema 类型定义（`lib/types/manifest.ts`） | P2 | 0.5 | ⬜ Todo | 所有 pipeline 模块的输入类型基准；必须最先做 | 无 |
+| 15 | JOH-10 | Schema 类型定义（`lib/types/manifest.ts`） | P2 | 0.5 | ✅ Completed | 所有 pipeline 模块的输入类型基准；必须最先做 | 无 |
 | 16 | JOH-7 | TextParser：Markdown → SceneGraph 解析 | P1 | 2.0 | ⬜ Todo | 整个 pipeline 的入口 P1；后续所有步骤的输入来源 | JOH-10 |
 | 17 | JOH-6 | TextParser：ContentManifest JSON Schema 验证 | P1 | 1.0 | ⬜ Todo | JSON 格式的显式验证；标准入口格式 | JOH-10 |
 | 18 | JOH-8 | TextParser：TXT 纯文本逐句切割（fallback） | P2 | 1.0 | ⬜ Todo | 最简场景兜底；内容解析模块完成后做 | JOH-7 |
@@ -209,4 +209,4 @@ JOH-16 (VideoAssembler) ←───────────────┘
 
 ---
 
-*最后更新：2026-06-22 19:20 · 数据来源：Linear API*
+*最后更新：2026-06-26 19:20 · 数据来源：Linear API*

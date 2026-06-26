@@ -9,8 +9,8 @@
 
 **Sprint**：Sprint 0
 **目标日期**：2026-06-27
-**总 Issues**：14 | **已完成**：3 / 14
-**总 SP**：11.0 | **已完成 SP**：3.0
+**总 Issues**：14 | **已完成**：14 / 14
+**总 SP**：11.0 | **已完成 SP**：11.0
 
 ---
 
@@ -20,32 +20,32 @@
 |---|--------|------|---|----|------|---------|
 | 1 | JOH-40 | Prisma + PostgreSQL：数据库 Schema 初始化 | P1 | 1.0 | ✅ Completed | 1st |
 | 2 | JOH-22 | BullMQ + Redis：任务队列初始化 | P1 | 1.0 | ✅ Completed | 2nd |
-| 3 | JOH-37 | owner token 隔离：X-Owner-Token header + DB hash | P1 | 0.5 | ⬜ Todo | 3rd |
+| 3 | JOH-37 | owner token 隔离：X-Owner-Token header + DB hash | P1 | 0.5 | ✅ Completed | 3rd |
 | 4 | JOH-23 | JobState：状态机（7 个状态流转） | P1 | 1.0 | ✅ Completed | 4th |
-| 5 | JOH-42 | GitHub Actions CI：lint + type-check + test + 覆盖率 >= 60% | P1 | 1.0 | ⬜ Todo | 5th |
-| 6 | JOH-24 | SSE 实时推送：任务进度 WebSocket | P2 | 1.0 | 🔵 In Progress | 6th |
-| 7 | JOH-25 | 断点续跑：manifestHash + ownerToken 幂等检查 | P2 | 1.0 | ⬜ Todo | 7th |
-| 8 | JOH-26 | 成本估算：API 调用计数 + usd 估算 | P2 | 1.0 | ⬜ Todo | 8th |
-| 9 | JOH-27 | 队列积压保护：50 任务上限 + 内存 12GB 阈值 | P2 | 0.5 | ⬜ Todo | 9th |
-| 10 | JOH-38 | Upstash Redis Rate Limiting（20 req/min/IP） | P2 | 0.5 | ⬜ Todo | 10th |
-| 11 | JOH-41 | Docker：Redis + PostgreSQL 开发环境 docker-compose | P1 | 0.5 | ⬜ Todo | 11th |
-| 12 | JOH-39 | 合规检查：正则 + 关键词黑名单（Worker 端执行） | P2 | 1.0 | ⬜ Todo | 12th |
-| 13 | JOH-43 | GitHub Actions：secret-scan.yml 密钥泄露扫描 | P2 | 0.5 | ⬜ Todo | 13th |
-| 14 | JOH-44 | GitHub Actions：release.yml main 合并构建发布 | P2 | 0.5 | ⬜ Todo | 14th |
+| 5 | JOH-42 | GitHub Actions CI：lint + type-check + test + 覆盖率 >= 60% | P1 | 1.0 | ✅ Completed | 5th |
+| 6 | JOH-24 | SSE 实时推送：任务进度 WebSocket | P2 | 1.0 | ✅ Completed | 6th |
+| 7 | JOH-25 | 断点续跑：manifestHash + ownerToken 幂等检查 | P2 | 1.0 | ✅ Completed | 7th |
+| 8 | JOH-26 | 成本估算：API 调用计数 + usd 估算 | P2 | 1.0 | ✅ Completed | 8th |
+| 9 | JOH-27 | 队列积压保护：50 任务上限 + 内存 12GB 阈值 | P2 | 0.5 | ✅ Completed | 9th |
+| 10 | JOH-38 | Upstash Redis Rate Limiting（20 req/min/IP） | P2 | 0.5 | ✅ Completed | 10th |
+| 11 | JOH-41 | Docker：Redis + PostgreSQL 开发环境 docker-compose | P1 | 0.5 | ✅ Completed | 11th |
+| 12 | JOH-39 | 合规检查：正则 + 关键词黑名单（Worker 端执行） | P2 | 1.0 | ✅ Completed | 12th |
+| 13 | JOH-43 | GitHub Actions：secret-scan.yml 密钥泄露扫描 | P2 | 0.5 | ✅ Completed | 13th |
+| 14 | JOH-44 | GitHub Actions：release.yml main 合并构建发布 | P2 | 0.5 | ✅ Completed | 14th |
 
 **Sprint 0 关键路径**：`JOH-40 → JOH-22 → JOH-23`（必须按顺序完成）
 
 ---
 
-### M0 - Foundation · Sprint 1（未开始）
+### M0 - Foundation · Sprint 1（进行中）
 
 **目标日期**：2026-07-25
-**总 Issues**：13 | **已完成**：0 / 13
-**总 SP**：13.5 | **已完成 SP**：0.0
+**总 Issues**：13 | **已完成**：1 / 13
+**总 SP**：13.5 | **已完成 SP**：0.5
 
 | # | Linear | 标题 | P | SP | 状态 | 推进顺序 |
 |---|--------|------|---|----|------|---------|
-| 15 | JOH-10 | Schema 类型定义（`lib/types/manifest.ts`） | P2 | 0.5 | ⬜ Todo | 1st |
+| 15 | JOH-10 | Schema 类型定义（`lib/types/manifest.ts`） | P2 | 0.5 | ✅ Completed | 1st |
 | 16 | JOH-7 | TextParser：Markdown → SceneGraph 解析 | P1 | 2.0 | ⬜ Todo | 2nd |
 | 17 | JOH-6 | TextParser：ContentManifest JSON Schema 验证 | P1 | 1.0 | ⬜ Todo | 3rd |
 | 18 | JOH-11 | ImageGenerator：GPT Image 2 调用（P2） | P1 | 1.0 | ⬜ Todo | 4th |
@@ -105,11 +105,11 @@
 
 | Milestone | Sprint | Issues | Done | SP Total | SP Done | 目标日期 | 状态 |
 |-----------|--------|--------|------|---------|---------|---------|------|
-| M0 - Foundation | Sprint 0 | 14 | 3 | 11.0 | 3.0 | 2026-06-27 | 🔵 进行中 |
-| M1 - Core Pipeline | Sprint 1 | 13 | 0 | 13.5 | 0.0 | — | ⬜ 未开始 |
+| M0 - Foundation | Sprint 0 | 14 | 14 | 11.0 | 11.0 | 2026-06-27 | ✅ 已完成 |
+| M1 - Core Pipeline | Sprint 1 | 13 | 1 | 13.5 | 0.5 | — | 🔵 进行中 |
 | M1 - Core Pipeline | Sprint 2 | 7 | 0 | 6.5 | 0.0 | — | ⌛ 等待 |
 | M2 - Product | Sprint 3 | 5 | 0 | 4.5 | 0.0 | 2026-08-22 | ⬜ 未开始 |
-| **总计** | | **39** | **0** | **35.5** | **0.0** | | |
+| **总计** | | **39** | **15** | **35.5** | **11.5** | | |
 
 ---
 
@@ -125,4 +125,4 @@
 
 ---
 
-*最后更新：2026-06-22 19:20*
+*最后更新：2026-06-26 19:20*

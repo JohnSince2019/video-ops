@@ -17,6 +17,10 @@
     "dev": "node --import tsx server.mjs",
     "queue:smoke": "node scripts/queue-smoke-test.mjs",
     "idempotency:smoke": "node --import tsx scripts/idempotency-smoke.mjs",
+    "compliance:smoke": "node --import tsx scripts/compliance-smoke.mjs",
+    "cost:smoke": "node --import tsx scripts/cost-smoke.mjs",
+    "queue-guard:smoke": "node --import tsx scripts/queue-guard-smoke.mjs",
+    "rate-limit:smoke": "node --import tsx scripts/rate-limit-smoke.mjs",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:smoke": "node scripts/prisma-smoke-test.mjs"
