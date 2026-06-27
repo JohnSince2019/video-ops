@@ -25,6 +25,7 @@ export type GenerateTtsResult = {
   format: "wav";
   cloneMode: "standard" | "zero_shot";
   referenceAudioPath?: string;
+  providerMetadata?: import("../providers/provider-types.js").ProviderExecutionMetadata;
 };
 
 export type TtsRunner = (command: {

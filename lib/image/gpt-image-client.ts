@@ -40,6 +40,7 @@ export type GenerateImageResult = {
     b64_json?: string;
     artifactKey: string;
   }>;
+  providerMetadata?: import("../providers/provider-types.js").ProviderExecutionMetadata;
 };
 
 export type GatewayFetch = typeof fetch;
