@@ -277,8 +277,24 @@ function renderWizardPage() {
               </select>
             </div>
             <div class="field">
+              <label for="voiceMode">声音方案 Voice Mode</label>
+              <select id="voiceMode">
+                <option value="male_coach_deep" selected>male_coach_deep</option>
+                <option value="male_clear_teacher">male_clear_teacher</option>
+                <option value="female_warm_narrator">female_warm_narrator</option>
+                <option value="female_energetic_creator">female_energetic_creator</option>
+                <option value="male_storytelling_soft">male_storytelling_soft</option>
+                <option value="custom_reference">custom_reference</option>
+              </select>
+            </div>
+            <div class="field">
               <label for="ownerToken">Owner Token</label>
               <input id="ownerToken" placeholder="例如：john-mobile-studio" />
+            </div>
+            <div class="field">
+              <label for="customVoiceReference">自定义声音参考 Custom Voice Reference</label>
+              <input id="customVoiceReference" placeholder="例如：john-reference.wav" />
+              <div class="hint">仅支持你本人或已明确授权的声音参考。后续会接入类似剪映的录入与克隆体验。</div>
             </div>
             <div class="field full">
               <label for="scriptText">脚本文本 Script</label>
@@ -289,6 +305,12 @@ function renderWizardPage() {
               <div class="summary-item">
                 <b style="display:block;margin-bottom:8px">John Style Notes</b>
                 <p>当前视觉方案会把画面约束为 John 的竖屏漫画讲解风格：暖色办公/训练场景、漫画人物、字幕安全区保留、禁止复制平台 UI、水印和账号元素。</p>
+              </div>
+            </div>
+            <div class="field full">
+              <div class="summary-item">
+                <b style="display:block;margin-bottom:8px">Voice Authorization</b>
+                <p>Only clone John's own voice or a voice with explicit permission. Do not clone unauthorized third-party voices.</p>
               </div>
             </div>
           </div>
@@ -314,7 +336,7 @@ function renderWizardPage() {
       </section>
 
       <script>
-        const ids = ["title", "author", "platform", "renderProfile", "scriptMode", "stylePreset", "personaPreset", "ownerToken", "scriptText"];
+        const ids = ["title", "author", "platform", "renderProfile", "scriptMode", "stylePreset", "personaPreset", "voiceMode", "ownerToken", "customVoiceReference", "scriptText"];
         const statusEl = document.getElementById("status");
         const summaryList = document.getElementById("summaryList");
         const errorList = document.getElementById("errorList");
@@ -390,7 +412,9 @@ function renderWizardPage() {
           document.getElementById("scriptMode").value = "plain_text";
           document.getElementById("stylePreset").value = "john_vertical_comic";
           document.getElementById("personaPreset").value = "john_persona_v1";
+          document.getElementById("voiceMode").value = "male_coach_deep";
           document.getElementById("ownerToken").value = "john-ai-lab";
+          document.getElementById("customVoiceReference").value = "";
           document.getElementById("scriptText").value = "第一段：为什么高强度脑力工作者需要工作流级 AI。\\n\\n第二段：Atlas 如何帮你把内容生产拆成可执行步骤。\\n\\n第三段：为什么视频化表达能放大你的副业影响力。";
           await sync();
         });

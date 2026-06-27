@@ -43,6 +43,8 @@ test("normalizes valid wizard input into a draft payload", () => {
   assert.equal(draft.ownerToken, "owner-token-001");
   assert.equal(draft.stylePreset, "john_vertical_comic");
   assert.equal(draft.personaPreset, "john_persona_v1");
+  assert.equal(draft.voiceMode, "male_coach_deep");
+  assert.equal(draft.ttsVoice, "zh-CN-male-yunze");
   assert.equal(draft.estimatedScenes, 3);
 });
 
@@ -64,9 +66,12 @@ test("summary includes platform, profile, script mode, and estimated scene count
   assert.equal(summary.scriptMode, "markdown");
   assert.equal(summary.stylePreset, "john_vertical_comic");
   assert.equal(summary.personaPreset, "john_persona_v1");
+  assert.equal(summary.voiceMode, "male_coach_deep");
+  assert.equal(summary.ttsVoice, "zh-CN-male-yunze");
   assert.equal(summary.estimatedScenes, 2);
   assert.equal(summary.checklist.includes("Platform: xiaohongshu"), true);
   assert.equal(summary.checklist.includes("Style preset: john_vertical_comic"), true);
+  assert.equal(summary.checklist.includes("Voice mode: male_coach_deep"), true);
 });
 
 test("plain text scene markers are counted as explicit scenes", () => {

@@ -10,6 +10,14 @@ import {
   type PersonaPresetId,
   type StylePresetId,
 } from "../image/style-presets.js";
+import {
+  CUSTOM_VOICE_MODE,
+  VOICE_PRESET_IDS,
+  getVoicePreset,
+  isCustomVoiceMode,
+  type VoiceMode,
+  type VoicePresetId,
+} from "../audio/voice-presets.js";
 
 export const SCRIPT_MODES = ["markdown", "plain_text"] as const;
 
@@ -25,6 +33,8 @@ export type WizardConfigInput = {
   scriptMode?: string;
   stylePreset?: string;
   personaPreset?: string;
+  voiceMode?: string;
+  customVoiceReference?: string;
 };
 
 export type WizardConfigDraft = {
@@ -37,6 +47,9 @@ export type WizardConfigDraft = {
   scriptMode: ScriptMode;
   stylePreset: StylePresetId;
   personaPreset: PersonaPresetId;
+  voiceMode: VoiceMode;
+  customVoiceReference?: string;
+  ttsVoice: string;
   estimatedScenes: number;
 };
 
@@ -48,6 +61,9 @@ export type WizardSummary = {
   scriptMode: ScriptMode;
   stylePreset: StylePresetId;
   personaPreset: PersonaPresetId;
+  voiceMode: VoiceMode;
+  customVoiceReference?: string;
+  ttsVoice: string;
   estimatedScenes: number;
   scriptCharacters: number;
   checklist: string[];
@@ -58,6 +74,7 @@ const DEFAULT_RENDER_PROFILE: RenderProfile = "standard";
 const DEFAULT_SCRIPT_MODE: ScriptMode = "plain_text";
 const DEFAULT_STYLE_PRESET: StylePresetId = "john_vertical_comic";
 const DEFAULT_PERSONA_PRESET: PersonaPresetId = "john_persona_v1";
+const DEFAULT_VOICE_MODE: VoicePresetId = "male_coach_deep";
 
 function estimateScenes(scriptText: string, scriptMode: ScriptMode) {
   const normalized = scriptText.trim();
@@ -113,6 +130,8 @@ export function validateWizardConfig(input: WizardConfigInput) {
   const scriptMode = input.scriptMode?.trim() ?? DEFAULT_SCRIPT_MODE;
   const stylePreset = input.stylePreset?.trim() ?? DEFAULT_STYLE_PRESET;
   const personaPreset = input.personaPreset?.trim() ?? DEFAULT_PERSONA_PRESET;
+  const voiceMode = input.voiceMode?.trim() ?? DEFAULT_VOICE_MODE;
+  const customVoiceReference = input.customVoiceReference?.trim();
 
   if (!title) {
     errors.push("title is required");
@@ -136,6 +155,15 @@ export function validateWizardConfig(input: WizardConfigInput) {
 
   if (!PERSONA_PRESET_IDS.includes(personaPreset as PersonaPresetId)) {
     errors.push(`personaPreset must be one of: ${PERSONA_PRESET_IDS.join(", ")}`);
+  }
+
+  const isPresetVoice = VOICE_PRESET_IDS.includes(voiceMode as VoicePresetId);
+  if (!isPresetVoice && !isCustomVoiceMode(voiceMode)) {
+    errors.push(`voiceMode must be one of: ${[...VOICE_PRESET_IDS, CUSTOM_VOICE_MODE].join(", ")}`);
+  }
+
+  if (isCustomVoiceMode(voiceMode) && !customVoiceReference) {
+    errors.push("customVoiceReference is required when voiceMode is custom_reference");
   }
 
   if (!author) {
@@ -164,6 +192,10 @@ export function normalizeWizardConfig(input: WizardConfigInput): WizardConfigDra
 
   const scriptMode = (input.scriptMode?.trim() ?? DEFAULT_SCRIPT_MODE) as ScriptMode;
   const scriptText = input.scriptText!.trim();
+  const voiceMode = (input.voiceMode?.trim() ?? DEFAULT_VOICE_MODE) as VoiceMode;
+  const ttsVoice = isCustomVoiceMode(voiceMode)
+    ? "custom-reference-voice"
+    : getVoicePreset(voiceMode).ttsVoice;
 
   return {
     title: input.title!.trim(),
@@ -175,6 +207,9 @@ export function normalizeWizardConfig(input: WizardConfigInput): WizardConfigDra
     scriptMode,
     stylePreset: (input.stylePreset?.trim() ?? DEFAULT_STYLE_PRESET) as StylePresetId,
     personaPreset: (input.personaPreset?.trim() ?? DEFAULT_PERSONA_PRESET) as PersonaPresetId,
+    voiceMode,
+    customVoiceReference: input.customVoiceReference?.trim() || undefined,
+    ttsVoice,
     estimatedScenes: estimateScenes(scriptText, scriptMode),
   };
 }
@@ -188,6 +223,9 @@ export function summarizeWizardConfig(input: WizardConfigDraft): WizardSummary {
     scriptMode: input.scriptMode,
     stylePreset: input.stylePreset,
     personaPreset: input.personaPreset,
+    voiceMode: input.voiceMode,
+    customVoiceReference: input.customVoiceReference,
+    ttsVoice: input.ttsVoice,
     estimatedScenes: input.estimatedScenes,
     scriptCharacters: input.scriptText.length,
     checklist: [
@@ -196,6 +234,8 @@ export function summarizeWizardConfig(input: WizardConfigDraft): WizardSummary {
       `Script mode: ${input.scriptMode}`,
       `Style preset: ${input.stylePreset}`,
       `Persona preset: ${input.personaPreset}`,
+      `Voice mode: ${input.voiceMode}`,
+      `TTS voice: ${input.ttsVoice}`,
       `Estimated scenes: ${input.estimatedScenes}`,
     ],
   };
