@@ -51,6 +51,15 @@ function estimateScenes(scriptText: string, scriptMode: ScriptMode) {
     return 0;
   }
 
+  const explicitSceneMarkers = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => /^scene\s+(\d+|[a-z0-9_-]+)/i.test(line)).length;
+
+  if (explicitSceneMarkers > 0) {
+    return explicitSceneMarkers;
+  }
+
   if (scriptMode === "markdown") {
     const headingScenes = normalized
       .split(/\n+/)

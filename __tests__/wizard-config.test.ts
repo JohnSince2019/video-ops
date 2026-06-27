@@ -63,3 +63,26 @@ test("summary includes platform, profile, script mode, and estimated scene count
   assert.equal(summary.estimatedScenes, 2);
   assert.equal(summary.checklist.includes("Platform: xiaohongshu"), true);
 });
+
+test("plain text scene markers are counted as explicit scenes", () => {
+  const draft = normalizeWizardConfig({
+    title: "Bench Press Demo",
+    platform: "douyin",
+    renderProfile: "standard",
+    author: "John",
+    ownerToken: "owner-bench-001",
+    scriptText: [
+      "Scene 1",
+      "narration: 第一幕",
+      "",
+      "Scene 2",
+      "narration: 第二幕",
+      "",
+      "Scene 3",
+      "narration: 第三幕",
+    ].join("\n"),
+    scriptMode: "plain_text",
+  });
+
+  assert.equal(draft.estimatedScenes, 3);
+});
