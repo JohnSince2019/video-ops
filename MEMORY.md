@@ -4,7 +4,7 @@
 > **不读本文件开始对话 = 必然失智。**
 > **同时请先读 WORKSPACE_MEMORY.md 了解跨项目上下文。**
 
-最后更新：2026-06-22 19:20（阶段 2.2 完成：Linear 39 issues 导入；阶段 2.3 完成：3 Milestones 创建 + 全部关联；project-manager/milestones/ 文档完成）
+最后更新：2026-06-27 10:20（Sprint 0 / 1 / 2 核心能力完成；Sprint 3 UI 原型与合规导出落地）
 
 ---
 
@@ -22,7 +22,25 @@
 - 两者共享 LLM Gateway 作为 AI 图片生成调用层
 - LLM Gateway 无 TTS 能力，video-ops 独立使用 CosyVoice 3.0 MLX
 
-**当前阶段**：PRD v1.0 已拍板（Q1-Q7 全部确认），可以启动 Sprint 0。
+**当前阶段**：原始 39 张 video-ops backlog 已基本完成实现；当前已进入更高层产品化迭代。
+
+### 1.1 当前本地可运行入口（2026-06-27）
+
+- `http://localhost:3001/`：Wizard 配置页
+- `http://localhost:3001/jobs`：任务管理面板
+- `http://localhost:3001/storyboard`：Storyboard 预览页
+- `http://localhost:3001/compliance-report`：合规报告导出页
+- `http://localhost:3001/demo`：SSE 进度流演示页
+
+### 1.2 已补齐的重要模块（2026-06-27）
+
+- TextParser：Markdown / TXT fallback / manifest schema / scene hash / prompt hash
+- Image：GPT Image / wanx B-roll / cache / quality gate
+- Audio：CosyVoice client / clone / quality gate / BGM preset library
+- Video：timeline assembler / render plan / platform metadata / output package
+- Job Infra：queue guard / state machine / idempotency / progress stream / retry / interrupted recovery / error log
+- Product UI：Wizard / Jobs / Storyboard / Compliance export / shared Zen shell
+- Delivery：Compliance report JSON + PDF export
 
 ---
 

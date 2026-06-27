@@ -17,6 +17,8 @@ export type SceneAudioConfig = {
 
 export type ContentScene = {
   id: string;
+  scene_hash: string;
+  prompt_hash: string;
   duration_ms: number;
   narration: string;
   script_type: ScriptType;
