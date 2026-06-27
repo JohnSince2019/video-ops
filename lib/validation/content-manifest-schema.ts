@@ -62,6 +62,7 @@ export const contentManifestSchema = {
             properties: {
               tts_voice: { type: "string", minLength: 1 },
               bgm: { type: "string", minLength: 1 },
+              reference_audio_path: { type: "string", minLength: 1 },
             },
           },
         },
@@ -142,6 +143,13 @@ function validateScene(scene: unknown, index: number, errors: string[]) {
     validateNonEmptyString(scene.audio.tts_voice, `${path}.audio.tts_voice`, errors);
     if (scene.audio.bgm !== undefined) {
       validateNonEmptyString(scene.audio.bgm, `${path}.audio.bgm`, errors);
+    }
+    if (scene.audio.reference_audio_path !== undefined) {
+      validateNonEmptyString(
+        scene.audio.reference_audio_path,
+        `${path}.audio.reference_audio_path`,
+        errors,
+      );
     }
   }
 }

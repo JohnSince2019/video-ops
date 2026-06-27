@@ -13,6 +13,23 @@ export type JobDashboardRecord = {
   manifestId?: string | null;
   ownerTokenHash?: string | null;
   lastCheckpoint?: unknown;
+  qualitySummary?: {
+    fileSizeBytes?: number | null;
+    durationSec?: number | null;
+    resolution?: string | null;
+    audioPresence?: boolean | null;
+    subtitleStatus?: "embedded" | "planned" | "missing" | null;
+    fallbackStatus?: "primary" | "fallback" | null;
+    fallbackReason?: string | null;
+    complianceStatus?: "allowed" | "blocked" | null;
+    complianceViolations?: number | null;
+  } | null;
+  costSummary?: {
+    gptImageUsd: number;
+    wanxUsd: number;
+    ttsUsd: number;
+    totalUsd: number;
+  } | null;
   outputs?: Array<{ path: string; kind: string; url?: string }>;
   errors?: Array<{ stepName: string; errorMessage: string; retryCount: number }>;
 };
@@ -41,6 +58,21 @@ export type JobDetailView = {
   checkpointSummary: string;
   errorSummary: string[];
   outputsSummary: string[];
+  qualitySummary: {
+    fileSizeLabel: string;
+    durationLabel: string;
+    resolutionLabel: string;
+    audioPresenceLabel: string;
+    subtitleStatusLabel: string;
+    fallbackStatusLabel: string;
+    complianceStatusLabel: string;
+  };
+  costSummary: {
+    gptImageUsd: string;
+    wanxUsd: string;
+    ttsUsd: string;
+    totalUsd: string;
+  };
 };
 
 function normalizeState(state?: string | null): JobState | "UNKNOWN" {
@@ -97,6 +129,30 @@ function stringifyCheckpoint(checkpoint: unknown) {
   }
 }
 
+function formatUsd(value?: number | null) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "$0.0000";
+  }
+
+  return `$${value.toFixed(4)}`;
+}
+
+function formatFileSize(value?: number | null) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return "未生成";
+  }
+
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
+  if (value >= 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+
+  return `${value} B`;
+}
+
 export function buildJobListView(records: JobDashboardRecord[]): JobListItem[] {
   return records.map((record, index) => {
     const state = normalizeState(record.state);
@@ -150,5 +206,45 @@ export function buildJobDetailView(record: JobDashboardRecord): JobDetailView {
       record.outputs?.length
         ? record.outputs.map((item) => `${item.kind}: ${item.url ?? item.path}`)
         : ["No output bundle available yet."],
+    qualitySummary: {
+      fileSizeLabel: formatFileSize(record.qualitySummary?.fileSizeBytes),
+      durationLabel:
+        typeof record.qualitySummary?.durationSec === "number" && Number.isFinite(record.qualitySummary.durationSec)
+          ? `${record.qualitySummary.durationSec.toFixed(1)}s`
+          : "未探测",
+      resolutionLabel: record.qualitySummary?.resolution?.trim() || "未探测",
+      audioPresenceLabel:
+        record.qualitySummary?.audioPresence === true
+          ? "有音频"
+          : record.qualitySummary?.audioPresence === false
+            ? "无音频"
+            : "未探测",
+      subtitleStatusLabel:
+        record.qualitySummary?.subtitleStatus === "embedded"
+          ? "已内嵌"
+          : record.qualitySummary?.subtitleStatus === "planned"
+            ? "规划中"
+            : record.qualitySummary?.subtitleStatus === "missing"
+              ? "缺失"
+              : "未知",
+      fallbackStatusLabel:
+        record.qualitySummary?.fallbackStatus === "fallback"
+          ? `Fallback${record.qualitySummary?.fallbackReason ? ` · ${record.qualitySummary.fallbackReason}` : ""}`
+          : record.qualitySummary?.fallbackStatus === "primary"
+            ? "正式产物"
+            : "未知",
+      complianceStatusLabel:
+        record.qualitySummary?.complianceStatus === "blocked"
+          ? `拦截${record.qualitySummary?.complianceViolations ? ` · ${record.qualitySummary.complianceViolations} 项` : ""}`
+          : record.qualitySummary?.complianceStatus === "allowed"
+            ? "通过"
+            : "未知",
+    },
+    costSummary: {
+      gptImageUsd: formatUsd(record.costSummary?.gptImageUsd),
+      wanxUsd: formatUsd(record.costSummary?.wanxUsd),
+      ttsUsd: formatUsd(record.costSummary?.ttsUsd),
+      totalUsd: formatUsd(record.costSummary?.totalUsd),
+    },
   };
 }

@@ -75,3 +75,29 @@ test("auto mode falls back to mock metadata when ffmpeg rendering cannot be used
     process.env.CI = previousCi;
   }
 });
+
+test("renderer carries custom voice reference into generated audio metadata", async () => {
+  const customVoiceManifest = {
+    ...manifest,
+    id: "manifest-renderer-custom-voice",
+    scenes: [
+      {
+        ...manifest.scenes[0],
+        audio: {
+          ...manifest.scenes[0].audio,
+          reference_audio_path: "/tmp/custom-voice-reference.wav",
+        },
+      },
+    ],
+  };
+
+  const result = await renderJobArtifacts({
+    jobId: "job-renderer-custom-voice",
+    manifest: customVoiceManifest,
+    mode: "mock",
+  });
+
+  assert.equal(result.timeline.clips[0]?.audio.voice, "zh-CN-male-yunze");
+  assert.equal(result.timeline.clips[0]?.audio.path.endsWith(".wav"), true);
+  assert.equal(result.outputPackage.metadataFile.content.includes("mock-renderer"), true);
+});

@@ -92,13 +92,23 @@ function estimateScenes(scriptText: string, scriptMode: ScriptMode) {
   }
 
   if (scriptMode === "markdown") {
-    const headingScenes = normalized
+    const semanticHeadings = normalized
       .split(/\n+/)
       .map((line) => line.trim())
-      .filter((line) => /^#{1,6}\s+/.test(line)).length;
+      .filter((line) => /^#{1,6}\s+/.test(line))
+      .map((line) => line.replace(/^#{1,6}\s+/, "").trim())
+      .filter(Boolean);
 
-    if (headingScenes > 0) {
-      return headingScenes;
+    const sceneLikeHeadings = semanticHeadings.filter((heading) =>
+      /(开场|钩子|正文|结尾|cta|总结|步骤|场景|镜头)/i.test(heading),
+    );
+
+    if (sceneLikeHeadings.length > 0) {
+      return sceneLikeHeadings.length;
+    }
+
+    if (semanticHeadings.length > 0) {
+      return Math.max(1, Math.min(semanticHeadings.length, 5));
     }
   }
 
@@ -236,6 +246,7 @@ export function summarizeWizardConfig(input: WizardConfigDraft): WizardSummary {
       `Persona preset: ${input.personaPreset}`,
       `Voice mode: ${input.voiceMode}`,
       `TTS voice: ${input.ttsVoice}`,
+      `Custom voice reference: ${input.customVoiceReference ?? "none"}`,
       `Estimated scenes: ${input.estimatedScenes}`,
     ],
   };

@@ -19,6 +19,9 @@ const imageProvider: ImageProvider = {
 const ttsProvider: TtsProvider = {
   id: "cosyvoice-mlx",
   displayName: "CosyVoice MLX",
+  qualityTier: "production",
+  supportsVoiceCloning: true,
+  supportsStreamingPreview: true,
   async synthesize() {
     return { ok: true };
   },
@@ -44,6 +47,8 @@ test("provider registry resolves default providers and lists them", () => {
 
   assert.equal(registry.getImageProvider().id, "gpt-image-2");
   assert.equal(registry.getTtsProvider().id, "cosyvoice-mlx");
+  assert.equal(registry.getTtsProvider().qualityTier, "production");
+  assert.equal(registry.getTtsProvider().supportsVoiceCloning, true);
   assert.equal(registry.getRendererProvider().id, "ffmpeg-local");
   assert.equal(registry.listImageProviders().length, 1);
   assert.equal(registry.listTtsProviders().length, 1);

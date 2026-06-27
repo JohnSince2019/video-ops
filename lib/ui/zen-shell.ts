@@ -1,96 +1,266 @@
 export const zenShellStyles = `
   :root {
-    --bg-1: #f4efe4;
-    --bg-2: #d6e4db;
-    --ink: #14213d;
-    --muted: #51606f;
-    --card: rgba(255, 250, 242, 0.84);
-    --line: rgba(20, 33, 61, 0.12);
-    --accent: #ff7a59;
-    --accent-2: #1f7a8c;
-    --ok: #2f855a;
-    --warn: #c05621;
+    --bg: #f5f7fb;
+    --panel: #ffffff;
+    --panel-soft: #f7f8fc;
+    --border: #e6eaf2;
+    --ink: #1b2440;
+    --muted: #7d879c;
+    --primary: #7667ff;
+    --primary-soft: rgba(118, 103, 255, 0.12);
+    --accent: #16a34a;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --shadow: 0 14px 32px rgba(15, 23, 42, 0.05);
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     margin: 0;
     color: var(--ink);
-    background:
-      radial-gradient(circle at top left, rgba(255, 122, 89, 0.18), transparent 28%),
-      radial-gradient(circle at top right, rgba(31, 122, 140, 0.18), transparent 24%),
-      linear-gradient(135deg, var(--bg-1), var(--bg-2));
-    font-family: Georgia, "Times New Roman", serif;
+    background: var(--bg);
+    font-family: "Inter", "Avenir Next", "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   }
-  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 18px 60px; }
-  .topbar {
+  a { color: inherit; }
+  p {
+    margin: 0;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+  h1, h2, h3, h4, button, .nav-link, label {
+    font-family: "Inter", "Avenir Next", "SF Pro Display", "PingFang SC", sans-serif;
+  }
+  .app-shell {
     display: flex;
-    justify-content: space-between;
+    min-height: 100vh;
+  }
+  .sidebar {
+    width: 188px;
+    flex: 0 0 188px;
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  .sidebar-brand {
+    display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 24px;
+    gap: 12px;
+    height: 64px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
   }
-  .brand { display: grid; gap: 4px; }
-  .eyebrow {
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    font-size: 12px;
-    color: var(--accent-2);
-    font-weight: 700;
-  }
-  h1, h2, h3, h4, button, .pill, label { font-family: "Avenir Next", "Trebuchet MS", sans-serif; }
-  h1 { margin: 0; font-size: 42px; line-height: 1.02; }
-  p { margin: 0; line-height: 1.65; color: var(--muted); }
-  .nav { display: flex; gap: 10px; flex-wrap: wrap; }
-  .pill {
-    padding: 10px 14px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-    color: var(--ink);
-    text-decoration: none;
-    background: rgba(255,255,255,0.48);
-    font-size: 14px;
-    font-weight: 700;
-  }
-  .pill.active {
-    background: var(--ink);
-    color: #fff8ef;
-    border-color: transparent;
-  }
-  .hero {
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
     display: grid;
-    gap: 18px;
-    grid-template-columns: 1.18fr 0.82fr;
-    align-items: start;
+    place-items: center;
+    background: linear-gradient(135deg, #7c6bff, #5a45ff);
+    color: white;
+    font-size: 14px;
+    font-weight: 800;
+    box-shadow: 0 8px 18px rgba(111, 92, 255, 0.22);
+  }
+  .brand-copy {
+    display: grid;
+    gap: 3px;
+  }
+  .brand-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+  .brand-subtitle {
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .sidebar-nav {
+    flex: 1;
+    display: grid;
+    gap: 6px;
+    padding: 12px 10px;
+    align-content: start;
+    grid-auto-rows: max-content;
+  }
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border-radius: 12px;
+    text-decoration: none;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    transition: background .18s ease, color .18s ease, transform .18s ease;
+    min-height: 42px;
+  }
+  .nav-link:hover {
+    background: var(--panel-soft);
+    color: var(--ink);
+    transform: translateX(1px);
+  }
+  .nav-link.active {
+    background: var(--primary-soft);
+    color: var(--primary);
+    box-shadow: inset 0 0 0 1px rgba(118, 103, 255, 0.08);
+  }
+  .nav-dot {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    color: currentColor;
+    opacity: .76;
+  }
+  .nav-link.active .nav-dot {
+    opacity: 1;
+  }
+  .nav-dot svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .sidebar-footer {
+    padding: 10px 10px 16px;
+    border-top: 1px solid var(--border);
+  }
+  .footer-card {
+    border-radius: 14px;
+    background: linear-gradient(180deg, #f5f2ff, #f0f4ff);
+    border: 1px solid #e7defe;
+    padding: 12px;
+  }
+  .footer-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .footer-value {
+    margin-top: 8px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .footer-value strong {
+    font-size: 28px;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--primary);
+  }
+  .footer-value span {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .content-shell {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .topbar {
+    height: 64px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .header-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  h1 {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 0 0 auto;
+  }
+  .header-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .header-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-left: 12px;
+    border-left: 1px solid var(--border);
+  }
+  .user-badge {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(111,92,255,.12), rgba(111,92,255,.22));
+    color: var(--primary);
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .user-copy {
+    display: grid;
+    gap: 2px;
+  }
+  .user-copy strong {
+    font-size: 14px;
+    color: var(--ink);
+  }
+  .user-copy span {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .page-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+  }
+  .page-wrap {
+    width: 100%;
   }
   .card {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 24px;
-    padding: 22px;
-    box-shadow: 0 18px 60px rgba(20, 33, 61, 0.08);
-    backdrop-filter: blur(14px);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: var(--shadow);
   }
-  .hero-grid {
-    display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 18px;
-  }
-  .stat {
-    background: rgba(255,255,255,0.58);
-    border-radius: 18px;
-    padding: 14px;
-    border: 1px solid rgba(20, 33, 61, 0.08);
-  }
-  .stat b {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 12px;
-    color: var(--accent-2);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .stat span { font-size: 18px; font-weight: 700; }
   .summary-list, .error-list, .event-log {
     display: grid;
     gap: 10px;
@@ -99,32 +269,81 @@ export const zenShellStyles = `
   .summary-item, .error-item, .event-item {
     padding: 12px 14px;
     border-radius: 16px;
-    background: rgba(255,255,255,0.62);
-    border: 1px solid rgba(20, 33, 61, 0.08);
+    background: var(--panel-soft);
+    border: 1px solid var(--border);
   }
   .error-item {
-    background: rgba(255, 122, 89, 0.12);
-    color: #8a2d13;
+    background: rgba(239, 68, 68, 0.08);
+    color: #b42318;
+    border-color: rgba(239, 68, 68, 0.16);
   }
-  .ok { color: var(--ok); font-weight: 700; }
+  .ok { color: #15803d; font-weight: 700; }
   .warn { color: var(--warn); font-weight: 700; }
-  .empty {
-    color: var(--muted);
-    font-style: italic;
+  .empty { color: var(--muted); font-style: italic; }
+  @media (max-width: 1024px) {
+    .sidebar {
+      width: 88px;
+      flex-basis: 88px;
+    }
+    .brand-copy, .nav-link span, .sidebar-footer {
+      display: none;
+    }
+    .sidebar-brand {
+      justify-content: center;
+      padding: 0;
+    }
+    .nav-link {
+      justify-content: center;
+      padding: 12px;
+    }
+    .nav-dot {
+      width: 10px;
+      height: 10px;
+    }
   }
-  @media (max-width: 900px) {
-    .hero { grid-template-columns: 1fr; }
-    h1 { font-size: 34px; }
+  @media (max-width: 820px) {
+    .app-shell {
+      flex-direction: column;
+    }
+    .sidebar {
+      width: 100%;
+      min-height: auto;
+      border-right: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-nav {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .brand-copy, .sidebar-footer, .nav-link span {
+      display: block;
+    }
+    .nav-link {
+      justify-content: flex-start;
+    }
   }
   @media (max-width: 640px) {
-    .hero-grid { grid-template-columns: 1fr; }
-    .wrap { padding: 20px 14px 42px; }
+    .topbar {
+      padding: 0 16px;
+    }
+    .page-content {
+      padding: 0;
+    }
+    h1 {
+      font-size: 18px;
+    }
+    .header-user {
+      display: none;
+    }
+    .sidebar-nav {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 `;
 
 export type ZenNavItem = {
   href: string;
   label: string;
+  icon?: string;
   active?: boolean;
 };
 
@@ -132,7 +351,7 @@ export function renderZenNav(items: ZenNavItem[]) {
   return items
     .map(
       (item) =>
-        `<a class="pill${item.active ? " active" : ""}" href="${item.href}">${item.label}</a>`,
+        `<a class="nav-link${item.active ? " active" : ""}" href="${item.href}"><span class="nav-dot">${item.icon ?? ""}</span><span>${item.label}</span></a>`,
     )
     .join("");
 }
@@ -153,17 +372,52 @@ export function renderZenPageShell(input: {
   <style>${zenShellStyles}${input.extraStyles ?? ""}</style>
 </head>
 <body>
-  <div class="wrap">
-    <header class="topbar">
-      <div class="brand">
-        <span class="eyebrow">${input.eyebrow}</span>
-        <h1>${input.title}</h1>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark">V</div>
+        <div class="brand-copy">
+          <div class="brand-title">VideoOps</div>
+          <div class="brand-subtitle">AI 视频生产系统</div>
+        </div>
       </div>
-      <nav class="nav">
+      <nav class="sidebar-nav">
         ${renderZenNav(input.navItems)}
       </nav>
-    </header>
-    ${input.body}
+      <div class="sidebar-footer">
+        <div class="footer-card">
+          <div class="footer-label">渲染健康度</div>
+          <div class="footer-value">
+            <strong>68%</strong>
+            <span>进行中</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="content-shell">
+      <header class="topbar">
+        <div class="header-copy">
+          <span class="eyebrow">${input.eyebrow}</span>
+          <h1>${input.title}</h1>
+        </div>
+        <div class="header-actions">
+          <div class="header-icon">S</div>
+          <div class="header-icon">N</div>
+          <div class="header-user">
+            <div class="user-badge">J</div>
+            <div class="user-copy">
+              <strong>John</strong>
+              <span>视频创作者</span>
+            </div>
+          </div>
+        </div>
+      </header>
+      <main class="page-content">
+        <div class="page-wrap">
+          ${input.body}
+        </div>
+      </main>
+    </div>
   </div>
 </body>
 </html>`;

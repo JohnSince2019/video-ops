@@ -3,6 +3,13 @@ import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import {
+  type GenerateTtsResult,
+  generateClonedSpeechForScene,
+  generateSpeechForScene,
+  type TtsRunner,
+} from "../audio/cosyvoice-client.js";
+import { createUnavailableMlxRunner, detectMlxAudioAvailability } from "../audio/local-tts-runner.js";
 import { buildJobAssetPaths } from "../assets/job-assets.js";
 import type { ProviderExecutionMetadata } from "../providers/provider-types.js";
 import type { ContentManifest } from "../types/manifest.js";
@@ -78,6 +85,75 @@ function buildWavTone(durationMs: number, frequency = 440) {
   return buffer;
 }
 
+function buildCloneAwareTone(durationMs: number, referenceAudioPath?: string, fallbackFrequency = 440) {
+  if (!referenceAudioPath) {
+    return buildWavTone(durationMs, fallbackFrequency);
+  }
+
+  const hashSeed = Array.from(referenceAudioPath).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const tunedFrequency = 220 + (hashSeed % 180);
+  return buildWavTone(durationMs, tunedFrequency);
+}
+
+const localToneTtsRunner: TtsRunner = async (request) => {
+  const outputDir = path.dirname(request.outputPath);
+  await fs.mkdir(outputDir, { recursive: true });
+  const tone = buildCloneAwareTone(
+    Math.max(1500, request.text.replace(/\s+/g, "").length * 180),
+    request.referenceAudioPath,
+    320,
+  );
+  await fs.writeFile(request.outputPath, tone);
+
+  return {
+    success: true,
+    audioPath: request.outputPath,
+    durationMs: Math.max(1500, request.text.replace(/\s+/g, "").length * 180),
+  };
+};
+
+async function createSceneAudioAsset(input: {
+  scene: ContentManifest["scenes"][number];
+  outputDir: string;
+  preferredRunner?: TtsRunner;
+}) {
+  const sceneInput = {
+    scene: input.scene,
+    outputDir: input.outputDir,
+    referenceAudioPath: input.scene.audio.reference_audio_path,
+  };
+
+  const hasMlxAudio = await detectMlxAudioAvailability();
+  const preferredRunner = input.preferredRunner ?? (hasMlxAudio ? createUnavailableMlxRunner() : undefined);
+  let generated: GenerateTtsResult;
+  let providerLabel = "local-tone-runner";
+  let providerMode = "fallback";
+
+  try {
+    if (input.scene.audio.reference_audio_path) {
+      generated = await generateClonedSpeechForScene(sceneInput, { runner: preferredRunner ?? localToneTtsRunner });
+    } else {
+      generated = await generateSpeechForScene(sceneInput, { runner: preferredRunner ?? localToneTtsRunner });
+    }
+    providerLabel = preferredRunner ? "mlx-audio-runner" : "local-tone-runner";
+    providerMode = preferredRunner ? "primary" : "fallback";
+  } catch {
+    if (input.scene.audio.reference_audio_path) {
+      generated = await generateClonedSpeechForScene(sceneInput, { runner: localToneTtsRunner });
+    } else {
+      generated = await generateSpeechForScene(sceneInput, { runner: localToneTtsRunner });
+    }
+    providerLabel = "local-tone-runner";
+    providerMode = "fallback";
+  }
+
+  return {
+    generated,
+    providerLabel,
+    providerMode,
+  };
+}
+
 function buildPpmImage(width: number, height: number, rgb: [number, number, number]) {
   const header = `P6\n${width} ${height}\n255\n`;
   const pixels = Buffer.alloc(width * height * 3);
@@ -103,10 +179,8 @@ async function buildSceneAssets(manifest: ContentManifest, outputPaths: ReturnTy
   for (const [index, scene] of manifest.scenes.entries()) {
     const basename = sanitizeFileSegment(scene.id, `scene-${index + 1}`);
     const imagePath = path.join(outputPaths.imagesDir, `${basename}.ppm`);
-    const audioPath = path.join(outputPaths.audioDir, `${basename}.wav`);
 
     await fs.writeFile(imagePath, buildPpmImage(1080, 1920, [240 - index * 20, 226 - index * 10, 210]));
-    await fs.writeFile(audioPath, buildWavTone(scene.duration_ms, 320 + index * 40));
 
     mainImages.push({
       sceneId: scene.id,
@@ -126,16 +200,20 @@ async function buildSceneAssets(manifest: ContentManifest, outputPaths: ReturnTy
       ],
     });
 
+    const { generated, providerLabel, providerMode } = await createSceneAudioAsset({
+      scene,
+      outputDir: outputPaths.audioDir,
+    });
+
     audios.push({
-      sceneId: scene.id,
-      sceneHash: scene.scene_hash,
-      model: "local-tone-audio",
-      voice: scene.audio.tts_voice,
-      text: scene.narration,
-      audioPath,
+      ...generated,
+      model: providerLabel,
       durationMs: scene.duration_ms,
-      format: "wav" as const,
-      cloneMode: "standard" as const,
+      providerMetadata: {
+        stage: "tts" as const,
+        provider: providerLabel,
+        mode: providerMode as "primary" | "fallback",
+      },
     });
   }
 

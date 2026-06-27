@@ -20,10 +20,10 @@ test("shared shell renderer outputs title and navigation structure", () => {
 });
 
 test("shared style tokens include key shell classes and design variables", () => {
-  assert.match(zenShellStyles, /--accent: #ff7a59/);
+  assert.match(zenShellStyles, /--primary: #7667ff/);
   assert.match(zenShellStyles, /\.topbar/);
   assert.match(zenShellStyles, /\.card/);
-  assert.match(zenShellStyles, /\.pill\.active/);
+  assert.match(zenShellStyles, /\.nav-link\.active/);
 });
 
 test("navigation helper marks active links consistently", () => {
@@ -32,6 +32,6 @@ test("navigation helper marks active links consistently", () => {
     { href: "/jobs", label: "Jobs" },
   ]);
 
-  assert.match(nav, /class="pill active"/);
+  assert.match(nav, /class="nav-link active"/);
   assert.match(nav, /Jobs/);
 });

@@ -1,4 +1,4 @@
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 import http from "node:http";
 import { URL } from "node:url";
@@ -8,9 +8,16 @@ import {
   createJobProgressPayload,
   createJobProgressStream,
 } from "./lib/progress/job-progress.ts";
+import {
+  buildCustomVoiceReferenceAbsolutePath,
+  getCustomVoiceReferenceRoot,
+  saveCustomVoiceReference,
+} from "./lib/audio/custom-voice-reference.ts";
+import { ensureVoicePreviewAsset, getVoicePreviewMeta } from "./lib/audio/voice-preview.ts";
 import { buildJobDetailView, buildJobListView } from "./lib/ui/job-dashboard.ts";
 import { buildComplianceReport, exportComplianceReportJson } from "./lib/compliance/compliance-report.ts";
 import { exportComplianceReportPdf } from "./lib/compliance/compliance-report-pdf.ts";
+import { runComplianceGuard } from "./lib/domain/compliance-guard.ts";
 import {
   buildStoryboardPreview,
   SUBTITLE_STYLES,
@@ -25,8 +32,42 @@ const port = Number(process.env.PORT ?? 3003);
 const channel = new JobProgressChannel();
 const createdJobs = new Map();
 const workspaceRoot = process.cwd();
+const voicePreviewRoot = path.join(workspaceRoot, "tmp", "voice-previews");
+const customVoiceReferenceRoot = getCustomVoiceReferenceRoot();
 
 const sharedPageStyles = `
+  .workspace-page {
+    min-height: calc(100vh - 64px);
+    display: grid;
+    grid-template-columns: 206px minmax(0, 1fr) 248px;
+    background: var(--bg);
+  }
+  .flow-sidebar,
+  .gate-sidebar {
+    background: rgba(255, 255, 255, 0.74);
+    border-right: 1px solid var(--border);
+    padding: 16px 14px;
+  }
+  .gate-sidebar {
+    border-right: 0;
+    border-left: 1px solid var(--border);
+  }
+  .main-stage {
+    min-width: 0;
+    padding: 16px 18px 24px;
+  }
+  .section-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
   .layout {
     display: grid;
     gap: 18px;
@@ -41,22 +82,27 @@ const sharedPageStyles = `
   .field { display: grid; gap: 8px; }
   .field.full { grid-column: 1 / -1; }
   label {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     color: var(--ink);
     letter-spacing: 0.02em;
   }
   input, select, textarea {
     width: 100%;
-    border: 1px solid rgba(20, 33, 61, 0.14);
-    background: rgba(255,255,255,0.8);
-    border-radius: 16px;
-    padding: 13px 14px;
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 12px;
+    padding: 11px 13px;
     font: inherit;
     color: var(--ink);
   }
   textarea { min-height: 220px; resize: vertical; }
-  .hint { font-size: 13px; color: var(--muted); }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: rgba(118, 103, 255, 0.5);
+    box-shadow: 0 0 0 3px rgba(118, 103, 255, 0.12);
+  }
+  .hint { font-size: 12px; color: var(--muted); }
   .actions {
     display: flex;
     gap: 10px;
@@ -65,20 +111,21 @@ const sharedPageStyles = `
   }
   button {
     border: 0;
-    border-radius: 999px;
-    padding: 12px 18px;
+    border-radius: 10px;
+    padding: 11px 16px;
     cursor: pointer;
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0.01em;
   }
   button.primary {
-    background: var(--accent);
+    background: var(--primary);
     color: white;
+    box-shadow: 0 8px 18px rgba(118, 103, 255, 0.2);
   }
   button.secondary {
-    background: rgba(31, 122, 140, 0.12);
-    color: var(--accent-2);
-    border: 1px solid rgba(31, 122, 140, 0.24);
+    background: #fff;
+    color: var(--ink);
+    border: 1px solid var(--border);
   }
   .summary-meta {
     display: grid;
@@ -94,6 +141,29 @@ const sharedPageStyles = `
     font-size: 13px;
     color: #22324d;
   }
+  .soft-card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+  @media (max-width: 1120px) {
+    .workspace-page {
+      grid-template-columns: 1fr;
+    }
+    .flow-sidebar,
+    .gate-sidebar {
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+    }
+    .gate-sidebar {
+      border-top: 1px solid var(--border);
+      border-bottom: 0;
+    }
+    .main-stage {
+      padding: 14px 16px 20px;
+    }
+  }
   @media (max-width: 900px) {
     .layout { grid-template-columns: 1fr; }
   }
@@ -103,11 +173,31 @@ const sharedPageStyles = `
 `;
 
 const navItems = [
-  { href: "/", label: "Wizard" },
-  { href: "/jobs", label: "Jobs" },
-  { href: "/storyboard", label: "Storyboard" },
-  { href: "/compliance-report", label: "Compliance" },
-  { href: "/demo", label: "SSE Demo" },
+  {
+    href: "/",
+    label: "向导",
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.1 4.9L19 10l-4.9 2.1L12 17l-2.1-4.9L5 10l4.9-2.1L12 3z"/><path d="M5 19l1.2-2.8L9 15l-2.8-1.2L5 11l-1.2 2.8L1 15l2.8 1.2L5 19z"/><path d="M19 21l.8-1.9L22 18l-2.2-.9L19 15l-.8 2.1L16 18l2.2 1.1L19 21z"/></svg>',
+  },
+  {
+    href: "/jobs",
+    label: "任务",
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="12" height="18" rx="2"/><path d="M8 7h5"/><path d="M8 11h5"/><path d="M8 15h3"/><path d="M18 8l2 2 3-4"/></svg>',
+  },
+  {
+    href: "/storyboard",
+    label: "分镜",
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="6" height="14" rx="1.5"/><rect x="10.5" y="5" width="10.5" height="6" rx="1.5"/><rect x="10.5" y="13" width="10.5" height="6" rx="1.5"/></svg>',
+  },
+  {
+    href: "/compliance-report",
+    label: "合规",
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>',
+  },
+  {
+    href: "/demo",
+    label: "进度演示",
+    icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18V6"/><path d="M10 18V10"/><path d="M16 18V8"/><path d="M22 18V4"/></svg>',
+  },
 ];
 
 const demoJobs = [
@@ -205,143 +295,1236 @@ const storyboardScenes = [
   },
 ];
 
+const videoWorkbenchSteps = [
+  { id: "asset_intake", title: "素材收集", detail: "粘贴完整短视频脚本，自动抽取标题、hook、摘要和场景。", status: "active" },
+  { id: "storyboard_generation", title: "分镜确认", detail: "核对场景拆分、口播和画面建议，确认镜头节奏。", status: "locked" },
+  { id: "image_generation", title: "图像生成", detail: "按 John 风格生成主画面和补充 B-roll 画面。", status: "locked" },
+  { id: "voice_generation", title: "声音应用", detail: "试听预设声音或导入你的声音，然后确认应用。", status: "locked" },
+  { id: "video_assembly", title: "合成预览", detail: "组装字幕、语音、画面和 BGM，生成可预览视频。", status: "locked" },
+  { id: "preview_publish", title: "合规发布", detail: "检查多平台输出、合规结果和最终 MP4 产物。", status: "locked" },
+];
+
+function buildStepLabel(step) {
+  if (step.status === "done") {
+    return "已通过";
+  }
+  if (step.status === "active") {
+    return "当前步骤";
+  }
+  return "未解锁";
+}
+
+function getWizardStepsForState(jobState) {
+  if (!jobState) {
+    return videoWorkbenchSteps;
+  }
+
+  const unlockedIndexByState = {
+    QUEUED: 1,
+    PARSING: 1,
+    AI_PROCESSING: 2,
+    ASSEMBLING: 4,
+    RENDERING: 4,
+    POST_PROCESSING: 5,
+    COMPLETED: 6,
+  };
+
+  const unlockedCount = unlockedIndexByState[jobState] ?? 1;
+  return videoWorkbenchSteps.map((step, index) => {
+    if (index + 1 < unlockedCount) {
+      return { ...step, status: "done" };
+    }
+    if (index + 1 === unlockedCount) {
+      return { ...step, status: "active" };
+    }
+    return { ...step, status: "locked" };
+  });
+}
+
+const wizardStepContent = {
+  asset_intake: {
+    title: "素材收集",
+    subtitle: "直接贴短视频脚本，系统自动识别标题、hook、摘要、时长和 scenes 结构。",
+    goalTitle: "把一条可拍的短视频脚本转成结构化生产输入",
+    goalText: "你提供脚本，系统负责提取 title、hook、summary、durationSec、scenes 和 cta。",
+    goalHint: "用户不应该先填一堆内部字段。这里的目标是少输入、快理解、可立即进入分镜和生成。",
+  },
+  storyboard_generation: {
+    title: "分镜确认",
+    subtitle: "确认 scene 拆分、口播顺序、画面建议与每段时长是否合理。",
+    goalTitle: "把脚本变成可以直接进入生产的镜头草图",
+    goalText: "这里重点确认每个 scene 的 voiceover、visualSuggestion 和 durationSec 是否支撑最终视频节奏。",
+    goalHint: "如果分镜不清楚，后面的生图、配音和合成都会放大问题，所以这一关是内容质量的关键闸口。",
+  },
+  image_generation: {
+    title: "图像生成",
+    subtitle: "基于 John 风格和每个 scene 的视觉建议生成主画面与补充素材。",
+    goalTitle: "让每个 scene 都有统一且可用的视觉资产",
+    goalText: "系统会围绕人物一致性、画面风格、安全区和平台比例生成主图与补充 B-roll。",
+    goalHint: "这一阶段更关注画风一致、人物稳定、镜头可读，而不是一次就追求最终极致质感。",
+  },
+  voice_generation: {
+    title: "声音应用",
+    subtitle: "选择预设声音或应用你的参考声音，确认整条视频的口播方案。",
+    goalTitle: "给脚本配上自然、稳定、可连续复用的声音",
+    goalText: "默认支持多组男女声预设，也为后续接入自定义音色克隆预留了入口。",
+    goalHint: "声音要服务内容理解，优先保证清晰、可信和没有明显 AI 味，再去考虑风格化。",
+  },
+  video_assembly: {
+    title: "合成预览",
+    subtitle: "组装画面、字幕、语音和 BGM，输出可预览的 MP4 成品。",
+    goalTitle: "把分散资产合成成一条可以真正观看的视频",
+    goalText: "这个阶段会完成时间线装配、字幕叠加、音视频合流，并准备预览和下载产物。",
+    goalHint: "如果这一关通过，说明产品已经从“脚本工具”跨进了“视频生产工具”。",
+  },
+  preview_publish: {
+    title: "合规发布",
+    subtitle: "核对多平台输出、合规状态、元数据和最终可交付的 MP4。",
+    goalTitle: "确认这条视频可以被安全交付和后续发布",
+    goalText: "这里会查看最终预览、输出包、元数据与发布前检查项，确保不是只生成了一个临时文件。",
+    goalHint: "最终目标不是“渲染成功”四个字，而是你真的拿到一条能继续发布和复用的视频资产。",
+  },
+};
+
+function resolveWizardStep(stepId) {
+  const defaultStep = "asset_intake";
+  if (!stepId) {
+    return defaultStep;
+  }
+  if (stepId in wizardStepContent) {
+    return stepId;
+  }
+  return defaultStep;
+}
+
+function stepQueryHref(stepId) {
+  return stepId === "asset_intake" ? "/" : `/?step=${stepId}`;
+}
+
+function profileLabel(value) {
+  if (value === "draft") return "草稿";
+  if (value === "high_quality") return "高质量";
+  return "标准";
+}
+
+function scriptModeLabel(value) {
+  return value === "markdown" ? "Markdown" : "纯文本";
+}
+
 function pageNav(activeHref) {
   return navItems.map((item) => ({ ...item, active: item.href === activeHref }));
 }
 
-function renderWizardPage() {
+function renderWizardPage(stepId = "angle_refine") {
+  const wizardSteps = getWizardStepsForState();
+  const currentStepId = resolveWizardStep(stepId);
+  const currentStepIndex = Math.max(0, wizardSteps.findIndex((step) => step.id === currentStepId));
+  const completedSteps = currentStepIndex;
+  const currentStepContent = wizardStepContent[currentStepId] ?? wizardStepContent.angle_refine;
+  const previousStepId = currentStepIndex > 0 ? wizardSteps[currentStepIndex - 1]?.id : null;
+  const progressPercent = Math.max(10, Math.round((completedSteps / wizardSteps.length) * 100));
+  const stepRailHtml = wizardSteps
+    .map(
+      (step, index) => {
+        const visualStatus = index < currentStepIndex ? "done" : index === currentStepIndex ? "active" : "locked";
+        return `
+            <a class="step-item${visualStatus === "active" ? " active" : ""}${visualStatus === "locked" ? " locked" : ""}" data-step-id="${step.id}" href="${stepQueryHref(step.id)}">
+              <div class="step-index">${index + 1}</div>
+              <div class="step-copy">
+                <div class="step-title">${step.title}</div>
+                <small class="step-status-label">${buildStepLabel({ status: visualStatus })}</small>
+                <p>${step.detail}</p>
+              </div>
+            </a>`;
+      },
+    )
+    .join("");
+  const isAssetIntakeStep = currentStepId === "asset_intake";
+  const isVoiceGenerationStep = currentStepId === "voice_generation";
+
   return renderZenPageShell({
-    title: "Video Creation Wizard",
-    eyebrow: "Video-Ops / Sprint 3 / JOH-32",
+    title: "视频工作台",
+    eyebrow: "Video-Ops / M3 / JOH-80",
     navItems: pageNav("/"),
-    extraStyles: sharedPageStyles,
+    extraStyles: `
+${sharedPageStyles}
+      .wizard-shell {
+        display: grid;
+        grid-template-columns: 206px minmax(0, 1fr) 248px;
+        min-height: calc(100vh - 64px);
+      }
+      .wizard-flow,
+      .wizard-gate {
+        background: rgba(255,255,255,0.72);
+        padding: 14px 12px;
+      }
+      .wizard-flow {
+        border-right: 1px solid var(--border);
+      }
+      .wizard-gate {
+        border-left: 1px solid var(--border);
+      }
+      .wizard-main {
+        min-width: 0;
+        padding: 14px 18px 24px;
+      }
+      .flow-header {
+        display: grid;
+        gap: 6px;
+        padding: 2px 4px 14px;
+      }
+      .flow-progress-bar {
+        height: 4px;
+        border-radius: 999px;
+        background: #eceffd;
+        overflow: hidden;
+      }
+      .flow-progress-bar span {
+        display: block;
+        width: ${progressPercent}%;
+        height: 100%;
+        border-radius: 999px;
+        background: var(--primary);
+      }
+      .step-rail,
+      .quality-list,
+      .job-events,
+      .gate-list,
+      .asset-list {
+        display: grid;
+        gap: 10px;
+      }
+      .step-item,
+      .quality-item,
+      .event-item-compact,
+      .gate-item,
+      .asset-item {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: #fff;
+      }
+      .step-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 12px;
+        opacity: 0.68;
+        text-decoration: none;
+      }
+      .step-item.active {
+        opacity: 1;
+        background: #f7f5ff;
+        border-color: #dcd5ff;
+        box-shadow: inset 0 0 0 1px rgba(118,103,255,0.08);
+      }
+      .step-item.locked {
+        opacity: 0.42;
+      }
+      .step-index {
+        width: 28px;
+        height: 28px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        background: #f1f3f9;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        flex: 0 0 auto;
+      }
+      .step-item.active .step-index {
+        background: var(--primary);
+        color: #fff;
+      }
+      .step-copy {
+        display: grid;
+        gap: 3px;
+      }
+      .step-title,
+      .panel-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--ink);
+        letter-spacing: -0.01em;
+      }
+      .step-copy small {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .step-copy p {
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      .tip-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .tip-icon {
+        width: 17px;
+        height: 17px;
+        border-radius: 999px;
+        background: #eef1fb;
+        color: var(--primary);
+        display: inline-grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 800;
+        cursor: help;
+        position: relative;
+      }
+      .tip-icon::after {
+        content: attr(data-tip);
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 10px);
+        transform: translateX(-50%);
+        min-width: 220px;
+        max-width: 280px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: #182033;
+        color: #fff;
+        font-size: 12px;
+        line-height: 1.5;
+        box-shadow: 0 16px 28px rgba(15, 23, 42, 0.22);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .15s ease;
+        z-index: 20;
+      }
+      .tip-icon:hover::after {
+        opacity: 1;
+      }
+      .script-intake-layout {
+        display: grid;
+        gap: 16px;
+      }
+      .script-paste-box {
+        display: grid;
+        gap: 10px;
+      }
+      .script-paste-box textarea {
+        min-height: 260px;
+        font-size: 14px;
+        line-height: 1.75;
+      }
+      .platform-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .check-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: #fff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .check-card input {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+      }
+      .auto-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .auto-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: #fbfcff;
+        padding: 14px;
+        display: grid;
+        gap: 8px;
+      }
+      .auto-card b {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .auto-card strong {
+        font-size: 14px;
+        color: var(--ink);
+      }
+      .scene-outline {
+        display: grid;
+        gap: 10px;
+      }
+      .scene-row {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px;
+        background: #fff;
+        display: grid;
+        gap: 8px;
+      }
+      .scene-row strong {
+        font-size: 13px;
+      }
+      .scene-row-label {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .scene-row-value {
+        color: var(--ink);
+        line-height: 1.6;
+      }
+      .voice-preset-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .voice-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+        background: #fff;
+        display: grid;
+        gap: 8px;
+      }
+      .voice-card.active {
+        border-color: #d9d2ff;
+        background: #f8f6ff;
+        box-shadow: inset 0 0 0 1px rgba(118, 103, 255, 0.08);
+      }
+      .voice-card small {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .voice-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .micro-copy {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .main-topbar {
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .main-title {
+        display: grid;
+        gap: 4px;
+      }
+      .main-title h2 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+      }
+      .main-title p {
+        font-size: 12px;
+      }
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .mini-ghost {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .submit-chip {
+        height: 34px;
+        border-radius: 10px;
+        padding: 0 14px;
+        background: var(--primary);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        font-size: 13px;
+        font-weight: 700;
+        box-shadow: 0 10px 18px rgba(118, 103, 255, 0.18);
+      }
+      .focus-banner,
+      .editor-card,
+      .storyboard-card,
+      .status-card {
+        display: grid;
+        gap: 14px;
+      }
+      .focus-banner {
+        padding: 14px 16px;
+        margin-bottom: 14px;
+      }
+      .focus-pill {
+        width: fit-content;
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: #f4f1ff;
+        color: var(--primary);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .focus-banner strong {
+        font-size: 14px;
+        color: var(--ink);
+      }
+      .focus-banner p {
+        font-size: 12px;
+      }
+      .editor-card {
+        padding: 18px;
+      }
+      .editor-card textarea#scriptText {
+        min-height: 316px;
+        font-size: 14px;
+        line-height: 1.8;
+      }
+      .field-grid.workbench {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .field.compact label { font-size: 12px; }
+      .editor-tools {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .editor-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .tiny-chip {
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: #f6f7fb;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .storyboard-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .story-scene {
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #fbfcff;
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+      }
+      .scene-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      .scene-title {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .scene-duration {
+        font-size: 11px;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .scene-visual {
+        min-height: 96px;
+        border-radius: 12px;
+        border: 1px dashed #d8def0;
+        background: linear-gradient(180deg, #f9fbff, #f3f6ff);
+        padding: 14px;
+        color: var(--ink);
+        font-size: 12px;
+      }
+      .scene-caption {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .progress-track {
+        height: 8px;
+        border-radius: 999px;
+        background: #eceffd;
+        overflow: hidden;
+      }
+      .progress-value {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #7667ff, #8d80ff);
+      }
+      .status-pair {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .status-box {
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #fff;
+      }
+      .status-box b {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .status-box span {
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+      .quality-item,
+      .event-item-compact,
+      .gate-item,
+      .asset-item {
+        padding: 12px;
+      }
+      .quality-item.pass {
+        border-color: #d9f0df;
+        background: #f6fcf8;
+      }
+      .quality-item.warn {
+        border-color: #f5e1b3;
+        background: #fffaf0;
+      }
+      .preview-shell {
+        display: grid;
+        gap: 12px;
+      }
+      .preview-stage {
+        border-radius: 20px;
+        overflow: hidden;
+        background: #0f1724;
+        min-height: 220px;
+        display: grid;
+        place-items: center;
+      }
+      .preview-stage video {
+        width: 100%;
+        display: block;
+        background: #000;
+      }
+      .preview-placeholder {
+        padding: 24px;
+        color: rgba(255,255,255,.82);
+        text-align: center;
+        font-size: 12px;
+      }
+      .preview-links {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .preview-links a {
+        color: var(--primary);
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .mono-box {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+        font-size: 12px;
+        color: #22324d;
+      }
+      .gate-panel {
+        display: grid;
+        gap: 12px;
+      }
+      .gate-card {
+        padding: 14px;
+        border-radius: 16px;
+        background: #fff;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+      .gate-score {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      .gate-score strong {
+        font-size: 26px;
+        line-height: 1;
+      }
+      .gate-badge {
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: #f5f7fb;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .gate-note {
+        padding: 12px;
+        border: 1px dashed #dde3f2;
+        border-radius: 12px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .gate-item strong,
+      .asset-item strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+      .gate-item p,
+      .asset-item p {
+        font-size: 12px;
+      }
+      .upload-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        text-decoration: none;
+      }
+      .voice-reference-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .inline-status {
+        min-height: 20px;
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+      }
+      .inline-status.busy {
+        color: #7c5cff;
+      }
+      .inline-status.success {
+        color: #1d7f45;
+      }
+      .inline-status.warn {
+        color: #c56a00;
+      }
+      button[disabled] {
+        cursor: not-allowed;
+        opacity: 0.68;
+        box-shadow: none;
+      }
+      @media (max-width: 1120px) {
+        .wizard-shell {
+          grid-template-columns: 1fr;
+        }
+        .wizard-main {
+          order: 1;
+        }
+        .wizard-flow {
+          order: 2;
+          border-right: 0;
+          border-top: 1px solid var(--border);
+        }
+        .wizard-gate {
+          order: 3;
+          border-left: 0;
+          border-top: 1px solid var(--border);
+        }
+      }
+      @media (max-width: 900px) {
+        .platform-grid,
+        .auto-grid,
+        .voice-preset-grid,
+        .field-grid.workbench,
+        .storyboard-grid,
+        .status-pair {
+          grid-template-columns: 1fr;
+        }
+        .main-topbar,
+        .editor-tools {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    `,
     body: `
-      <section class="hero">
-        <article class="card">
-          <p>把“做一个视频前到底要准备什么”收敛成一个真正可填写的入口。这里先完成第一版配置页，让后续任务创建、Storyboard 和任务面板都有统一起点。</p>
-          <div class="hero-grid">
-            <div class="stat"><b>Target User</b><span>AI-native creators</span></div>
-            <div class="stat"><b>Primary Goal</b><span>One clear start page</span></div>
-            <div class="stat"><b>Supported Platforms</b><span>douyin / xiaohongshu / videox</span></div>
-            <div class="stat"><b>Current Route</b><span>http://localhost:${port}/</span></div>
+      <section class="wizard-shell">
+        <aside class="wizard-flow">
+          <div class="flow-header">
+            <div class="section-title">创作流水线</div>
+            <div class="section-label">已完成 ${completedSteps}/${wizardSteps.length} 步</div>
+            <div class="flow-progress-bar"><span></span></div>
           </div>
-        </article>
-        <aside class="card">
-          <p>手动验收重点：</p>
-          <div class="summary-list">
-            <div class="summary-item">1. 留空标题或脚本文本时，会马上看到明确错误提示。</div>
-            <div class="summary-item">2. 切换平台、渲染档位、脚本模式时，右侧摘要会实时联动。</div>
-            <div class="summary-item">3. 手机宽度下表单会自动折叠为单列布局。</div>
+          <div class="step-rail">
+            ${stepRailHtml}
           </div>
         </aside>
-      </section>
 
-      <section class="layout">
-        <section class="card">
-          <div class="field-grid">
-            <div class="field">
-              <label for="title">标题 Title</label>
-              <input id="title" placeholder="例如：AI 如何让研发效率提升 3 倍" />
+        <main class="wizard-main">
+          <div class="main-topbar">
+            <div class="main-title">
+              <h2>${currentStepContent.title}</h2>
+              <p>${currentStepContent.subtitle}</p>
             </div>
-            <div class="field">
-              <label for="author">作者 Author</label>
-              <input id="author" value="John" />
-            </div>
-            <div class="field">
-              <label for="platform">平台 Platform</label>
-              <select id="platform">
-                <option value="douyin">douyin</option>
-                <option value="xiaohongshu">xiaohongshu</option>
-                <option value="videox">videox</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="renderProfile">渲染档位 Render Profile</label>
-              <select id="renderProfile">
-                <option value="draft">draft</option>
-                <option value="standard" selected>standard</option>
-                <option value="high_quality">high_quality</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="scriptMode">脚本模式 Script Mode</label>
-              <select id="scriptMode">
-                <option value="plain_text" selected>plain_text</option>
-                <option value="markdown">markdown</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="stylePreset">视觉风格 Style Preset</label>
-              <select id="stylePreset">
-                <option value="john_vertical_comic" selected>john_vertical_comic</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="personaPreset">人物预设 Persona Preset</label>
-              <select id="personaPreset">
-                <option value="john_persona_v1" selected>john_persona_v1</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="voiceMode">声音方案 Voice Mode</label>
-              <select id="voiceMode">
-                <option value="male_coach_deep" selected>male_coach_deep</option>
-                <option value="male_clear_teacher">male_clear_teacher</option>
-                <option value="female_warm_narrator">female_warm_narrator</option>
-                <option value="female_energetic_creator">female_energetic_creator</option>
-                <option value="male_storytelling_soft">male_storytelling_soft</option>
-                <option value="custom_reference">custom_reference</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="ownerToken">Owner Token</label>
-              <input id="ownerToken" placeholder="例如：john-mobile-studio" />
-            </div>
-            <div class="field">
-              <label for="customVoiceReference">自定义声音参考 Custom Voice Reference</label>
-              <input id="customVoiceReference" placeholder="例如：john-reference.wav" />
-              <div class="hint">仅支持你本人或已明确授权的声音参考。后续会接入类似剪映的录入与克隆体验。</div>
-            </div>
-            <div class="field full">
-              <label for="scriptText">脚本文本 Script</label>
-              <textarea id="scriptText" placeholder="在这里输入你的脚本、Markdown 场景或者段落文本。"></textarea>
-              <div class="hint">支持普通文本和 Markdown 两种输入方式。摘要区会估算场景数量，帮助你快速判断脚本结构是否合理。</div>
-            </div>
-            <div class="field full">
-              <div class="summary-item">
-                <b style="display:block;margin-bottom:8px">John Style Notes</b>
-                <p>当前视觉方案会把画面约束为 John 的竖屏漫画讲解风格：暖色办公/训练场景、漫画人物、字幕安全区保留、禁止复制平台 UI、水印和账号元素。</p>
-              </div>
-            </div>
-            <div class="field full">
-              <div class="summary-item">
-                <b style="display:block;margin-bottom:8px">Voice Authorization</b>
-                <p>Only clone John's own voice or a voice with explicit permission. Do not clone unauthorized third-party voices.</p>
-              </div>
+            <div class="nav-actions">
+              ${
+                previousStepId
+                  ? `<a class="mini-ghost" id="prevStepBtn" href="${stepQueryHref(previousStepId)}">上一步</a>`
+                  : `<span class="mini-ghost">上一步</span>`
+              }
+              <span class="submit-chip">提交验收</span>
             </div>
           </div>
-          <div class="actions">
-            <button class="primary" id="validateBtn">Validate Draft</button>
-            <button class="secondary" id="createJobBtn">Create Job</button>
-            <button class="secondary" id="loadDemoBtn">Load Demo Content</button>
-          </div>
-        </section>
 
-        <aside class="card">
-          <p><span id="status" class="warn">Waiting for input</span></p>
-          <div class="summary-meta">
-            <div class="stat"><b>Estimated Scenes</b><span id="estimatedScenes">0</span></div>
-            <div class="stat"><b>Characters</b><span id="scriptCharacters">0</span></div>
-          </div>
-          <div class="summary-list" id="summaryList"></div>
-          <div class="error-list" id="errorList"></div>
-          <div class="summary-item" style="margin-top:14px">
-            <b style="display:block;margin-bottom:8px">Normalized Draft JSON</b>
-            <pre id="draftJson" class="empty">No valid draft yet.</pre>
-          </div>
-          <div class="summary-item" style="margin-top:14px">
-            <b style="display:block;margin-bottom:8px">Current Job</b>
-            <pre id="jobStatus" class="empty">No job created yet.</pre>
+          <section class="soft-card focus-banner">
+            <span class="focus-pill">本步目标</span>
+            <strong>${currentStepContent.goalTitle}</strong>
+            <p>${currentStepContent.goalText}</p>
+            <p>${currentStepContent.goalHint}</p>
+          </section>
+
+          <section class="card editor-card">
+              <div class="panel-title">${isAssetIntakeStep ? "脚本输入与自动抽取" : "脚本编辑器"}</div>
+              <div class="editor-meta">
+                <span class="tiny-chip" id="currentTaskChip">暂无任务</span>
+                <span class="tiny-chip" id="currentModeChip">纯文本</span>
+                <span class="tiny-chip" id="currentProfileChip">标准</span>
+                <span class="tiny-chip" id="heroStatus">可提交</span>
+              </div>
+              ${
+                isAssetIntakeStep
+                  ? `
+              <div class="script-intake-layout">
+                <div class="script-paste-box">
+                  <label class="tip-label" for="scriptText">短视频脚本 <span class="tip-icon" data-tip="直接粘贴完整脚本即可。系统会自动尝试提取标题、hook、summary、总时长和每个 scene 的口播/画面建议。">?</span></label>
+                  <input id="platform" type="hidden" value="douyin" />
+                  <input id="scriptMode" type="hidden" value="plain_text" />
+                  <input id="voiceMode" type="hidden" value="male_coach_deep" />
+                  <textarea id="scriptText" placeholder="在这里直接粘贴你的短视频脚本。建议包含：title、hook、summary、durationSec、scenes、cta。"></textarea>
+                  <div class="micro-copy">支持自然语言脚本，也支持接近 JSON / Markdown 的结构化脚本。脚本模式将自动识别，无需手动选择。</div>
+                </div>
+
+                <div class="field">
+                  <label class="tip-label">发布平台 <span class="tip-icon" data-tip="这里不是单选。一次勾选多个平台后，后续会按平台分别输出适配的视频规格和发布信息。">?</span></label>
+                  <div class="platform-grid">
+                    <label class="check-card"><input type="checkbox" id="platformWechat" checked /><span>微信视频号</span></label>
+                    <label class="check-card"><input type="checkbox" id="platformXiaohongshu" checked /><span>小红书</span></label>
+                    <label class="check-card"><input type="checkbox" id="platformDouyin" checked /><span>抖音</span></label>
+                    <label class="check-card"><input type="checkbox" id="platformBilibili" /><span>B站</span></label>
+                  </div>
+                </div>
+
+                <div class="auto-grid">
+                  <div class="auto-card">
+                    <b>自动提取标题</b>
+                    <strong id="derivedTitle">等待脚本解析</strong>
+                  </div>
+                  <div class="auto-card">
+                    <b>自动提取 Hook</b>
+                    <strong id="derivedHook">等待脚本解析</strong>
+                  </div>
+                  <div class="auto-card">
+                    <b>自动提取摘要</b>
+                    <strong id="derivedSummary">等待脚本解析</strong>
+                  </div>
+                  <div class="auto-card">
+                    <b>自动提取总时长</b>
+                    <strong id="derivedDuration">等待脚本解析</strong>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <label class="tip-label">自动识别场景 <span class="tip-icon" data-tip="系统会把脚本拆成 scenes，每个 scene 包含 voiceover、visualSuggestion 和 durationSec，供下一步分镜确认直接使用。">?</span></label>
+                  <div class="scene-outline" id="sceneOutline">
+                    <div class="summary-item empty">粘贴脚本后，这里会自动生成 scenes 草稿。</div>
+                  </div>
+                </div>
+
+                <div class="field-grid workbench">
+                  <div class="field compact">
+                    <label class="tip-label" for="author">作者 <span class="tip-icon" data-tip="用于写入元数据和产物归属，不会直接影响镜头内容。">?</span></label>
+                    <input id="author" value="John" />
+                  </div>
+                  <div class="field compact">
+                    <label class="tip-label" for="renderProfile">渲染档位 <span class="tip-icon" data-tip="标准档位用于日常生产；高质量档位适合正式发布；草稿档位用于快速预览。">?</span></label>
+                    <select id="renderProfile">
+                      <option value="draft">草稿</option>
+                      <option value="standard" selected>标准</option>
+                      <option value="high_quality">高质量</option>
+                    </select>
+                  </div>
+                  <div class="field compact">
+                    <label class="tip-label" for="stylePreset">视觉风格 <span class="tip-icon" data-tip="约束生成图片的整体风格、构图、字幕安全区和人物画风。">?</span></label>
+                    <select id="stylePreset">
+                      <option value="john_vertical_comic" selected>John 竖屏漫画</option>
+                    </select>
+                  </div>
+                  <div class="field compact">
+                    <label class="tip-label" for="personaPreset">人物预设 <span class="tip-icon" data-tip="用于锁定主角身份和形象连续性，保证不同场景仍然是同一个 John。">?</span></label>
+                    <select id="personaPreset">
+                      <option value="john_persona_v1" selected>John 人设 v1</option>
+                    </select>
+                  </div>
+                  <div class="field compact">
+                    <label class="tip-label" for="ownerToken">归属标识 <span class="tip-icon" data-tip="用于识别这条任务属于哪个工作流或哪个创作人，也会参与幂等和任务去重。">?</span></label>
+                    <input id="ownerToken" value="john-ai-lab" placeholder="例如：john-mobile-studio" />
+                  </div>
+                  <div class="field compact">
+                    <label class="tip-label" for="title">保底标题 <span class="tip-icon" data-tip="当脚本自动抽取标题失败时，会回退使用这里的标题。正常情况下无需手动填写。">?</span></label>
+                    <input id="title" placeholder="如自动抽取失败，可在这里补充标题" />
+                  </div>
+                </div>
+
+                ${
+                  isAssetIntakeStep
+                    ? `
+                <div class="field full">
+                  <label class="tip-label">声音方案摘要 <span class="tip-icon" data-tip="素材收集阶段只需要确认你准备使用哪一类声音。完整试听、录音、应用操作放到第 4 步“声音应用”里完成。">?</span></label>
+                  <div class="auto-grid">
+                    <div class="auto-card">
+                      <b>当前声音方案</b>
+                      <strong id="activeVoiceModeLabel">男声教练沉稳</strong>
+                    </div>
+                    <div class="auto-card">
+                      <b>自定义声音参考</b>
+                      <strong id="activeVoiceReferenceLabel">未使用自定义参考</strong>
+                    </div>
+                  </div>
+                  <div class="hint">现在先确认脚本结构是否正确。试听、录音、应用声音请在第 4 步完成。</div>
+                </div>
+                    `
+                    : ""
+                }
+
+                ${
+                  isVoiceGenerationStep
+                    ? `
+                <div class="field">
+                  <label class="tip-label">声音方案 <span class="tip-icon" data-tip="先试听，再点应用该声音。也可以输入你自己的参考音频并应用为本次任务音色。">?</span></label>
+                  <div class="voice-preset-grid">
+                    <article class="voice-card active" data-voice-mode="male_coach_deep">
+                      <strong>男声教练沉稳</strong>
+                      <small>适合训练、方法论和动作纠正视频。</small>
+                      <div class="voice-actions">
+                        <button type="button" class="secondary voice-preview-btn">试听</button>
+                        <button type="button" class="primary voice-apply-btn">应用该声音</button>
+                      </div>
+                    </article>
+                    <article class="voice-card" data-voice-mode="male_clear_teacher">
+                      <strong>男声老师清晰</strong>
+                      <small>适合知识拆解、SOP 教学和框架讲解。</small>
+                      <div class="voice-actions">
+                        <button type="button" class="secondary voice-preview-btn">试听</button>
+                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
+                      </div>
+                    </article>
+                    <article class="voice-card" data-voice-mode="female_warm_narrator">
+                      <strong>女声旁白温和</strong>
+                      <small>适合平稳叙述、总结和温和解释类视频。</small>
+                      <div class="voice-actions">
+                        <button type="button" class="secondary voice-preview-btn">试听</button>
+                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
+                      </div>
+                    </article>
+                    <article class="voice-card" data-voice-mode="female_energetic_creator">
+                      <strong>女声创作者活力</strong>
+                      <small>适合钩子开场、节奏更快的短视频表达。</small>
+                      <div class="voice-actions">
+                        <button type="button" class="secondary voice-preview-btn">试听</button>
+                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
+                      </div>
+                    </article>
+                    <article class="voice-card" data-voice-mode="male_storytelling_soft">
+                      <strong>男声叙事柔和</strong>
+                      <small>适合复盘、成长故事和更平稳的经验分享。</small>
+                      <div class="voice-actions">
+                        <button type="button" class="secondary voice-preview-btn">试听</button>
+                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
+                      </div>
+                    </article>
+                  </div>
+                  <div class="inline-status" id="presetVoiceStatus">当前已应用：男声教练沉稳</div>
+                </div>
+
+                <div class="field full">
+                  <label class="tip-label" for="customVoiceReference">录入你自己的声音 <span class="tip-icon" data-tip="上传或录入你自己的声音参考后，可以直接应用为本次任务的自定义音色，并通过试听先确认效果。">?</span></label>
+                  <input id="customVoiceReference" placeholder="上传或录音后自动回填文件名" readonly />
+                  <div class="voice-reference-actions">
+                    <label class="secondary upload-button" for="customVoiceFile">上传声音文件</label>
+                    <input id="customVoiceFile" type="file" accept="audio/*" hidden />
+                    <button type="button" class="secondary" id="recordVoiceBtn">开始录音</button>
+                    <button type="button" class="secondary" id="stopRecordVoiceBtn" disabled>停止录音</button>
+                    <button type="button" class="primary" id="applyCustomVoiceBtn">应用我的声音</button>
+                    <button type="button" class="secondary" id="previewCustomVoiceBtn">试听我的声音</button>
+                  </div>
+                  <div class="inline-status" id="customVoiceStatus">上传或录音后，可应用为本次任务音色。</div>
+                  <div class="hint">仅支持你本人或已明确授权的声音参考。应用自定义声音前，需要你确认使用授权。</div>
+                </div>
+                    `
+                    : ""
+                }
+              </div>
+                  `
+                  : isVoiceGenerationStep
+                    ? `
+              <div class="field-grid workbench">
+                <input id="platform" type="hidden" value="douyin" />
+                <input id="scriptMode" type="hidden" value="plain_text" />
+                <input id="voiceMode" type="hidden" value="male_coach_deep" />
+                <div class="field compact">
+                  <label for="title">标题</label>
+                  <input id="title" placeholder="例如：AI 如何让研发效率提升 3 倍" />
+                </div>
+                <div class="field compact">
+                  <label for="author">作者</label>
+                  <input id="author" value="John" />
+                </div>
+                <div class="field compact">
+                  <label for="renderProfile">渲染档位</label>
+                  <select id="renderProfile">
+                    <option value="draft">草稿</option>
+                    <option value="standard" selected>标准</option>
+                    <option value="high_quality">高质量</option>
+                  </select>
+                </div>
+                <div class="field compact">
+                  <label for="stylePreset">视觉风格</label>
+                  <select id="stylePreset">
+                    <option value="john_vertical_comic" selected>John 竖屏漫画</option>
+                  </select>
+                </div>
+                <div class="field compact">
+                  <label for="personaPreset">人物预设</label>
+                  <select id="personaPreset">
+                    <option value="john_persona_v1" selected>John 人设 v1</option>
+                  </select>
+                </div>
+                <div class="field compact">
+                  <label for="ownerToken">归属标识</label>
+                  <input id="ownerToken" placeholder="例如：john-mobile-studio" />
+                </div>
+                <div class="field full">
+                  <label for="scriptText">脚本文本</label>
+                  <textarea id="scriptText" placeholder="这里保留脚本全文，方便你在应用声音时仍能对照内容。"></textarea>
+                </div>
+
+                <div class="field full">
+                  <label class="tip-label">声音方案 <span class="tip-icon" data-tip="完整试听、应用、录音、自定义声音操作都集中在这一步完成。">?</span></label>
+                  <div class="voice-preset-grid">
+                    <article class="voice-card active" data-voice-mode="male_coach_deep">
+                      <strong>男声教练沉稳</strong>
+                      <small>适合训练、方法论和动作纠正视频。</small>
+                      <div class="voice-actions">
+                        <button type="button" class="secondary voice-preview-btn">试听</button>
+                        <button type="button" class="primary voice-apply-btn">应用该声音</button>
+                      </div>
+                    </article>
+                    <article class="voice-card" data-voice-mode="male_clear_teacher">
+                      <strong>男声老师清晰</strong>
+                      <small>适合知识拆解、SOP 教学和框架讲解。</small>
+                      <div class="voice-actions">
+                        <button type="button" class="secondary voice-preview-btn">试听</button>
+                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
+                      </div>
+                    </article>
+                    <article class="voice-card" data-voice-mode="female_warm_narrator">
+                      <strong>女声旁白温和</strong>
+                      <small>适合平稳叙述、总结和温和解释类视频。</small>
+                      <div class="voice-actions">
+                        <button type="button" class="secondary voice-preview-btn">试听</button>
+                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
+                      </div>
+                    </article>
+                    <article class="voice-card" data-voice-mode="female_energetic_creator">
+                      <strong>女声创作者活力</strong>
+                      <small>适合钩子开场、节奏更快的短视频表达。</small>
+                      <div class="voice-actions">
+                        <button type="button" class="secondary voice-preview-btn">试听</button>
+                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
+                      </div>
+                    </article>
+                    <article class="voice-card" data-voice-mode="male_storytelling_soft">
+                      <strong>男声叙事柔和</strong>
+                      <small>适合复盘、成长故事和更平稳的经验分享。</small>
+                      <div class="voice-actions">
+                        <button type="button" class="secondary voice-preview-btn">试听</button>
+                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
+                      </div>
+                    </article>
+                  </div>
+                  <div class="inline-status" id="presetVoiceStatus">当前已应用：男声教练沉稳</div>
+                </div>
+
+                <div class="field full">
+                  <label class="tip-label" for="customVoiceReference">录入你自己的声音 <span class="tip-icon" data-tip="上传或录入你自己的声音参考后，可以直接应用为本次任务的自定义音色，并通过试听先确认效果。">?</span></label>
+                  <input id="customVoiceReference" placeholder="上传或录音后自动回填文件名" readonly />
+                  <div class="voice-reference-actions">
+                    <label class="secondary upload-button" for="customVoiceFile">上传声音文件</label>
+                    <input id="customVoiceFile" type="file" accept="audio/*" hidden />
+                    <button type="button" class="secondary" id="recordVoiceBtn">开始录音</button>
+                    <button type="button" class="secondary" id="stopRecordVoiceBtn" disabled>停止录音</button>
+                    <button type="button" class="primary" id="applyCustomVoiceBtn">应用我的声音</button>
+                    <button type="button" class="secondary" id="previewCustomVoiceBtn">试听我的声音</button>
+                  </div>
+                  <div class="inline-status" id="customVoiceStatus">上传或录音后，可应用为本次任务音色。</div>
+                  <div class="hint">仅支持你本人或已明确授权的声音参考。应用自定义声音前，需要你确认使用授权。</div>
+                </div>
+              </div>
+                    `
+                    : `
+              <div class="field-grid workbench">
+                <div class="field compact">
+                  <label for="title">标题</label>
+                  <input id="title" placeholder="例如：AI 如何让研发效率提升 3 倍" />
+                </div>
+                <div class="field compact">
+                  <label for="author">作者</label>
+                  <input id="author" value="John" />
+                </div>
+                <div class="field compact">
+                  <label for="renderProfile">渲染档位</label>
+                  <select id="renderProfile">
+                    <option value="draft">草稿</option>
+                    <option value="standard" selected>标准</option>
+                    <option value="high_quality">高质量</option>
+                  </select>
+                </div>
+                <div class="field compact">
+                  <label for="stylePreset">视觉风格</label>
+                  <select id="stylePreset">
+                    <option value="john_vertical_comic" selected>John 竖屏漫画</option>
+                  </select>
+                </div>
+                <div class="field compact">
+                  <label for="personaPreset">人物预设</label>
+                  <select id="personaPreset">
+                    <option value="john_persona_v1" selected>John 人设 v1</option>
+                  </select>
+                </div>
+                <div class="field compact">
+                  <label for="ownerToken">归属标识</label>
+                  <input id="ownerToken" placeholder="例如：john-mobile-studio" />
+                </div>
+                <div class="field full">
+                  <label for="scriptText">脚本文本</label>
+                  <textarea id="scriptText" placeholder="在这里输入你的脚本、Markdown 场景或者段落文本。"></textarea>
+                </div>
+              </div>
+                  `
+              }
+
+              <div class="editor-tools">
+                <div class="actions">
+                  <button class="primary" id="validateBtn">校验草稿</button>
+                  <button class="secondary" id="createJobBtn">创建任务</button>
+                  <button class="secondary" id="loadDemoBtn">载入演示内容</button>
+                </div>
+                <span id="status" class="warn">等待输入</span>
+              </div>
+          </section>
+
+          <section class="card storyboard-card" style="margin-top:14px">
+              <div class="panel-title">分镜预览</div>
+              <p>这里显示脚本拆分后的场景预览，帮助你在创建任务前先理解节奏和镜头意图。编辑脚本后先点 Validate，就能即时看到场景化结果。</p>
+              <div class="storyboard-grid" id="storyboardGrid">
+                <div class="summary-item empty">先校验草稿，再生成分镜预览。</div>
+              </div>
+          </section>
+        </main>
+
+        <aside class="wizard-gate">
+          <div class="gate-panel">
+            <section class="gate-card">
+              <div class="panel-title" id="overviewPanelTitle">当前草稿概览</div>
+              <div class="gate-score">
+                <strong><span id="qualityScore">--</span> <small id="qualityScoreSuffix" style="font-size:13px;color:var(--muted)">/100</small></strong>
+                <span class="gate-badge" id="gateBadge">待提交</span>
+              </div>
+              <div class="progress-track"><div class="progress-value" id="progressValue" style="width:0%"></div></div>
+              <div class="status-pair" style="margin-top:12px">
+                <div class="status-box"><b id="estimatedScenesLabel">预估场景数</b><span id="estimatedScenes">0</span></div>
+                <div class="status-box"><b id="scriptCharactersLabel">字数</b><span id="scriptCharacters">0</span></div>
+              </div>
+            </section>
+
+            <section class="gate-card">
+              <div class="panel-title" id="focusPanelTitle">当前这一步重点</div>
+              <div class="gate-note" id="focusPanelNote">素材收集阶段先关注：脚本是否完整、场景拆分是否顺、声音方案是否选对。任务创建后，右侧才重点显示进度、预览和产物质量。</div>
+              <div class="quality-list" id="summaryList"></div>
+              <div class="error-list" id="errorList"></div>
+            </section>
+
+            <section class="gate-card">
+              <div class="panel-title" id="selectedPlanPanelTitle">当前已选方案</div>
+              <div class="asset-list">
+                <div class="asset-item">
+                  <strong>当前声音方案</strong>
+                  <p id="activeVoiceModeLabel">男声教练沉稳</p>
+                </div>
+                <div class="asset-item">
+                  <strong>当前声音参考</strong>
+                  <p id="activeVoiceReferenceLabel">未使用自定义参考</p>
+                </div>
+                <div class="asset-item">
+                  <strong>当前视觉风格</strong>
+                  <p>John 竖屏漫画</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="gate-card">
+              <div class="panel-title" id="nextGatePanelTitle">下一步 Gate 要求</div>
+              <div class="gate-list" id="nextGateList">
+                <div class="gate-item"><strong>内容已保存</strong><p>草稿通过基础校验，字段完整。</p></div>
+                <div class="gate-item"><strong>结构评分 &gt; 70</strong><p>场景拆分合理，文案足以进入 Storyboard。</p></div>
+                <div class="gate-item"><strong>产物可继续生成</strong><p>创建任务后可跟踪 SSE，并最终看到 MP4 预览。</p></div>
+              </div>
+            </section>
+
+            <section class="gate-card status-card">
+              <div class="panel-title">任务进度</div>
+              <div class="status-pair">
+                <div class="status-box"><b>任务状态</b><span id="jobStateChip" style="font-size:14px">空闲</span></div>
+                <div class="status-box"><b>当前步骤</b><span id="jobStepChip" style="font-size:14px">暂无步骤</span></div>
+              </div>
+              <div class="job-events" id="jobEvents">
+                <div class="event-item-compact">这里只保留最新几条关键进度，不再堆满所有试听和录音操作。</div>
+              </div>
+              <div class="summary-item">
+                <b style="display:block;margin-bottom:8px">当前任务快照</b>
+                <pre id="jobStatus" class="mono-box empty">尚未创建任务。</pre>
+              </div>
+            </section>
+
+            <section class="gate-card">
+              <div class="panel-title">预览面板</div>
+              <div class="preview-shell">
+                <div class="preview-stage" id="previewStage">
+                  <div class="preview-placeholder">当前还没有完成的 MP4。渲染结束后，这里会出现播放器和下载链接。</div>
+                </div>
+                <div class="preview-links" id="previewLinks"></div>
+                <div class="summary-item">
+                  <b style="display:block;margin-bottom:8px">产物质量摘要</b>
+                  <div class="quality-list" id="jobQualitySummary">
+                    <div class="summary-item empty">任务完成后，这里会显示文件大小、时长、分辨率、音频、字幕、fallback 与合规状态。</div>
+                  </div>
+                </div>
+                <div class="summary-item">
+                  <b style="display:block;margin-bottom:8px">成本估算</b>
+                  <div class="quality-list" id="jobCostSummary">
+                    <div class="summary-item empty">创建任务后，这里会显示图像、TTS 和总成本估算。</div>
+                  </div>
+                </div>
+                <div class="summary-item">
+                  <b style="display:block;margin-bottom:8px">标准化草稿 JSON</b>
+                  <pre id="draftJson" class="mono-box empty">当前还没有有效草稿。</pre>
+                </div>
+              </div>
+            </section>
           </div>
         </aside>
       </section>
@@ -355,15 +1538,621 @@ function renderWizardPage() {
         const jobStatus = document.getElementById("jobStatus");
         const estimatedScenes = document.getElementById("estimatedScenes");
         const scriptCharacters = document.getElementById("scriptCharacters");
+        const qualityScore = document.getElementById("qualityScore");
+        const storyboardGrid = document.getElementById("storyboardGrid");
+        const derivedTitle = document.getElementById("derivedTitle");
+        const derivedHook = document.getElementById("derivedHook");
+        const derivedSummary = document.getElementById("derivedSummary");
+        const derivedDuration = document.getElementById("derivedDuration");
+        const sceneOutline = document.getElementById("sceneOutline");
+        const platformWechat = document.getElementById("platformWechat");
+        const platformXiaohongshu = document.getElementById("platformXiaohongshu");
+        const platformDouyin = document.getElementById("platformDouyin");
+        const platformBilibili = document.getElementById("platformBilibili");
+        const previewStage = document.getElementById("previewStage");
+        const previewLinks = document.getElementById("previewLinks");
+        const jobQualitySummary = document.getElementById("jobQualitySummary");
+        const jobCostSummary = document.getElementById("jobCostSummary");
+        const progressValue = document.getElementById("progressValue");
+        const jobStateChip = document.getElementById("jobStateChip");
+        const jobStepChip = document.getElementById("jobStepChip");
+        const jobEvents = document.getElementById("jobEvents");
+        const currentTaskChip = document.getElementById("currentTaskChip");
+        const currentModeChip = document.getElementById("currentModeChip");
+        const currentProfileChip = document.getElementById("currentProfileChip");
+        const heroStatus = document.getElementById("heroStatus");
+        const customVoiceReferenceInput = document.getElementById("customVoiceReference");
+        const customVoiceFileInput = document.getElementById("customVoiceFile");
+        const recordVoiceBtn = document.getElementById("recordVoiceBtn");
+        const stopRecordVoiceBtn = document.getElementById("stopRecordVoiceBtn");
+        const applyCustomVoiceBtn = document.getElementById("applyCustomVoiceBtn");
+        const previewCustomVoiceBtn = document.getElementById("previewCustomVoiceBtn");
+        const presetVoiceStatus = document.getElementById("presetVoiceStatus");
+        const customVoiceStatus = document.getElementById("customVoiceStatus");
+        const validateBtn = document.getElementById("validateBtn");
+        const createJobBtn = document.getElementById("createJobBtn");
+        const loadDemoBtn = document.getElementById("loadDemoBtn");
+        const activeVoiceModeLabel = document.getElementById("activeVoiceModeLabel");
+        const activeVoiceReferenceLabel = document.getElementById("activeVoiceReferenceLabel");
+        const overviewPanelTitle = document.getElementById("overviewPanelTitle");
+        const qualityScoreSuffix = document.getElementById("qualityScoreSuffix");
+        const gateBadge = document.getElementById("gateBadge");
+        const estimatedScenesLabel = document.getElementById("estimatedScenesLabel");
+        const scriptCharactersLabel = document.getElementById("scriptCharactersLabel");
+        const focusPanelTitle = document.getElementById("focusPanelTitle");
+        const focusPanelNote = document.getElementById("focusPanelNote");
+        const selectedPlanPanelTitle = document.getElementById("selectedPlanPanelTitle");
+        const nextGatePanelTitle = document.getElementById("nextGatePanelTitle");
+        const nextGateList = document.getElementById("nextGateList");
+        const voicePreviewPlayer = new Audio();
+        const DRAFT_STORAGE_KEY = "video_ops_wizard_draft_v1";
+        const CURRENT_STEP_ID = ${JSON.stringify(currentStepId)};
+        let activeRecorder = null;
+        let recorderStream = null;
+        let recorderChunks = [];
         let activeEventSource = null;
 
+        function clientProfileLabel(value) {
+          if (value === "draft") return "草稿";
+          if (value === "high_quality") return "高质量";
+          return "标准";
+        }
+
+        function clientScriptModeLabel(value) {
+          return value === "markdown" ? "Markdown" : "纯文本";
+        }
+
+        function clientVoiceModeLabel(value) {
+          if (value === "male_coach_deep") return "男声教练沉稳";
+          if (value === "male_clear_teacher") return "男声老师清晰";
+          if (value === "female_warm_narrator") return "女声旁白温和";
+          if (value === "female_energetic_creator") return "女声创作者活力";
+          if (value === "male_storytelling_soft") return "男声叙事柔和";
+          if (value === "custom_reference") return "自定义声音";
+          return "未选择";
+        }
+
+        function renderStepGate() {
+          if (!overviewPanelTitle || !qualityScoreSuffix || !gateBadge || !estimatedScenesLabel || !scriptCharactersLabel || !focusPanelTitle || !focusPanelNote || !selectedPlanPanelTitle || !nextGatePanelTitle || !nextGateList) {
+            return;
+          }
+
+          const gateConfig = {
+            asset_intake: {
+              overviewTitle: "脚本就绪概览",
+              focusTitle: "素材收集这一步看什么",
+              focusNote: "这里只看三件事：脚本是否完整、自动拆出的场景是否顺、是否已经知道要用哪类声音。先把输入搞清楚，比过早盯渲染结果更重要。",
+              selectedPlanTitle: "当前已选输入方案",
+              nextGateTitle: "进入分镜确认前必须满足",
+              gateBadgeText: "待校验",
+              scoreSuffix: "/100",
+              estimatedLabel: "预估场景数",
+              scriptLabel: "脚本字数",
+              gates: [
+                { title: "脚本能读懂", text: "至少能提取出标题、核心观点和 CTA，不要让后续步骤猜你的意思。" },
+                { title: "场景拆分顺", text: "每一段都要能回答“这一段说什么、画面拍什么、预计几秒”。" },
+                { title: "声音方向已定", text: "现在只需要知道用预设声音还是你自己的声音，试听动作放到第 4 步。" },
+              ],
+            },
+            storyboard_generation: {
+              overviewTitle: "分镜确认概览",
+              focusTitle: "分镜确认这一步看什么",
+              focusNote: "这里不是继续写文案，而是确认每个 scene 是否真的能拍、能讲、能让后面的图像和配音环节少返工。",
+              selectedPlanTitle: "当前分镜输入",
+              nextGateTitle: "进入图像生成前必须满足",
+              gateBadgeText: "待确认",
+              scoreSuffix: "/100",
+              estimatedLabel: "分镜段数",
+              scriptLabel: "脚本字数",
+              gates: [
+                { title: "镜头逻辑顺", text: "开场、展开、收束、CTA 的顺序要自然，不要中间跳话题。" },
+                { title: "每段画面可执行", text: "visualSuggestion 要足够具体，避免后面只能出抽象图。" },
+                { title: "节奏合理", text: "每段建议时长要和内容重量匹配，避免 30 秒脚本拆出过多场景。" },
+              ],
+            },
+            image_generation: {
+              overviewTitle: "画面准备概览",
+              focusTitle: "图像生成这一步看什么",
+              focusNote: "这里关注的是风格一致、人物连续和平台可用，不是追求单张图极致精修。",
+              selectedPlanTitle: "当前视觉方案",
+              nextGateTitle: "进入声音应用前必须满足",
+              gateBadgeText: "待生成",
+              scoreSuffix: "/100",
+              estimatedLabel: "待生成场景",
+              scriptLabel: "脚本字数",
+              gates: [
+                { title: "人物稳定", text: "John 形象在不同场景里要保持一致，不能每段都像不同人。" },
+                { title: "构图适合竖屏", text: "文字安全区、主体位置和裁切都要适配多平台短视频。" },
+                { title: "场景覆盖完整", text: "关键 scene 都要有可用图，不能只生成封面图。" },
+              ],
+            },
+            voice_generation: {
+              overviewTitle: "声音应用概览",
+              focusTitle: "声音应用这一步看什么",
+              focusNote: "这一关只做一件事：把整条视频的声音方案定下来。先试听再应用，确认自然度、清晰度和可信感，再去合成。",
+              selectedPlanTitle: "当前声音方案",
+              nextGateTitle: "进入合成预览前必须满足",
+              gateBadgeText: "待应用",
+              scoreSuffix: "/5",
+              estimatedLabel: "可用声音组",
+              scriptLabel: "自定义参考",
+              gates: [
+                { title: "声音听起来自然", text: "不要有明显机器人味、吞字或发音飘的问题。" },
+                { title: "音色和内容匹配", text: "知识拆解、动作纠错和成长复盘，适合的语气并不一样。" },
+                { title: "如用本人声音已授权", text: "上传或录音前确认你有权使用这个声音参考。" },
+              ],
+            },
+            video_assembly: {
+              overviewTitle: "合成任务概览",
+              focusTitle: "合成预览这一步看什么",
+              focusNote: "这里开始真正看任务进度、SSE 事件和视频预览。脚本和声音都定下后，右侧应该更多反映生产状态，而不是草稿解释。",
+              selectedPlanTitle: "当前产线方案",
+              nextGateTitle: "进入合规发布前必须满足",
+              gateBadgeText: "处理中",
+              scoreSuffix: "/100",
+              estimatedLabel: "任务进度",
+              scriptLabel: "最新状态",
+              gates: [
+                { title: "SSE 持续推进", text: "至少能看到 PARSING 到 RENDERING 的过程，不是卡在创建成功一行。" },
+                { title: "可打开预览", text: "产物出来后，用户必须能直接预览或下载，而不是只看 JSON。" },
+                { title: "时间线无明显错位", text: "字幕、语音、画面至少要基本对齐，不能完全错拍。" },
+              ],
+            },
+            preview_publish: {
+              overviewTitle: "发布前概览",
+              focusTitle: "合规发布这一步看什么",
+              focusNote: "最后一关看的是交付，而不是内部状态。你要拿到的是能继续发布、能复用、能回查的成品资产。",
+              selectedPlanTitle: "当前交付包",
+              nextGateTitle: "标记完成前必须满足",
+              gateBadgeText: "待交付",
+              scoreSuffix: "/100",
+              estimatedLabel: "产物数量",
+              scriptLabel: "脚本字数",
+              gates: [
+                { title: "MP4 可打开", text: "用户要能在页面里直接播放，不是只有一个路径字符串。" },
+                { title: "元数据齐全", text: "至少包含任务信息、输出信息和后续复盘需要的关键信息。" },
+                { title: "多平台可继续分发", text: "尺寸、字幕和合规状态不能阻塞下一步发布。" },
+              ],
+            },
+          };
+
+          const config = gateConfig[CURRENT_STEP_ID] || gateConfig.asset_intake;
+          overviewPanelTitle.textContent = config.overviewTitle;
+          qualityScoreSuffix.textContent = config.scoreSuffix;
+          gateBadge.textContent = config.gateBadgeText;
+          estimatedScenesLabel.textContent = config.estimatedLabel;
+          scriptCharactersLabel.textContent = config.scriptLabel;
+          focusPanelTitle.textContent = config.focusTitle;
+          focusPanelNote.textContent = config.focusNote;
+          selectedPlanPanelTitle.textContent = config.selectedPlanTitle;
+          nextGatePanelTitle.textContent = config.nextGateTitle;
+          nextGateList.innerHTML = config.gates.map((item) => (
+            '<div class="gate-item"><strong>' + item.title + '</strong><p>' + item.text + '</p></div>'
+          )).join("");
+        }
+
+        function saveDraftToStorage() {
+          try {
+            const snapshot = {};
+            ids.forEach((id) => {
+              const element = document.getElementById(id);
+              if (!element) return;
+              snapshot[id] = element.value ?? "";
+            });
+            snapshot.platformWechat = Boolean(platformWechat?.checked);
+            snapshot.platformXiaohongshu = Boolean(platformXiaohongshu?.checked);
+            snapshot.platformDouyin = Boolean(platformDouyin?.checked);
+            snapshot.platformBilibili = Boolean(platformBilibili?.checked);
+            localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+          } catch {}
+        }
+
+        function restoreDraftFromStorage() {
+          try {
+            const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+            if (!raw) return;
+            const snapshot = JSON.parse(raw);
+            ids.forEach((id) => {
+              const element = document.getElementById(id);
+              if (!element) return;
+              const value = snapshot[id];
+              if (typeof value === "string") {
+                element.value = value;
+              }
+            });
+            if (platformWechat && typeof snapshot.platformWechat === "boolean") platformWechat.checked = snapshot.platformWechat;
+            if (platformXiaohongshu && typeof snapshot.platformXiaohongshu === "boolean") platformXiaohongshu.checked = snapshot.platformXiaohongshu;
+            if (platformDouyin && typeof snapshot.platformDouyin === "boolean") platformDouyin.checked = snapshot.platformDouyin;
+            if (platformBilibili && typeof snapshot.platformBilibili === "boolean") platformBilibili.checked = snapshot.platformBilibili;
+          } catch {}
+        }
+
+        function syncVoiceStatus() {
+          const voiceModeValue = document.getElementById("voiceMode").value;
+          const customReferenceValue = customVoiceReferenceInput?.value?.trim() || "";
+          if (activeVoiceModeLabel) {
+            activeVoiceModeLabel.textContent = clientVoiceModeLabel(voiceModeValue);
+          }
+          if (activeVoiceReferenceLabel) {
+            activeVoiceReferenceLabel.textContent = customReferenceValue || "未使用自定义参考";
+          }
+        }
+
+        function setInlineStatus(element, text, tone) {
+          if (!element) return;
+          element.textContent = text;
+          element.className = "inline-status" + (tone ? " " + tone : "");
+        }
+
+        function setButtonState(button, text, disabled) {
+          if (!button) return;
+          if (!button.dataset.defaultText) {
+            button.dataset.defaultText = button.textContent || "";
+          }
+          button.textContent = text;
+          button.disabled = Boolean(disabled);
+        }
+
+        function resetButtonState(button) {
+          if (!button) return;
+          button.textContent = button.dataset.defaultText || button.textContent;
+          button.disabled = false;
+        }
+
+        function markActiveVoiceCard(selectedCard) {
+          document.querySelectorAll(".voice-card").forEach((item) => {
+            item.classList.toggle("active", item === selectedCard);
+            const applyBtn = item.querySelector(".voice-apply-btn");
+            if (!applyBtn) return;
+            applyBtn.classList.toggle("primary", item === selectedCard);
+            applyBtn.classList.toggle("secondary", item !== selectedCard);
+            applyBtn.textContent = item === selectedCard ? "已应用" : (applyBtn.dataset.defaultText || "应用该声音");
+          });
+        }
+
+        function detectScriptMode(text) {
+          const normalized = (text || "").trim();
+          if (!normalized) return "plain_text";
+          if (/^#{1,6}\\s+/m.test(normalized) || /visual_hint:/i.test(normalized) || /tts_voice:/i.test(normalized)) {
+            return "markdown";
+          }
+          return "plain_text";
+        }
+
         function collect() {
-          return Object.fromEntries(ids.map((id) => [id, document.getElementById(id).value]));
+          const payload = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)?.value ?? ""]));
+          const scriptText = payload.scriptText || "";
+          const derived = deriveScriptStructure(scriptText);
+          payload.title = (payload.title || "").trim() || derived.title || "";
+          payload.scriptMode = detectScriptMode(scriptText);
+
+          if (platformWechat?.checked) {
+            payload.platform = "videox";
+          } else if (platformXiaohongshu?.checked) {
+            payload.platform = "xiaohongshu";
+          } else if (platformDouyin?.checked) {
+            payload.platform = "douyin";
+          } else if (platformBilibili?.checked) {
+            payload.platform = "videox";
+          }
+
+          return payload;
+        }
+
+        function appendEvent(text) {
+          const repeatedPrefixes = ["正在试听", "已应用声音方案", "已应用自定义声音参考", "开始录音", "录音结束", "已保存自定义声音参考"];
+          if (repeatedPrefixes.some((prefix) => text.startsWith(prefix))) {
+            const recent = Array.from(jobEvents.querySelectorAll(".event-item-compact")).slice(0, 4);
+            const duplicated = recent.find((item) => item.textContent === text);
+            if (duplicated) {
+              return;
+            }
+          }
+          const item = document.createElement("div");
+          item.className = "event-item-compact";
+          item.textContent = text;
+          jobEvents.prepend(item);
+          while (jobEvents.children.length > 8) {
+            jobEvents.removeChild(jobEvents.lastElementChild);
+          }
+        }
+
+        function deriveScriptStructure(text) {
+          const normalized = (text || "").trim();
+          if (!normalized) {
+            return {
+              title: "",
+              hook: "",
+              summary: "",
+              durationSec: 0,
+              cta: "",
+              scenes: [],
+            };
+          }
+
+          const lines = normalized.split("\\n").map((line) => line.trim()).filter(Boolean);
+          const fieldValue = (prefix) => {
+            const line = lines.find((item) => item.toLowerCase().startsWith(prefix + ":"));
+            return line ? line.slice(prefix.length + 1).trim() : "";
+          };
+
+          const title = fieldValue("title");
+          const hook = fieldValue("hook");
+          const summary = fieldValue("summary");
+          const durationSecRaw = Number(fieldValue("durationSec"));
+          const cta = fieldValue("cta");
+
+          if (/^#{1,6}\\s+/m.test(normalized)) {
+            const markdownLines = normalized.split("\\n");
+            const sections = [];
+            let current = null;
+
+            const flushSection = () => {
+              if (!current) return;
+              const body = current.lines.join("\\n").trim();
+              if (!body) return;
+              sections.push({
+                heading: current.heading,
+                body,
+              });
+            };
+
+            markdownLines.forEach((line) => {
+              const match = line.match(/^(#{1,6})\\s+(.+)$/);
+              if (match) {
+                flushSection();
+                current = { heading: match[2].trim(), lines: [] };
+                return;
+              }
+              if (!current) return;
+              current.lines.push(line.trim());
+            });
+            flushSection();
+
+            const semanticSections = sections.filter((section) =>
+              /(开场|钩子|正文|结尾|cta|总结|步骤|场景|镜头)/i.test(section.heading),
+            );
+
+            if (semanticSections.length) {
+              const titleSection = sections.find((section) => section.heading === "标题");
+              const summarySection = sections.find((section) => section.heading === "正文");
+              const ctaSection = sections.find((section) => /cta/i.test(section.heading));
+              const markdownScenes = [];
+              const pushScene = (titleText, voiceoverText, visualHintText) => {
+                const compactVoiceover = (voiceoverText || "")
+                  .replace(/^- /gm, "")
+                  .replace(new RegExp("\\n+", "g"), " ")
+                  .replace(new RegExp("\\s+", "g"), " ")
+                  .trim();
+                if (!compactVoiceover) return;
+                markdownScenes.push({
+                  index: markdownScenes.length + 1,
+                  title: titleText,
+                  voiceover: compactVoiceover,
+                  visualSuggestion: visualHintText,
+                  durationSec: Math.max(4, Math.min(12, Math.round(Math.max(compactVoiceover.length, 18) / 11))),
+                });
+              };
+
+              semanticSections.forEach((section) => {
+                if (section.heading === "开场钩子") {
+                  pushScene("开场钩子", section.body, "用强对比的 John 讲解画面快速抛出问题，让用户 3 秒内知道这条视频在说什么。");
+                  return;
+                }
+
+                if (section.heading === "正文") {
+                  const bodyBlocks = section.body
+                    .split(/\\n{2,}/)
+                    .map((item) => item.replace(/^- /gm, "").replace(new RegExp("\\s+", "g"), " ").trim())
+                    .filter(Boolean);
+                  bodyBlocks.forEach((block, blockIndex) => {
+                    pushScene(
+                      bodyBlocks.length > 1 ? "核心观点 " + (blockIndex + 1) : "核心表达",
+                      block,
+                      "围绕这一段核心观点，生成 John 风格竖屏讲解画面，并突出关键词、逻辑关系和节奏变化。",
+                    );
+                  });
+                  return;
+                }
+
+                if (section.heading === "结尾") {
+                  pushScene("结尾收束", section.body, "画面从讲解过渡到总结收束，突出结论和主张，让用户明确记住这条视频的核心价值。");
+                  return;
+                }
+
+                if (/cta/i.test(section.heading)) {
+                  pushScene("行动引导", section.body, "用明确的关注或互动提示收尾，画面上保留清晰的 CTA 信息和 John 的人物统一性。");
+                  return;
+                }
+
+                pushScene(section.heading, section.body, "围绕这一段内容生成 John 风格竖屏讲解画面，并突出该段的主要信息。");
+              });
+
+              return {
+                title: title || titleSection?.body || sections[0]?.heading || normalized.slice(0, 28),
+                hook: hook || semanticSections.find((section) => /开场|钩子/i.test(section.heading))?.body?.replace(new RegExp("\\n+", "g"), " ").trim() || markdownScenes[0]?.voiceover || "",
+                summary: summary || summarySection?.body?.replace(/^- /gm, "").replace(new RegExp("\\n+", "g"), " ").trim().slice(0, 80) || markdownScenes[1]?.voiceover?.slice(0, 80) || "",
+                durationSec: Number.isFinite(durationSecRaw) && durationSecRaw > 0 ? durationSecRaw : markdownScenes.reduce((sum, scene) => sum + scene.durationSec, 0),
+                cta: cta || ctaSection?.body?.replace(new RegExp("\\n+", "g"), " ").trim() || "",
+                scenes: markdownScenes,
+              };
+            }
+          }
+
+          const sceneBlocks = normalized
+            .split(/\\n\\s*\\n/)
+            .map((item) => item.trim())
+            .filter((item) => /^scene\\s+\\d+/i.test(item));
+
+          const scenes = sceneBlocks.map((block, index) => {
+            const blockLines = block.split("\\n").map((line) => line.trim()).filter(Boolean);
+            const readSceneField = (name) => {
+              const line = blockLines.find((item) => item.toLowerCase().startsWith(name.toLowerCase() + ":"));
+              return line ? line.slice(name.length + 1).trim() : "";
+            };
+            const voiceover = readSceneField("voiceover") || blockLines.slice(1).join(" ");
+            const visualSuggestion = readSceneField("visualSuggestion") || "根据这段口播生成 John 风格竖屏讲解画面";
+            const durationSec = Number(readSceneField("durationSec")) || Math.max(4, Math.min(12, Math.round(Math.max(voiceover.length, 18) / 9)));
+            return {
+              index: index + 1,
+              title: "场景片段",
+              voiceover,
+              visualSuggestion,
+              durationSec,
+            };
+          });
+
+          if (!scenes.length) {
+            const blocks = normalized.split(/\\n\\s*\\n/).map((item) => item.trim()).filter(Boolean);
+            blocks.forEach((block, index) => {
+              const voiceover = block.replace(/^(title|hook|summary|durationSec|cta):.*$/gim, "").trim();
+              if (!voiceover) return;
+              scenes.push({
+                index: index + 1,
+                title: "场景片段",
+                voiceover,
+                visualSuggestion: "根据这段口播生成 John 风格竖屏讲解画面",
+                durationSec: Math.max(4, Math.min(12, Math.round(Math.max(voiceover.length, 18) / 9))),
+              });
+            });
+          }
+
+          return {
+            title: title || scenes[0]?.voiceover?.slice(0, 28) || normalized.slice(0, 28),
+            hook: hook || scenes[0]?.voiceover?.slice(0, 60) || normalized.slice(0, 60),
+            summary: summary || scenes[1]?.voiceover?.slice(0, 80) || normalized.slice(0, 80),
+            durationSec: Number.isFinite(durationSecRaw) && durationSecRaw > 0 ? durationSecRaw : scenes.reduce((sum, scene) => sum + scene.durationSec, 0),
+            cta,
+            scenes,
+          };
+        }
+
+        function renderDerivedStructure(text) {
+          if (!derivedTitle || !derivedHook || !derivedSummary || !derivedDuration || !sceneOutline) {
+            return;
+          }
+
+          const derived = deriveScriptStructure(text);
+          const fallbackTitleInput = document.getElementById("title");
+          const scriptModeInput = document.getElementById("scriptMode");
+          if (fallbackTitleInput && !fallbackTitleInput.value.trim() && derived.title) {
+            fallbackTitleInput.value = derived.title;
+          }
+          if (scriptModeInput) {
+            scriptModeInput.value = detectScriptMode(text);
+          }
+          derivedTitle.textContent = derived.title || "等待脚本解析";
+          derivedHook.textContent = derived.hook || "等待脚本解析";
+          derivedSummary.textContent = derived.summary || "等待脚本解析";
+          derivedDuration.textContent = derived.durationSec ? derived.durationSec + " 秒" : "等待脚本解析";
+
+          if (!derived.scenes.length) {
+            sceneOutline.innerHTML = '<div class="summary-item empty">粘贴脚本后，这里会自动生成 scenes 草稿。</div>';
+            return;
+          }
+
+          sceneOutline.innerHTML = derived.scenes.map((scene) => [
+            '<article class="scene-row">',
+            '  <strong>第 ' + scene.index + ' 段 · ' + (scene.title || "场景片段") + '</strong>',
+            '  <div><div class="scene-row-label">这一段要说什么</div><div class="scene-row-value">' + scene.voiceover + '</div></div>',
+            '  <div><div class="scene-row-label">建议画面</div><div class="scene-row-value">' + scene.visualSuggestion + '</div></div>',
+            '  <div><div class="scene-row-label">建议时长</div><div class="scene-row-value">' + scene.durationSec + ' 秒</div></div>',
+            '</article>'
+          ].join("")).join("");
+        }
+
+        function renderPreview(detail) {
+          const previewUrl = detail?.previewUrl;
+          if (!previewUrl) {
+            previewStage.innerHTML = '<div class="preview-placeholder">当前还没有完成的 MP4。渲染结束后，这里会出现播放器和下载链接。</div>';
+            previewLinks.innerHTML = "";
+            return;
+          }
+
+          previewStage.innerHTML = '<video controls preload="metadata" src="' + previewUrl + '"></video>';
+          previewLinks.innerHTML = [
+            '<a href="' + previewUrl + '" target="_blank" rel="noreferrer">打开 MP4</a>',
+            '<a href="' + previewUrl + '" download>下载 MP4</a>',
+            detail.outputPaths?.metadataPath ? '<a href="/' + detail.outputPaths.metadataPath + '" target="_blank" rel="noreferrer">元数据 JSON</a>' : ''
+          ].filter(Boolean).join("");
+        }
+
+        function renderJobQuality(detail) {
+          const quality = detail?.qualitySummary;
+          const cost = detail?.costSummary;
+
+          if (!quality) {
+            jobQualitySummary.innerHTML = '<div class="summary-item empty">任务完成后，这里会显示文件大小、时长、分辨率、音频、字幕、fallback 与合规状态。</div>';
+          } else {
+            jobQualitySummary.innerHTML = [
+              '<div class="quality-item pass">文件大小：' + (detail.qualitySummary.fileSizeLabel || "未生成") + '</div>',
+              '<div class="quality-item pass">时长：' + (detail.qualitySummary.durationLabel || "未探测") + '</div>',
+              '<div class="quality-item pass">分辨率：' + (detail.qualitySummary.resolutionLabel || "未探测") + '</div>',
+              '<div class="quality-item ' + ((detail.qualitySummary.audioPresenceLabel || "").includes("无") ? 'warn' : 'pass') + '">音频：' + (detail.qualitySummary.audioPresenceLabel || "未探测") + '</div>',
+              '<div class="quality-item ' + ((detail.qualitySummary.subtitleStatusLabel || "").includes("缺失") ? 'warn' : 'pass') + '">字幕：' + (detail.qualitySummary.subtitleStatusLabel || "未知") + '</div>',
+              '<div class="quality-item ' + ((detail.qualitySummary.fallbackStatusLabel || "").includes("Fallback") ? 'warn' : 'pass') + '">渲染模式：' + (detail.qualitySummary.fallbackStatusLabel || "未知") + '</div>',
+              '<div class="quality-item ' + ((detail.qualitySummary.complianceStatusLabel || "").includes("拦截") ? 'warn' : 'pass') + '">合规：' + (detail.qualitySummary.complianceStatusLabel || "未知") + '</div>',
+            ].join("");
+          }
+
+          if (!cost) {
+            jobCostSummary.innerHTML = '<div class="summary-item empty">创建任务后，这里会显示图像、TTS 和总成本估算。</div>';
+            return;
+          }
+
+          jobCostSummary.innerHTML = [
+            '<div class="quality-item pass">GPT Image：' + detail.costSummary.gptImageUsd + '</div>',
+            '<div class="quality-item pass">Wanx：' + detail.costSummary.wanxUsd + '</div>',
+            '<div class="quality-item pass">TTS：' + detail.costSummary.ttsUsd + '</div>',
+            '<div class="quality-item pass">总成本：' + detail.costSummary.totalUsd + '</div>',
+          ].join("");
         }
 
         function renderJobSnapshot(snapshot) {
           jobStatus.textContent = JSON.stringify(snapshot, null, 2);
           jobStatus.className = "";
+          if (typeof snapshot.progress === "number") {
+            progressValue.style.width = snapshot.progress + "%";
+          }
+          if (snapshot.state) {
+            jobStateChip.textContent = snapshot.state;
+          }
+          if (snapshot.currentStep) {
+            jobStepChip.textContent = snapshot.currentStep;
+          }
+        }
+
+        function getWizardStepStatuses(jobState) {
+          const statuses = ["active", "locked", "locked", "locked", "locked", "locked"];
+          const unlockedIndexByState = {
+            QUEUED: 1,
+            PARSING: 1,
+            AI_PROCESSING: 2,
+            ASSEMBLING: 4,
+            RENDERING: 4,
+            POST_PROCESSING: 5,
+            COMPLETED: 6,
+          };
+
+          const unlockedCount = unlockedIndexByState[jobState] || 1;
+          return statuses.map((_, index) => {
+            if (index + 1 < unlockedCount) return "done";
+            if (index + 1 === unlockedCount) return "active";
+            return "locked";
+          });
+        }
+
+        function updateWizardRail(jobState) {
+          const statuses = getWizardStepStatuses(jobState);
+          document.querySelectorAll(".step-item").forEach((item, index) => {
+            const status = statuses[index] || "locked";
+            item.classList.toggle("active", status === "active");
+            item.classList.toggle("locked", status === "locked");
+            const statusLabel = item.querySelector(".step-status-label");
+            if (statusLabel) {
+              statusLabel.textContent = status === "done" ? "已通过" : status === "active" ? "当前步骤" : "未解锁";
+            }
+          });
         }
 
         function renderErrors(errors) {
@@ -379,18 +2168,99 @@ function renderWizardPage() {
 
         function renderSummary(summary) {
           summaryList.innerHTML = "";
-          summary.checklist.forEach((text) => {
+          const displayChecklist =
+            CURRENT_STEP_ID === "asset_intake"
+              ? [
+                  "脚本结构已能提取标题、Hook、摘要和 CTA。",
+                  "自动识别场景已生成可读的口播、画面建议和时长。",
+                  "可以进入下一步分镜确认，不必再手填内部字段。",
+                ]
+              : CURRENT_STEP_ID === "voice_generation"
+                ? [
+                    "脚本内容已稳定，可直接选择或应用声音方案。",
+                    "声音方案会在本步集中试听和确认，不再分散到素材页。",
+                    "确认声音后即可进入合成预览。",
+                  ]
+                : summary.checklist;
+
+          displayChecklist.forEach((text, index) => {
             const item = document.createElement("div");
-            item.className = "summary-item";
+            item.className = "quality-item " + (index < 4 ? "pass" : "warn");
             item.textContent = text;
             summaryList.appendChild(item);
           });
-          estimatedScenes.textContent = String(summary.estimatedScenes);
-          scriptCharacters.textContent = String(summary.scriptCharacters);
+          if (CURRENT_STEP_ID === "voice_generation") {
+            estimatedScenes.textContent = "5";
+            scriptCharacters.textContent = customVoiceReferenceInput?.value?.trim() ? "已上传" : "未上传";
+          } else {
+            estimatedScenes.textContent = String(summary.estimatedScenes);
+            scriptCharacters.textContent = String(summary.scriptCharacters);
+          }
+          const score =
+            CURRENT_STEP_ID === "voice_generation"
+              ? (customVoiceReferenceInput?.value?.trim() ? 5 : 4)
+              : Math.max(42, Math.min(96, 58 + summary.estimatedScenes * 6 + Math.min(14, Math.floor(summary.scriptCharacters / 80))));
+          qualityScore.textContent = String(score);
+        }
+
+        function splitScenes(text, mode) {
+          const derived = deriveScriptStructure(text);
+          return derived.scenes.map((scene, index) => ({
+            id: "scene-" + String(index + 1).padStart(3, "0"),
+            narration: scene.voiceover,
+            visualHint: scene.visualSuggestion,
+            durationMs: (scene.durationSec || 4) * 1000,
+            transition: "crossfade",
+          }));
+        }
+
+        async function renderStoryboardFromDraft(payload) {
+          const scenes = splitScenes(payload.scriptText, payload.scriptMode);
+          if (!scenes.length) {
+            storyboardGrid.innerHTML = '<div class="summary-item empty">先校验草稿，再生成分镜预览。</div>';
+            return;
+          }
+
+          const response = await fetch("/api/storyboard/preview", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              scenes,
+              controls: {
+                textMode: "original",
+                subtitleStyle: "minimal",
+                transitionStyle: "crossfade"
+              }
+            }),
+          });
+          const result = await response.json();
+          renderStoryboard(result);
+        }
+
+        function renderStoryboard(preview) {
+          if (!preview?.cards?.length) {
+            storyboardGrid.innerHTML = '<div class="summary-item empty">当前还没有分镜卡片。</div>';
+            return;
+          }
+
+          storyboardGrid.innerHTML = preview.cards.map((card) => [
+            '<article class="story-scene">',
+            '  <div class="scene-top">',
+            '    <span class="scene-title">' + card.title + '</span>',
+            '    <span class="scene-duration">' + card.durationLabel + '</span>',
+            '  </div>',
+            '  <div class="scene-visual">' + (card.visualHint || "No visual hint") + '</div>',
+            '  <div>' + card.narration + '</div>',
+            '  <div class="scene-caption">字幕：' + card.subtitleStyle + ' · 转场：' + card.transition + '</div>',
+            '</article>'
+          ].join("")).join("");
         }
 
         async function sync() {
           const payload = collect();
+          currentModeChip.textContent = clientScriptModeLabel(payload.scriptMode || "plain_text");
+          currentProfileChip.textContent = clientProfileLabel(payload.renderProfile || "standard");
+          renderDerivedStructure(payload.scriptText || "");
           const response = await fetch("/api/wizard/validate", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -400,30 +2270,243 @@ function renderWizardPage() {
           renderErrors(result.errors ?? []);
 
           if (result.valid && result.summary && result.draft) {
-            statusEl.textContent = "Ready to submit";
+            statusEl.textContent = "可提交";
             statusEl.className = "ok";
+            heroStatus.textContent = "可提交";
             renderSummary(result.summary);
             draftJson.textContent = JSON.stringify(result.draft, null, 2);
             draftJson.className = "";
+            await renderStoryboardFromDraft(payload);
           } else {
-            statusEl.textContent = "Draft has validation errors";
+            statusEl.textContent = "草稿存在校验问题";
             statusEl.className = "warn";
-            summaryList.innerHTML = '<div class="summary-item empty">Summary will appear after required fields are valid.</div>';
-            estimatedScenes.textContent = "0";
-            scriptCharacters.textContent = String((payload.scriptText || "").trim().length);
-            draftJson.textContent = "No valid draft yet.";
+            heroStatus.textContent = "待修正";
+            summaryList.innerHTML = '<div class="summary-item empty">必填项通过后，这里会显示质量摘要。</div>';
+            if (CURRENT_STEP_ID === "voice_generation") {
+              estimatedScenes.textContent = "5";
+              scriptCharacters.textContent = customVoiceReferenceInput?.value?.trim() ? "已上传" : "未上传";
+            } else {
+              estimatedScenes.textContent = "0";
+              scriptCharacters.textContent = String((payload.scriptText || "").trim().length);
+            }
+            qualityScore.textContent = "--";
+            draftJson.textContent = "当前还没有有效草稿。";
             draftJson.className = "empty";
+            storyboardGrid.innerHTML = '<div class="summary-item empty">先修复校验问题，再刷新分镜预览。</div>';
           }
         }
 
         ids.forEach((id) => {
-          document.getElementById(id).addEventListener("input", sync);
-          document.getElementById(id).addEventListener("change", sync);
+          const element = document.getElementById(id);
+          if (!element) return;
+          element.addEventListener("input", sync);
+          element.addEventListener("change", sync);
+          element.addEventListener("input", saveDraftToStorage);
+          element.addEventListener("change", saveDraftToStorage);
         });
 
-        document.getElementById("validateBtn").addEventListener("click", sync);
-        document.getElementById("createJobBtn").addEventListener("click", async () => {
+        platformWechat?.addEventListener("change", saveDraftToStorage);
+        platformXiaohongshu?.addEventListener("change", saveDraftToStorage);
+        platformDouyin?.addEventListener("change", saveDraftToStorage);
+        platformBilibili?.addEventListener("change", saveDraftToStorage);
+
+        validateBtn?.addEventListener("click", async () => {
+          setButtonState(validateBtn, "校验中...", true);
+          heroStatus.textContent = "校验中";
+          try {
+            await sync();
+          } finally {
+            resetButtonState(validateBtn);
+          }
+        });
+        document.querySelectorAll(".voice-apply-btn").forEach((button) => {
+          button.addEventListener("click", async (event) => {
+            const card = event.currentTarget.closest(".voice-card");
+            const selectedVoiceMode = card?.getAttribute("data-voice-mode");
+            if (!selectedVoiceMode) return;
+            const voiceName = card?.querySelector("strong")?.textContent?.trim() || "当前声音";
+            setButtonState(event.currentTarget, "应用中...", true);
+            setInlineStatus(presetVoiceStatus, "正在应用：" + voiceName, "busy");
+            document.getElementById("voiceMode").value = selectedVoiceMode;
+            markActiveVoiceCard(card);
+            heroStatus.textContent = "应用声音中";
+            syncVoiceStatus();
+            await sync();
+            setInlineStatus(presetVoiceStatus, "已应用：" + voiceName, "success");
+            heroStatus.textContent = "声音已应用";
+            resetButtonState(event.currentTarget);
+            event.currentTarget.textContent = "已应用";
+          appendEvent("已应用声音方案：" + voiceName);
+          saveDraftToStorage();
+        });
+        });
+        async function uploadCustomVoiceBlob(blob, filename) {
+          setInlineStatus(customVoiceStatus, "正在上传声音参考...", "busy");
+          setButtonState(recordVoiceBtn, "处理中...", true);
+          setButtonState(stopRecordVoiceBtn, "停止录音", true);
+          customVoiceFileInput.disabled = true;
+          const arrayBuffer = await blob.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = "";
+          for (const value of bytes) {
+            binary += String.fromCharCode(value);
+          }
+
+          const response = await fetch("/api/custom-voice-reference", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              filename,
+              mimeType: blob.type || "audio/webm",
+              base64: btoa(binary),
+            }),
+          });
+          const result = await response.json();
+          if (!response.ok || !result.ok) {
+            appendEvent("自定义声音上传失败");
+            setInlineStatus(customVoiceStatus, "上传失败，请重试。", "warn");
+            resetButtonState(recordVoiceBtn);
+            resetButtonState(stopRecordVoiceBtn);
+            stopRecordVoiceBtn.disabled = true;
+            customVoiceFileInput.disabled = false;
+            return null;
+          }
+          customVoiceReferenceInput.value = result.filename;
+          appendEvent("已保存自定义声音参考：" + result.filename);
+          setInlineStatus(customVoiceStatus, "已上传：" + result.filename + "，现在可以应用或试听。", "success");
+          syncVoiceStatus();
+          saveDraftToStorage();
+          resetButtonState(recordVoiceBtn);
+          resetButtonState(stopRecordVoiceBtn);
+          stopRecordVoiceBtn.disabled = true;
+          customVoiceFileInput.disabled = false;
+          return result;
+        }
+
+        customVoiceFileInput?.addEventListener("change", async (event) => {
+          const file = event.currentTarget.files?.[0];
+          if (!file) return;
+          setInlineStatus(customVoiceStatus, "正在上传：" + file.name, "busy");
+          await uploadCustomVoiceBlob(file, file.name);
+          event.currentTarget.value = "";
+        });
+
+        recordVoiceBtn?.addEventListener("click", async () => {
+          if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+            appendEvent("当前浏览器不支持录音");
+            setInlineStatus(customVoiceStatus, "当前浏览器不支持录音。", "warn");
+            return;
+          }
+          recorderStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          recorderChunks = [];
+          activeRecorder = new MediaRecorder(recorderStream);
+          activeRecorder.ondataavailable = (event) => {
+            if (event.data?.size) recorderChunks.push(event.data);
+          };
+          activeRecorder.onstop = async () => {
+            const blob = new Blob(recorderChunks, { type: activeRecorder.mimeType || "audio/webm" });
+            await uploadCustomVoiceBlob(blob, "custom-voice-recording.webm");
+            recorderStream?.getTracks().forEach((track) => track.stop());
+            recorderStream = null;
+            activeRecorder = null;
+            resetButtonState(recordVoiceBtn);
+            stopRecordVoiceBtn.disabled = true;
+          };
+          activeRecorder.start();
+          setButtonState(recordVoiceBtn, "录音中...", true);
+          setButtonState(stopRecordVoiceBtn, "结束并保存", false);
+          setInlineStatus(customVoiceStatus, "录音中，请说出一段你的标准口播。", "busy");
+          appendEvent("开始录音，请说出一段你的标准口播。");
+        });
+
+        stopRecordVoiceBtn?.addEventListener("click", () => {
+          if (!activeRecorder) return;
+          setButtonState(stopRecordVoiceBtn, "保存中...", true);
+          setInlineStatus(customVoiceStatus, "录音结束，正在保存声音参考...", "busy");
+          activeRecorder.stop();
+          appendEvent("录音结束，正在保存自定义声音参考。");
+        });
+
+        applyCustomVoiceBtn?.addEventListener("click", async () => {
+          if (!customVoiceReferenceInput.value.trim()) {
+            appendEvent("请先上传或录入你的声音参考。");
+            setInlineStatus(customVoiceStatus, "请先上传或录入你的声音参考。", "warn");
+            return;
+          }
+          setButtonState(applyCustomVoiceBtn, "应用中...", true);
+          setInlineStatus(customVoiceStatus, "正在应用你的声音...", "busy");
+          document.getElementById("voiceMode").value = "custom_reference";
+          markActiveVoiceCard(null);
+          heroStatus.textContent = "应用自定义声音中";
+          await sync();
+          heroStatus.textContent = "已应用自定义声音";
+          appendEvent("已应用自定义声音参考。");
+          setInlineStatus(customVoiceStatus, "已应用你的声音。", "success");
+          resetButtonState(applyCustomVoiceBtn);
+          applyCustomVoiceBtn.textContent = "已应用";
+          syncVoiceStatus();
+          saveDraftToStorage();
+        });
+
+        previewCustomVoiceBtn?.addEventListener("click", async () => {
+          const referenceName = customVoiceReferenceInput.value.trim();
+          if (!referenceName) {
+            appendEvent("请先上传或录入你的声音参考。");
+            setInlineStatus(customVoiceStatus, "请先上传或录入你的声音参考。", "warn");
+            return;
+          }
+
+          setButtonState(previewCustomVoiceBtn, "试听中...", true);
+          setInlineStatus(customVoiceStatus, "正在加载你的声音试听...", "busy");
+          const response = await fetch("/api/voice-preview?voiceMode=custom_reference&customVoiceReference=" + encodeURIComponent(referenceName));
+          const result = await response.json();
+          if (!response.ok || !result.ok || !result.previewUrl) {
+            appendEvent("自定义声音试听加载失败");
+            setInlineStatus(customVoiceStatus, "自定义声音试听加载失败。", "warn");
+            resetButtonState(previewCustomVoiceBtn);
+            return;
+          }
+
+          voicePreviewPlayer.pause();
+          voicePreviewPlayer.src = result.previewUrl;
+          voicePreviewPlayer.currentTime = 0;
+          await voicePreviewPlayer.play();
+          appendEvent("正在试听：自定义声音");
+          setInlineStatus(customVoiceStatus, "正在试听你的声音。", "success");
+          resetButtonState(previewCustomVoiceBtn);
+        });
+        document.querySelectorAll(".voice-preview-btn").forEach((button) => {
+          button.addEventListener("click", async (event) => {
+            const card = event.currentTarget.closest(".voice-card");
+            const name = card?.querySelector("strong")?.textContent?.trim() || "当前声音";
+            const voiceMode = card?.getAttribute("data-voice-mode");
+            if (!voiceMode) return;
+
+            setButtonState(event.currentTarget, "试听中...", true);
+            setInlineStatus(presetVoiceStatus, "正在加载试听：" + name, "busy");
+            const response = await fetch("/api/voice-preview?voiceMode=" + encodeURIComponent(voiceMode));
+            const result = await response.json();
+
+            if (!response.ok || !result.ok || !result.previewUrl) {
+              appendEvent("试听加载失败：" + name);
+              setInlineStatus(presetVoiceStatus, "试听失败：" + name, "warn");
+              resetButtonState(event.currentTarget);
+              return;
+            }
+
+            voicePreviewPlayer.pause();
+            voicePreviewPlayer.src = result.previewUrl;
+            voicePreviewPlayer.currentTime = 0;
+            await voicePreviewPlayer.play();
+            appendEvent("正在试听：" + name);
+            setInlineStatus(presetVoiceStatus, "正在试听：" + name, "success");
+            resetButtonState(event.currentTarget);
+          });
+        });
+        createJobBtn?.addEventListener("click", async () => {
           const payload = collect();
+          setButtonState(createJobBtn, "创建中...", true);
+          heroStatus.textContent = "创建任务中";
           const response = await fetch("/api/jobs", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -432,18 +2515,27 @@ function renderWizardPage() {
           const result = await response.json();
 
           if (!response.ok || !result.ok) {
-            renderErrors([result.error || "Job creation failed."]);
+            renderErrors([result.error || "创建任务失败。"]);
+            resetButtonState(createJobBtn);
+            heroStatus.textContent = "创建失败";
             return;
           }
 
           renderErrors([]);
+          currentTaskChip.textContent = result.job.id;
           renderJobSnapshot({
             jobId: result.job.id,
-            state: result.job.state,
-            progress: result.job.progress,
-            currentStep: result.job.currentStep,
+            state: "PARSING",
+            progress: 1,
+            currentStep: "subscribe_progress",
             storyboardScenes: result.storyboard.summary.totalScenes,
           });
+          updateWizardRail("PARSING");
+          renderStoryboard(result.storyboard);
+          heroStatus.textContent = "PARSING";
+          appendEvent("PARSING • 任务已创建，正在建立进度订阅。");
+          appendEvent("已创建任务 " + result.job.id + "，并开始订阅 SSE 进度。");
+          setButtonState(createJobBtn, "任务已创建", true);
 
           if (activeEventSource) {
             activeEventSource.close();
@@ -463,23 +2555,35 @@ function renderWizardPage() {
               outputs: detail.outputsSummary,
               previewUrl: detail.previewUrl,
             });
+            updateWizardRail(payload.state);
+            renderPreview(detail);
+            renderJobQuality(detail);
+            heroStatus.textContent = payload.state;
+            appendEvent(payload.state + " • " + payload.message);
+            if (payload.state === "COMPLETED" || payload.state === "FAILED" || payload.state === "INTERRUPTED") {
+              resetButtonState(createJobBtn);
+            }
           });
         });
-        document.getElementById("loadDemoBtn").addEventListener("click", async () => {
+        loadDemoBtn?.addEventListener("click", async () => {
+          setButtonState(loadDemoBtn, "载入中...", true);
           document.getElementById("title").value = "AI 工具如何让研发效率提升 3 倍";
           document.getElementById("author").value = "John";
-          document.getElementById("platform").value = "douyin";
           document.getElementById("renderProfile").value = "standard";
-          document.getElementById("scriptMode").value = "plain_text";
           document.getElementById("stylePreset").value = "john_vertical_comic";
           document.getElementById("personaPreset").value = "john_persona_v1";
-          document.getElementById("voiceMode").value = "male_coach_deep";
           document.getElementById("ownerToken").value = "john-ai-lab";
           document.getElementById("customVoiceReference").value = "";
-          document.getElementById("scriptText").value = "第一段：为什么高强度脑力工作者需要工作流级 AI。\\n\\n第二段：Atlas 如何帮你把内容生产拆成可执行步骤。\\n\\n第三段：为什么视频化表达能放大你的副业影响力。";
+          document.getElementById("scriptText").value = "title: 卧推肩疼？先看手肘角度\\nhook: 你卧推一发力肩膀就疼，问题可能不在肩，而在手肘开太大。\\nsummary: 用 45 到 60 度的手肘夹角，让肩更稳、胸更容易发力。\\ndurationSec: 32\\n\\nscene 1\\nvoiceover: 卧推肩疼，很多人第一反应是肩有问题，其实常见原因是手肘开得太平。\\nvisualSuggestion: John 在卧推凳上示范错误动作，手肘外展接近 90 度。\\ndurationSec: 8\\n\\nscene 2\\nvoiceover: 更稳的做法是让上臂和躯干保持大约 45 到 60 度，这样肩膀压力会小很多。\\nvisualSuggestion: John 用线条标出手肘夹角，展示正确角度区间。\\ndurationSec: 12\\n\\nscene 3\\nvoiceover: 下次训练前先录一组侧面视频，对照这个角度检查自己，再决定要不要加重量。\\nvisualSuggestion: John 看回放纠正动作，画面叠加角度参考线。\\ndurationSec: 12\\n\\ncta: 如果你想继续看这种动作纠错短视频，评论区告诉我你最想修哪个动作。";
+          syncVoiceStatus();
+          saveDraftToStorage();
           await sync();
+          resetButtonState(loadDemoBtn);
+          setInlineStatus(customVoiceStatus, "演示脚本已载入，可继续试听和创建任务。", "success");
         });
 
+        restoreDraftFromStorage();
+        syncVoiceStatus();
         sync();
       </script>
     `,
@@ -884,6 +2988,7 @@ ${sharedPageStyles}
           document.getElementById(id).addEventListener("change", syncPreview);
         });
 
+        renderStepGate();
         renderPreview(${JSON.stringify(initialPreview)});
       </script>
     `,
@@ -1075,6 +3180,33 @@ function pickMimeType(filePath) {
   return "application/octet-stream";
 }
 
+async function readFileSizeSafe(filePath) {
+  try {
+    const stat = await fs.stat(filePath);
+    return stat.size;
+  } catch {
+    return null;
+  }
+}
+
+function getComplianceSummaryFromManifest(manifest) {
+  const text = manifest?.scenes?.map((scene) => scene.narration).join("\n") ?? "";
+  const compliance = runComplianceGuard(text);
+  return {
+    complianceStatus: compliance.allowed ? "allowed" : "blocked",
+    complianceViolations: compliance.violations.length,
+  };
+}
+
+function getRenderResolution(rendered) {
+  const width = rendered?.renderPlan?.spec?.width;
+  const height = rendered?.renderPlan?.spec?.height;
+  if (!width || !height) {
+    return null;
+  }
+  return `${width}x${height}`;
+}
+
 function emitJobProgress(jobId, state, progress, step, message, meta = {}) {
   return channel.emit(
     createJobProgressPayload({
@@ -1133,6 +3265,8 @@ async function runCreatedJobLifecycle(jobId) {
       mode: "auto",
     });
 
+    const complianceSummary = getComplianceSummaryFromManifest(job.manifest);
+
     updateCreatedJob(jobId, (current) => ({
       ...current,
       outputPaths: {
@@ -1155,6 +3289,16 @@ async function runCreatedJobLifecycle(jobId) {
           previewUrl: rendered.previewUrl,
           provider: rendered.providerMetadata.provider,
           probe: rendered.probe ?? null,
+        },
+        qualitySummary: {
+          ...(current.record.qualitySummary ?? {}),
+          durationSec: rendered.probe?.durationSec ?? null,
+          resolution: getRenderResolution(rendered),
+          audioPresence: rendered.probe?.streamTypes?.includes("audio") ?? true,
+          subtitleStatus: "planned",
+          fallbackStatus: rendered.providerMetadata.mode,
+          fallbackReason: rendered.providerMetadata.fallbackReason ?? null,
+          ...complianceSummary,
         },
         outputs: [
           { kind: "video", path: rendered.outputPackage.video.path, url: rendered.outputPackage.video.url },
@@ -1204,7 +3348,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && url.pathname === "/") {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(renderWizardPage());
+    res.end(renderWizardPage(url.searchParams.get("step") ?? undefined));
     return;
   }
 
@@ -1234,6 +3378,40 @@ const server = http.createServer(async (req, res) => {
       res.end();
       return;
     }
+    createReadStream(absolutePath).pipe(res);
+    return;
+  }
+
+  if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/api/voice-preview/file/")) {
+    const relativePath = url.pathname.replace(/^\/api\/voice-preview\/file\//, "");
+    const absolutePath = path.join(voicePreviewRoot, relativePath);
+
+    if (!existsSync(absolutePath)) {
+      sendJson(res, 404, { ok: false, error: "Voice preview file not found" });
+      return;
+    }
+
+    res.writeHead(200, {
+      "content-type": "audio/wav",
+      "cache-control": "public, max-age=86400",
+    });
+    createReadStream(absolutePath).pipe(res);
+    return;
+  }
+
+  if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/api/custom-voice-reference/file/")) {
+    const relativePath = url.pathname.replace(/^\/api\/custom-voice-reference\/file\//, "");
+    const absolutePath = buildCustomVoiceReferenceAbsolutePath(decodeURIComponent(relativePath));
+
+    if (!existsSync(absolutePath)) {
+      sendJson(res, 404, { ok: false, error: "Custom voice reference file not found" });
+      return;
+    }
+
+    res.writeHead(200, {
+      "content-type": pickMimeType(absolutePath),
+      "cache-control": "public, max-age=86400",
+    });
     createReadStream(absolutePath).pipe(res);
     return;
   }
@@ -1281,9 +3459,8 @@ const server = http.createServer(async (req, res) => {
 
       const draft = normalizeWizardConfig(payload);
       const created = storeCreatedJob(createVideoJobFromDraft(draft));
-      void runCreatedJobLifecycle(created.record.id);
 
-      sendJson(res, 201, {
+      const responsePayload = {
         ok: true,
         job: {
           id: created.record.id,
@@ -1293,7 +3470,11 @@ const server = http.createServer(async (req, res) => {
         },
         storyboard: created.storyboard,
         manifest: created.manifest,
-      });
+      };
+      sendJson(res, 201, responsePayload);
+      setTimeout(() => {
+        void runCreatedJobLifecycle(created.record.id);
+      }, 0);
     } catch (error) {
       sendJson(res, 400, {
         ok: false,
@@ -1303,19 +3484,79 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/custom-voice-reference") {
+    try {
+      const payload = await readJsonBody(req);
+      const saved = await saveCustomVoiceReference(payload);
+      sendJson(res, 201, {
+        ok: true,
+        filename: saved.filename,
+        previewUrl: saved.relativeUrl,
+        mimeType: saved.mimeType,
+      });
+    } catch (error) {
+      sendJson(res, 400, {
+        ok: false,
+        error: error instanceof Error ? error.message : "Custom voice upload failed",
+      });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/voice-preview") {
+    try {
+      const voiceMode = (url.searchParams.get("voiceMode") ?? "").trim();
+      const customVoiceReference = (url.searchParams.get("customVoiceReference") ?? "").trim();
+      if (!voiceMode) {
+        sendJson(res, 400, { ok: false, error: "voiceMode is required" });
+        return;
+      }
+
+      const asset = await ensureVoicePreviewAsset({ voiceMode, customVoiceReference });
+      const meta = getVoicePreviewMeta(voiceMode);
+      sendJson(res, 200, {
+        ok: true,
+        voiceMode,
+        label: meta.label,
+        sampleText: meta.sampleText,
+        isPreviewPlaceholder: meta.isPreviewPlaceholder,
+        previewUrl: asset.relativeUrl,
+        usedFallback: asset.usedFallback,
+        customVoiceReference: customVoiceReference || undefined,
+      });
+    } catch (error) {
+      sendJson(res, 400, {
+        ok: false,
+        error: error instanceof Error ? error.message : "Voice preview failed",
+      });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname.startsWith("/api/jobs/")) {
     const jobId = url.pathname.replace("/api/jobs/", "");
     const created = getCreatedJob(jobId);
     if (created) {
+      const videoPath = created.record.outputs?.find((item) => item.kind === "video")?.path ?? null;
+      const fileSizeBytes = videoPath ? await readFileSizeSafe(videoPath) : null;
       const previewUrl =
         created.record.outputs?.find((item) => item.kind === "video")?.url ?? null;
+      const hydratedRecord = {
+        ...created.record,
+        qualitySummary: {
+          ...(created.record.qualitySummary ?? {}),
+          fileSizeBytes,
+        },
+      };
       sendJson(res, 200, {
-        ...buildJobDetailView(created.record),
+        ...buildJobDetailView(hydratedRecord),
         storyboard: created.storyboard,
         manifest: created.manifest,
         outputPaths: created.outputPaths,
         previewUrl,
         probe: created.renderResult?.probe ?? null,
+        rawQualitySummary: hydratedRecord.qualitySummary ?? null,
+        rawCostSummary: hydratedRecord.costSummary ?? null,
       });
       return;
     }

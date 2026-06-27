@@ -19,6 +19,9 @@ export type ImageProvider = {
 export type TtsProvider = {
   id: string;
   displayName: string;
+  qualityTier?: "baseline" | "production" | "premium";
+  supportsVoiceCloning?: boolean;
+  supportsStreamingPreview?: boolean;
   synthesize(...args: unknown[]): Promise<unknown>;
 };
 

@@ -1,9 +1,12 @@
 import crypto from "node:crypto";
 
+import { buildCustomVoiceReferenceAbsolutePath } from "../audio/custom-voice-reference.js";
 import { buildJobAssetPaths } from "../assets/job-assets.js";
 import type { JobState } from "../domain/job-state.js";
 import { parseMarkdownToSceneGraph } from "../parser/markdown-scene-graph.js";
 import { parseTextToSceneGraph } from "../parser/text-fallback.js";
+import { estimateJobCost } from "../domain/cost-estimator.js";
+import { runComplianceGuard } from "../domain/compliance-guard.js";
 import type { SceneGraph } from "../types/scene-graph.js";
 import type { JobDashboardRecord } from "../ui/job-dashboard.js";
 import {
@@ -36,6 +39,10 @@ function hashOwnerToken(ownerToken: string) {
 }
 
 function toManifest(draft: WizardConfigDraft) {
+  const referenceAudioPath = draft.customVoiceReference
+    ? buildCustomVoiceReferenceAbsolutePath(draft.customVoiceReference)
+    : undefined;
+
   if (draft.scriptMode === "markdown") {
     return parseMarkdownToSceneGraph(draft.scriptText);
   }
@@ -46,6 +53,7 @@ function toManifest(draft: WizardConfigDraft) {
     renderProfile: draft.renderProfile,
     author: draft.author,
     ttsVoice: draft.ttsVoice,
+    referenceAudioPath,
   });
 }
 
@@ -74,6 +82,10 @@ function buildInitialRecord(input: {
 }) {
   const now = new Date().toISOString();
   const outputPaths = buildJobAssetPaths(input.jobId);
+  const compliance = runComplianceGuard(input.draft.scriptText);
+  const ttsDurationSecs = Math.round(
+    input.manifest.scenes.reduce((total, scene) => total + scene.duration_ms, 0) / 1000,
+  );
 
   return {
     id: input.jobId,
@@ -93,7 +105,25 @@ function buildInitialRecord(input: {
       stylePreset: input.draft.stylePreset,
       personaPreset: input.draft.personaPreset,
       voiceMode: input.draft.voiceMode,
+      customVoiceReference: input.draft.customVoiceReference ?? null,
+      ttsVoice: input.draft.ttsVoice,
     },
+    qualitySummary: {
+      fileSizeBytes: null,
+      durationSec: null,
+      resolution: null,
+      audioPresence: null,
+      subtitleStatus: "planned",
+      fallbackStatus: null,
+      fallbackReason: null,
+      complianceStatus: compliance.allowed ? "allowed" : "blocked",
+      complianceViolations: compliance.violations.length,
+    },
+    costSummary: estimateJobCost({
+      gptImageCalls: input.manifest.scenes.length,
+      wanxCalls: 0,
+      ttsDurationSecs,
+    }),
     outputs: [
       { kind: "video", path: outputPaths.videoPath },
       { kind: "cover", path: outputPaths.coverPath },

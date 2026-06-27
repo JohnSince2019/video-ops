@@ -66,3 +66,25 @@ test("creates a manifest from markdown drafts and records style/voice checkpoint
   assert.equal(created.storyboard.cards[0]?.title, "Scene 1");
   assert.match(JSON.stringify(created.record.lastCheckpoint), /john_vertical_comic/i);
 });
+
+test("custom voice reference is preserved in job checkpoint metadata", () => {
+  const draft = normalizeWizardConfig({
+    title: "Custom Voice Demo",
+    platform: "douyin",
+    renderProfile: "standard",
+    author: "John",
+    ownerToken: "owner-custom-voice-001",
+    scriptText: "第一段：这是自定义声音任务。",
+    scriptMode: "plain_text",
+    stylePreset: "john_vertical_comic",
+    personaPreset: "john_persona_v1",
+    voiceMode: "custom_reference",
+    customVoiceReference: "john-custom-reference.wav",
+  });
+
+  const created = createVideoJobFromDraft(draft);
+
+  assert.match(JSON.stringify(created.record.lastCheckpoint), /john-custom-reference\.wav/);
+  assert.match(JSON.stringify(created.record.lastCheckpoint), /custom-reference-voice/);
+  assert.equal(created.manifest.scenes[0]?.audio.reference_audio_path?.endsWith("john-custom-reference.wav"), true);
+});

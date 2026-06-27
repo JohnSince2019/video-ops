@@ -69,10 +69,12 @@ export function buildTtsRequest(input: GenerateTtsInput) {
   const voice = input.scene.audio.tts_voice;
   const text = input.scene.narration.trim();
   const referenceRoot = process.env.VIDEO_OPS_TTS_REFERENCE_DIR ?? DEFAULT_TTS_REFERENCE_DIR;
-  const referenceAudioPath = input.referenceAudioPath?.trim()
-    ? path.isAbsolute(input.referenceAudioPath)
-      ? input.referenceAudioPath
-      : path.join(referenceRoot, input.referenceAudioPath)
+  const inheritedReferenceAudioPath = input.scene.audio.reference_audio_path?.trim();
+  const requestedReferenceAudioPath = input.referenceAudioPath?.trim() || inheritedReferenceAudioPath;
+  const referenceAudioPath = requestedReferenceAudioPath
+    ? path.isAbsolute(requestedReferenceAudioPath)
+      ? requestedReferenceAudioPath
+      : path.join(referenceRoot, requestedReferenceAudioPath)
     : undefined;
   const outputPath = path.join(
     outputDir,

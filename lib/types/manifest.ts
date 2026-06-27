@@ -13,6 +13,7 @@ export type SceneMood = (typeof SCENE_MOODS)[number];
 export type SceneAudioConfig = {
   tts_voice: string;
   bgm?: string;
+  reference_audio_path?: string;
 };
 
 export type ContentScene = {

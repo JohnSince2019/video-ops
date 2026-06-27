@@ -105,3 +105,17 @@ test("result structure can be consumed by cache or timeline modules", async () =
   assert.equal(result.durationMs > 0, true);
   assert.equal(result.text, scene.narration);
 });
+
+test("scene-level reference audio path is inherited into local TTS requests", () => {
+  const request = buildTtsRequest({
+    scene: {
+      ...scene,
+      audio: {
+        ...scene.audio,
+        reference_audio_path: "/tmp/custom-voice-reference.wav",
+      },
+    },
+  });
+
+  assert.equal(request.referenceAudioPath, "/tmp/custom-voice-reference.wav");
+});

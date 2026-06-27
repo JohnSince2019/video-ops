@@ -11,6 +11,7 @@ export type TextFallbackOptions = {
   author?: string;
   copyrightLicense?: string;
   ttsVoice?: string;
+  referenceAudioPath?: string;
   mood?: ContentScene["mood"];
   scriptType?: ContentScene["script_type"];
   wordsPerSecond?: number;
@@ -23,6 +24,7 @@ const DEFAULTS: Required<TextFallbackOptions> = {
   author: "John",
   copyrightLicense: "commercial",
   ttsVoice: "zh-CN-female-yunyang",
+  referenceAudioPath: "",
   mood: "calm",
   scriptType: "narration",
   wordsPerSecond: 4,
@@ -107,6 +109,7 @@ function buildScenes(
         visual_hint: visualHint,
         audio: {
           tts_voice: options.ttsVoice,
+          reference_audio_path: options.referenceAudioPath || undefined,
         },
       };
     });

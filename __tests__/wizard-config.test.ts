@@ -96,3 +96,47 @@ test("plain text scene markers are counted as explicit scenes", () => {
 
   assert.equal(draft.estimatedScenes, 3);
 });
+
+test("markdown short-video script headings are not all treated as scenes", () => {
+  const draft = normalizeWizardConfig({
+    title: "高输出操作系统",
+    platform: "douyin",
+    renderProfile: "standard",
+    author: "John",
+    ownerToken: "owner-markdown-script-001",
+    scriptText: [
+      "# 短视频脚本：你不是缺 AI 工具，你是缺一套高输出操作系统",
+      "",
+      "## 标题",
+      "你不是不会用 AI，你只是还没有一套高输出操作系统",
+      "",
+      "## 时长",
+      "30-45 秒",
+      "",
+      "## 开场钩子",
+      "很多高强度上班的人，不是真的不会用 AI。",
+      "问题是，你只是多了一个工具，但没有多一套系统。",
+      "",
+      "## 正文",
+      "你白天开会、写方案、带团队、回消息，已经很累了。",
+      "下班再想做内容、做副业、做个人品牌，脑子其实已经空了。",
+      "",
+      "这时候，真正有用的不是再学 10 个 prompt。",
+      "而是建立一套系统：",
+      "",
+      "- 让 AI 帮你接住真实工作里的素材",
+      "- 帮你把经验整理成可表达的内容",
+      "- 再把一篇内容，拆成文章、短视频、短帖反复复用",
+      "",
+      "## 结尾",
+      "我现在就在做这件事。",
+      "不是教你多会一个工具，而是一起搭一套能长期高质量输出的操作系统。",
+      "",
+      "## CTA",
+      "如果你也想把工作流、内容流和精力系统真正接起来，关注我。",
+    ].join("\n"),
+    scriptMode: "markdown",
+  });
+
+  assert.equal(draft.estimatedScenes, 4);
+});

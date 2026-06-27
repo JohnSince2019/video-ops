@@ -1,0 +1,21 @@
+title: 卧推肩疼？先看手肘角度
+hook: 卧推一发力就肩疼，问题很可能不在肩，而在手肘开太大。
+summary: 用 45 到 60 度的手肘夹角，让肩更稳、胸更容易发力。
+durationSec: 30
+
+scene 1
+voiceover: 很多人卧推肩疼，不是因为肩本身脆弱，而是下放时手肘开得太平。
+visualSuggestion: John 在卧推凳上示范错误动作，手肘接近九十度外展。
+durationSec: 8
+
+scene 2
+voiceover: 更稳的做法是让上臂和躯干保持四十五到六十度，这样肩膀压力会小很多。
+visualSuggestion: John 用角度线标出正确区间，展示肩和胸的发力路径。
+durationSec: 12
+
+scene 3
+voiceover: 下次训练前先拍一组侧面视频，对照这个角度检查自己，再决定要不要继续加重量。
+visualSuggestion: John 回看训练录像，对照角度线做修正。
+durationSec: 10
+
+cta: 想继续看动作纠错系列，就告诉我你最想修哪个动作。
