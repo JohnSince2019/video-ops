@@ -38,8 +38,11 @@ export type JobListItem = {
   id: string;
   title: string;
   state: JobState | "UNKNOWN";
+  stateLabel: string;
   platform: string;
+  platformLabel: string;
   renderProfile: string;
+  renderProfileLabel: string;
   updatedLabel: string;
   progressLabel: string;
   statusTone: "queued" | "running" | "success" | "error" | "neutral";
@@ -51,6 +54,7 @@ export type JobDetailView = {
   id: string;
   title: string;
   state: JobState | "UNKNOWN";
+  stateLabel: string;
   progress: number;
   currentStep: string;
   platform: string;
@@ -95,12 +99,12 @@ function normalizeState(state?: string | null): JobState | "UNKNOWN" {
 
 function formatDateLabel(value?: string | null) {
   if (!value) {
-    return "Unknown time";
+    return "未知时间";
   }
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Unknown time";
+    return "未知时间";
   }
 
   return date.toISOString().replace("T", " ").slice(0, 16);
@@ -125,7 +129,7 @@ function getStatusTone(state: JobState | "UNKNOWN"): JobListItem["statusTone"] {
 
 function stringifyCheckpoint(checkpoint: unknown) {
   if (!checkpoint) {
-    return "No checkpoint captured yet.";
+    return "当前还没有记录到任务检查点。";
   }
 
   if (typeof checkpoint === "string") {
@@ -135,7 +139,7 @@ function stringifyCheckpoint(checkpoint: unknown) {
   try {
     return JSON.stringify(checkpoint, null, 2);
   } catch {
-    return "Checkpoint data unavailable.";
+    return "检查点数据暂时不可读。";
   }
 }
 
@@ -147,7 +151,7 @@ function buildCheckpointReadableSummary(checkpoint: unknown) {
   const data = checkpoint as Record<string, unknown>;
   const lines: string[] = [];
   if (typeof data.step === "string") {
-    lines.push(`当前阶段：${data.step}`);
+    lines.push(`当前阶段：${formatWorkflowStepLabel(data.step)}`);
   }
   if (typeof data.voiceMode === "string") {
     lines.push(`声音模式：${formatVoiceModeLabel(data.voiceMode)}`);
@@ -162,10 +166,10 @@ function buildCheckpointReadableSummary(checkpoint: unknown) {
     lines.push(`声音参考：${data.customVoiceReference}`);
   }
   if (typeof data.stylePreset === "string") {
-    lines.push(`视觉风格：${data.stylePreset}`);
+    lines.push(`视觉风格：${formatStylePresetLabel(data.stylePreset)}`);
   }
   if (typeof data.personaPreset === "string") {
-    lines.push(`人物预设：${data.personaPreset}`);
+    lines.push(`人物预设：${formatPersonaPresetLabel(data.personaPreset)}`);
   }
   if (typeof data.progress === "number") {
     lines.push(`任务进度：${data.progress}%`);
@@ -261,6 +265,55 @@ function formatTtsDeploymentLabel(providerId?: string) {
   return "未设置";
 }
 
+function formatWorkflowStepLabel(step?: string) {
+  const labels: Record<string, string> = {
+    waiting_for_worker: "等待系统开始处理",
+    wizard_submission: "已提交创作任务",
+    parse_manifest: "解析脚本与任务单",
+    parsing: "解析脚本内容",
+    storyboard_ready: "分镜已准备完成",
+    image_generation: "生成画面素材",
+    build_timeline: "组装视频时间线",
+    tts_generation: "生成配音音频",
+    ffmpeg_render: "渲染 MP4 视频",
+    render_failed: "渲染失败待处理",
+    post_processing: "整理最终产物",
+    done: "任务已完成",
+  };
+
+  return labels[step || ""] || step || "当前暂无执行步骤";
+}
+
+function formatStylePresetLabel(value?: string) {
+  const labels: Record<string, string> = {
+    john_vertical_comic: "John 竖屏讲解风格",
+  };
+
+  return labels[value || ""] || value || "未设置";
+}
+
+function formatPersonaPresetLabel(value?: string) {
+  const labels: Record<string, string> = {
+    john_persona_v1: "John 专属人物形象",
+  };
+
+  return labels[value || ""] || value || "未设置";
+}
+
+function formatOutputKindLabel(kind?: string) {
+  const labels: Record<string, string> = {
+    video: "视频文件",
+    cover: "封面图",
+    metadata: "元数据文件",
+  };
+
+  return labels[kind || ""] || kind || "未知产物";
+}
+
+function formatErrorStepLabel(step?: string) {
+  return formatWorkflowStepLabel(step);
+}
+
 function formatStateLabel(state: JobState | "UNKNOWN") {
   const labels: Record<JobState | "UNKNOWN", string> = {
     QUEUED: "排队中",
@@ -279,23 +332,31 @@ function formatStateLabel(state: JobState | "UNKNOWN") {
 }
 
 function formatPlatformLabel(platform: string) {
+  if (!platform || platform === "unknown-platform") {
+    return "未知平台";
+  }
+
   const labels: Record<string, string> = {
     douyin: "抖音",
     xiaohongshu: "小红书",
     videox: "微信视频号 / B站",
   };
 
-  return labels[platform] || platform || "未知平台";
+  return labels[platform] || platform;
 }
 
 function formatRenderProfileLabel(profile: string) {
+  if (!profile || profile === "unknown-profile") {
+    return "未知档位";
+  }
+
   const labels: Record<string, string> = {
     draft: "草稿",
     standard: "标准",
     high_quality: "高质量",
   };
 
-  return labels[profile] || profile || "未知档位";
+  return labels[profile] || profile;
 }
 
 export function buildJobListView(records: JobDashboardRecord[]): JobListItem[] {
@@ -310,10 +371,13 @@ export function buildJobListView(records: JobDashboardRecord[]): JobListItem[] {
 
     return {
       id: record.id,
-      title: record.title?.trim() || `Untitled Job ${index + 1}`,
+      title: record.title?.trim() || `未命名任务 ${index + 1}`,
       state,
+      stateLabel: formatStateLabel(state),
       platform: record.platform?.trim() || "unknown-platform",
+      platformLabel: formatPlatformLabel(record.platform?.trim() || "unknown-platform"),
       renderProfile: record.renderProfile?.trim() || "unknown-profile",
+      renderProfileLabel: formatRenderProfileLabel(record.renderProfile?.trim() || "unknown-profile"),
       updatedLabel: formatDateLabel(record.updatedAt),
       progressLabel: `${progressValue}%`,
       statusTone: getStatusTone(state),
@@ -334,10 +398,11 @@ export function buildJobDetailView(record: JobDashboardRecord): JobDetailView {
 
   return {
     id: record.id,
-    title: record.title?.trim() || "Untitled Job",
+    title: record.title?.trim() || "未命名任务",
     state,
+    stateLabel: formatStateLabel(state),
     progress,
-    currentStep: record.currentStep?.trim() || "No active step",
+    currentStep: formatWorkflowStepLabel(record.currentStep?.trim()),
     platform: formatPlatformLabel(record.platform?.trim() || "unknown-platform"),
     renderProfile: formatRenderProfileLabel(record.renderProfile?.trim() || "unknown-profile"),
     updatedLabel: formatDateLabel(record.updatedAt),
@@ -347,13 +412,13 @@ export function buildJobDetailView(record: JobDashboardRecord): JobDetailView {
     errorSummary:
       record.errors?.length
         ? record.errors.map(
-            (item) => `${item.stepName}: ${item.errorMessage} (retry ${item.retryCount})`,
+            (item) => `${formatErrorStepLabel(item.stepName)}：${item.errorMessage}（已重试 ${item.retryCount} 次）`,
           )
-        : ["No errors recorded."],
+        : ["当前没有错误记录。"],
     outputsSummary:
       record.outputs?.length
-        ? record.outputs.map((item) => `${item.kind}: ${item.url ?? item.path}`)
-        : ["No output bundle available yet."],
+        ? record.outputs.map((item) => `${formatOutputKindLabel(item.kind)}：${item.url ?? item.path}`)
+        : ["当前还没有可用产物。"],
     ttsStrategySummary: {
       providerLabel: formatTtsProviderLabel(readCheckpointField(record.lastCheckpoint, "ttsProviderId")),
       routeLabel: readCheckpointField(record.lastCheckpoint, "ttsRouteLabel") || "未设置",
@@ -384,7 +449,7 @@ export function buildJobDetailView(record: JobDashboardRecord): JobDetailView {
               : "未知",
       fallbackStatusLabel:
         record.qualitySummary?.fallbackStatus === "fallback"
-          ? `Fallback${record.qualitySummary?.fallbackReason ? ` · ${record.qualitySummary.fallbackReason}` : ""}`
+          ? `使用 fallback${record.qualitySummary?.fallbackReason ? ` · ${record.qualitySummary.fallbackReason}` : ""}`
           : record.qualitySummary?.fallbackStatus === "primary"
             ? "正式产物"
             : "未知",

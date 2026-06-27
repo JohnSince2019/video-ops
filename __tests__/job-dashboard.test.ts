@@ -23,9 +23,12 @@ test("task list normalization exposes state, platform, profile, progress, and up
   assert.equal(list[0]?.title, "AI 效率视频");
   assert.equal(list[0]?.state, "AI_PROCESSING");
   assert.equal(list[0]?.platform, "douyin");
+  assert.equal(list[0]?.platformLabel, "抖音");
   assert.equal(list[0]?.renderProfile, "standard");
+  assert.equal(list[0]?.renderProfileLabel, "标准");
   assert.equal(list[0]?.progressLabel, "42%");
   assert.equal(list[0]?.updatedLabel, "2026-06-27 02:10");
+  assert.equal(list[0]?.stateLabel, "AI 处理中");
   assert.equal(list[0]?.ttsProviderLabel, "F5-TTS");
   assert.equal(list[0]?.ttsRouteLabel, "高拟真 SaaS 生产路线");
 });
@@ -64,11 +67,14 @@ test("task detail output includes step, progress, errors, checkpoint, and output
   });
 
   assert.equal(detail.state, "FAILED");
+  assert.equal(detail.stateLabel, "失败");
   assert.equal(detail.progress, 73);
-  assert.equal(detail.currentStep, "tts_generation");
-  assert.equal(detail.errorSummary[0], "tts_generation: cosyvoice timeout (retry 2)");
-  assert.equal(detail.outputsSummary[0], "cover: output/cover.png");
+  assert.equal(detail.currentStep, "生成配音音频");
+  assert.equal(detail.errorSummary[0], "生成配音音频：cosyvoice timeout（已重试 2 次）");
+  assert.equal(detail.outputsSummary[0], "封面图：output/cover.png");
   assert.match(detail.checkpointSummary, /image_generation/);
+  assert.equal(detail.checkpointReadableSummary[0], "当前阶段：生成画面素材");
+  assert.equal(detail.checkpointReadableSummary.includes("TTS 路线：默认中文解说路线"), true);
   assert.equal(detail.ttsStrategySummary.voiceModeLabel, "男声老师清晰");
   assert.equal(detail.ttsStrategySummary.providerLabel, "CosyVoice MLX");
   assert.equal(detail.ttsStrategySummary.routeLabel, "默认中文解说路线");
@@ -76,7 +82,7 @@ test("task detail output includes step, progress, errors, checkpoint, and output
   assert.equal(detail.ttsStrategySummary.deploymentLabel, "本地与云端都可落地");
   assert.equal(detail.qualitySummary.fileSizeLabel, "1.50 MB");
   assert.equal(detail.qualitySummary.durationLabel, "14.2s");
-  assert.equal(detail.qualitySummary.fallbackStatusLabel, "Fallback · ffmpeg render failed");
+  assert.equal(detail.qualitySummary.fallbackStatusLabel, "使用 fallback · ffmpeg render failed");
   assert.equal(detail.qualitySummary.complianceStatusLabel, "通过");
   assert.equal(detail.costSummary.totalUsd, "$0.1590");
 });
@@ -122,14 +128,20 @@ test("unknown state and missing fields fall back to safe display values", () => 
     state: "SOMETHING_NEW",
   });
 
-  assert.equal(list[0]?.title, "Untitled Job 1");
+  assert.equal(list[0]?.title, "未命名任务 1");
   assert.equal(list[0]?.state, "UNKNOWN");
+  assert.equal(list[0]?.stateLabel, "未知");
   assert.equal(list[0]?.platform, "unknown-platform");
+  assert.equal(list[0]?.platformLabel, "未知平台");
   assert.equal(list[0]?.renderProfile, "unknown-profile");
+  assert.equal(list[0]?.renderProfileLabel, "未知档位");
   assert.equal(detail.state, "UNKNOWN");
-  assert.equal(detail.currentStep, "No active step");
-  assert.equal(detail.errorSummary[0], "No errors recorded.");
-  assert.equal(detail.outputsSummary[0], "No output bundle available yet.");
+  assert.equal(detail.stateLabel, "未知");
+  assert.equal(detail.platform, "未知平台");
+  assert.equal(detail.renderProfile, "未知档位");
+  assert.equal(detail.currentStep, "当前暂无执行步骤");
+  assert.equal(detail.errorSummary[0], "当前没有错误记录。");
+  assert.equal(detail.outputsSummary[0], "当前还没有可用产物。");
   assert.equal(detail.ttsStrategySummary.providerLabel, "未设置");
   assert.equal(detail.qualitySummary.fileSizeLabel, "未生成");
   assert.equal(detail.costSummary.totalUsd, "$0.0000");

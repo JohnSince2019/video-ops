@@ -146,7 +146,7 @@ async function main() {
     await page.waitForFunction(() => {
       const title = document.querySelector("#derivedTitle")?.textContent?.trim();
       const status = document.querySelector("#status")?.textContent?.trim();
-      return Boolean(title && title !== "等待脚本解析" && status === "可提交");
+      return Boolean(title && title !== "等待脚本解析" && status === "草稿校验通过");
     }, { timeout: 30000 });
     console.log("[e2e] derived fields rendered");
 
@@ -244,12 +244,12 @@ async function main() {
     );
     console.log("[e2e] job id visible");
 
-    await waitForEventContains(page, "PARSING", 30000);
+    await waitForEventContains(page, "解析中", 30000);
     await waitForEventContains(page, "COMPLETED", 30000);
     console.log("[e2e] completed event observed");
 
     const eventTexts = await collectEventTexts(page);
-    const statesToObserve = ["PARSING", "AI_PROCESSING", "ASSEMBLING", "RENDERING", "COMPLETED"];
+    const statesToObserve = ["解析中", "AI_PROCESSING", "ASSEMBLING", "RENDERING", "COMPLETED"];
     for (const state of statesToObserve) {
       assert.ok(eventTexts.some((item) => item.includes(state)), `missing event state: ${state}`);
       result.stateTimeline.push({

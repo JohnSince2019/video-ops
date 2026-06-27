@@ -277,7 +277,31 @@ const demoJobs = [
     currentStep: "image_generation",
     manifestId: "manifest-001",
     ownerTokenHash: "owner-hash-001",
-    lastCheckpoint: { step: "parsing", scenes: 5 },
+    lastCheckpoint: {
+      step: "image_generation",
+      progress: 44,
+      storyboardScenes: 5,
+      voiceMode: "male_clear_teacher",
+      ttsProviderId: "cosyvoice-mlx",
+      ttsRouteLabel: "默认中文解说路线",
+      stylePreset: "john_vertical_comic",
+      personaPreset: "john_persona_v1",
+    },
+    qualitySummary: {
+      durationSec: null,
+      resolution: null,
+      audioPresence: null,
+      subtitleStatus: "planned",
+      fallbackStatus: null,
+      complianceStatus: "allowed",
+      complianceViolations: 0,
+    },
+    costSummary: {
+      gptImageUsd: 0.092,
+      wanxUsd: 0.018,
+      ttsUsd: 0.011,
+      totalUsd: 0.121,
+    },
     outputs: [],
     errors: [],
   },
@@ -293,7 +317,35 @@ const demoJobs = [
     currentStep: "done",
     manifestId: "manifest-002",
     ownerTokenHash: "owner-hash-002",
-    lastCheckpoint: { step: "post_processing", outputsReady: true },
+    lastCheckpoint: {
+      step: "done",
+      progress: 100,
+      storyboardScenes: 6,
+      outputsReady: true,
+      previewUrl: "/output/jobs/job-002/final/video.mp4",
+      voiceMode: "female_energetic_creator",
+      ttsProviderId: "f5-tts",
+      ttsRouteLabel: "高拟真 SaaS 生产路线",
+      stylePreset: "john_vertical_comic",
+      personaPreset: "john_persona_v1",
+    },
+    qualitySummary: {
+      fileSizeBytes: 8_912_384,
+      durationSec: 34.6,
+      resolution: "1080x1920",
+      audioPresence: true,
+      subtitleStatus: "embedded",
+      fallbackStatus: "primary",
+      fallbackReason: null,
+      complianceStatus: "allowed",
+      complianceViolations: 0,
+    },
+    costSummary: {
+      gptImageUsd: 0.188,
+      wanxUsd: 0.024,
+      ttsUsd: 0.063,
+      totalUsd: 0.275,
+    },
     outputs: [
       { kind: "video", path: "output/job-002.mp4" },
       { kind: "cover", path: "output/job-002-cover.png" },
@@ -313,7 +365,35 @@ const demoJobs = [
     currentStep: "tts_generation",
     manifestId: "manifest-003",
     ownerTokenHash: "owner-hash-003",
-    lastCheckpoint: { step: "image_generation", scene: 4 },
+    lastCheckpoint: {
+      step: "tts_generation",
+      progress: 58,
+      storyboardScenes: 4,
+      scene: 4,
+      voiceMode: "custom_reference",
+      customVoiceReference: "john-demo.wav",
+      ttsProviderId: "cosyvoice-mlx",
+      ttsRouteLabel: "自定义声音克隆路线",
+      stylePreset: "john_vertical_comic",
+      personaPreset: "john_persona_v1",
+    },
+    qualitySummary: {
+      fileSizeBytes: null,
+      durationSec: null,
+      resolution: "1080x1920",
+      audioPresence: false,
+      subtitleStatus: "planned",
+      fallbackStatus: "fallback",
+      fallbackReason: "TTS 生成超时",
+      complianceStatus: "allowed",
+      complianceViolations: 0,
+    },
+    costSummary: {
+      gptImageUsd: 0.121,
+      wanxUsd: 0.012,
+      ttsUsd: 0.036,
+      totalUsd: 0.169,
+    },
     outputs: [{ kind: "cover", path: "output/job-003-cover.png" }],
     errors: [{ stepName: "tts_generation", errorMessage: "cosyvoice timeout", retryCount: 3 }],
   },
@@ -329,7 +409,32 @@ const demoJobs = [
     currentStep: "waiting_for_worker",
     manifestId: "manifest-004",
     ownerTokenHash: "owner-hash-004",
-    lastCheckpoint: null,
+    lastCheckpoint: {
+      step: "waiting_for_worker",
+      progress: 0,
+      storyboardScenes: 0,
+      voiceMode: "male_coach_deep",
+      ttsProviderId: "melotts",
+      ttsRouteLabel: "低成本快速预览路线",
+      stylePreset: "john_vertical_comic",
+      personaPreset: "john_persona_v1",
+    },
+    qualitySummary: {
+      fileSizeBytes: null,
+      durationSec: null,
+      resolution: null,
+      audioPresence: null,
+      subtitleStatus: "planned",
+      fallbackStatus: null,
+      complianceStatus: "allowed",
+      complianceViolations: 0,
+    },
+    costSummary: {
+      gptImageUsd: 0,
+      wanxUsd: 0,
+      ttsUsd: 0,
+      totalUsd: 0,
+    },
     outputs: [],
     errors: [],
   },
@@ -408,22 +513,22 @@ function getWizardStepsForState(jobState) {
 const wizardStepContent = {
   asset_intake: {
     title: "素材收集",
-    subtitle: "直接贴短视频脚本，系统自动识别标题、hook、摘要、时长和 scenes 结构。",
+    subtitle: "直接粘贴短视频脚本，系统会自动识别标题、开场抓手、摘要、总时长和分段结构。",
     goalTitle: "把一条可拍的短视频脚本转成结构化生产输入",
-    goalText: "你提供脚本，系统负责提取 title、hook、summary、durationSec、scenes 和 cta。",
+    goalText: "你提供脚本，系统负责提取标题、开场抓手、摘要、总时长、分段内容和行动引导。",
     goalHint: "用户不应该先填一堆内部字段。这里的目标是少输入、快理解、可立即进入分镜和生成。",
   },
   storyboard_generation: {
     title: "分镜确认",
-    subtitle: "确认 scene 拆分、口播顺序、画面建议与每段时长是否合理。",
+    subtitle: "确认每一段内容的拆分、口播顺序、画面建议与时长是否合理。",
     goalTitle: "把脚本变成可以直接进入生产的镜头草图",
-    goalText: "这里重点确认每个 scene 的 voiceover、visualSuggestion 和 durationSec 是否支撑最终视频节奏。",
+    goalText: "这里重点确认每一段要说什么、建议画面是什么、建议时长是否支撑最终视频节奏。",
     goalHint: "如果分镜不清楚，后面的生图、配音和合成都会放大问题，所以这一关是内容质量的关键闸口。",
   },
   image_generation: {
     title: "图像生成",
-    subtitle: "基于 John 风格和每个 scene 的视觉建议生成主画面与补充素材。",
-    goalTitle: "让每个 scene 都有统一且可用的视觉资产",
+    subtitle: "基于 John 风格和每一段的画面建议生成主画面与补充素材。",
+    goalTitle: "让每一段内容都有统一且可用的视觉资产",
     goalText: "系统会围绕人物一致性、画面风格、安全区和平台比例生成主图与补充 B-roll。",
     goalHint: "这一阶段更关注画风一致、人物稳定、镜头可读，而不是一次就追求最终极致质感。",
   },
@@ -737,6 +842,52 @@ ${sharedPageStyles}
         color: var(--ink);
         line-height: 1.6;
       }
+      .advanced-config {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: #fcfdff;
+        overflow: hidden;
+      }
+      .advanced-config[open] {
+        background: #fff;
+      }
+      .advanced-config summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .advanced-config summary::-webkit-details-marker {
+        display: none;
+      }
+      .advanced-config-title {
+        display: grid;
+        gap: 4px;
+      }
+      .advanced-config-title strong {
+        font-size: 14px;
+        color: var(--ink);
+      }
+      .advanced-config-title span {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .advanced-config-caret {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .advanced-config[open] .advanced-config-caret {
+        color: var(--primary);
+      }
+      .advanced-config-body {
+        padding: 0 16px 16px;
+      }
       .voice-preset-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -872,11 +1023,96 @@ ${sharedPageStyles}
       }
       .field.compact label { font-size: 12px; }
       .editor-tools {
+        display: grid;
+        gap: 14px;
+      }
+      .workflow-actions {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+      }
+      .action-stage {
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        background: #fbfcff;
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+      }
+      .action-stage.primary {
+        background: linear-gradient(180deg, #f8f6ff, #ffffff);
+        border-color: rgba(118, 103, 255, 0.16);
+      }
+      .action-stage-head {
         display: flex;
+        align-items: center;
         justify-content: space-between;
         gap: 12px;
+      }
+      .action-stage-kicker {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .action-stage-title {
+        font-size: 15px;
+        font-weight: 800;
+        color: var(--ink);
+      }
+      .action-stage-hint {
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+      .action-stage .actions {
+        margin-top: 0;
+      }
+      .stage-chip {
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid var(--border);
+        background: #fff;
+        color: var(--muted);
+      }
+      .stage-chip.ready {
+        background: rgba(22, 163, 74, 0.08);
+        border-color: rgba(22, 163, 74, 0.14);
+        color: #15803d;
+      }
+      .stage-chip.warn {
+        background: rgba(245, 158, 11, 0.12);
+        border-color: rgba(245, 158, 11, 0.15);
+        color: #b45309;
+      }
+      .support-actions {
+        display: flex;
         align-items: center;
+        justify-content: space-between;
+        gap: 12px;
         flex-wrap: wrap;
+      }
+      .support-copy {
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+      .workflow-status {
+        display: grid;
+        gap: 4px;
+      }
+      .workflow-status-line {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .workflow-status-hint {
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--muted);
       }
       .editor-meta {
         display: flex;
@@ -892,6 +1128,21 @@ ${sharedPageStyles}
         color: var(--muted);
         font-size: 11px;
         font-weight: 700;
+      }
+      .tiny-chip.ok {
+        background: rgba(22, 163, 74, 0.08);
+        border-color: rgba(22, 163, 74, 0.14);
+        color: #15803d;
+      }
+      .tiny-chip.warn {
+        background: rgba(245, 158, 11, 0.12);
+        border-color: rgba(245, 158, 11, 0.15);
+        color: #b45309;
+      }
+      .tiny-chip.busy {
+        background: rgba(118, 103, 255, 0.12);
+        border-color: rgba(118, 103, 255, 0.16);
+        color: #6d56f5;
       }
       .storyboard-grid {
         display: grid;
@@ -933,6 +1184,57 @@ ${sharedPageStyles}
       .scene-caption {
         font-size: 12px;
         color: var(--muted);
+      }
+      .gate-checklist {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .gate-check {
+        display: grid;
+        grid-template-columns: 22px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #fff;
+      }
+      .gate-check.done {
+        background: #f8fff9;
+        border-color: rgba(22, 163, 74, 0.14);
+      }
+      .gate-check.pending {
+        background: #fffaf2;
+        border-color: rgba(245, 158, 11, 0.14);
+      }
+      .gate-check-icon {
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .gate-check.done .gate-check-icon {
+        background: rgba(22, 163, 74, 0.12);
+        color: #15803d;
+      }
+      .gate-check.pending .gate-check-icon {
+        background: rgba(245, 158, 11, 0.12);
+        color: #b45309;
+      }
+      .gate-check strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+        color: var(--ink);
+      }
+      .gate-check p {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.6;
       }
       .progress-track {
         height: 8px;
@@ -1121,6 +1423,7 @@ ${sharedPageStyles}
         }
       }
       @media (max-width: 900px) {
+        .workflow-actions,
         .platform-grid,
         .auto-grid,
         .voice-preset-grid,
@@ -1185,12 +1488,12 @@ ${sharedPageStyles}
                   ? `
               <div class="script-intake-layout">
                 <div class="script-paste-box">
-                  <label class="tip-label" for="scriptText">短视频脚本 <span class="tip-icon" data-tip="直接粘贴完整脚本即可。系统会自动尝试提取标题、hook、summary、总时长和每个 scene 的口播/画面建议。">?</span></label>
+                  <label class="tip-label" for="scriptText">短视频脚本 <span class="tip-icon" data-tip="直接粘贴完整脚本即可。系统会自动尝试提取标题、开场抓手、摘要、总时长，以及每一段要说什么和建议画面。">?</span></label>
                   <input id="platform" type="hidden" value="douyin" />
                   <input id="scriptMode" type="hidden" value="plain_text" />
                   <input id="voiceMode" type="hidden" value="male_coach_deep" />
                   <input id="ttsProviderId" type="hidden" value="${defaultVoiceProvider.id}" />
-                  <textarea id="scriptText" placeholder="在这里直接粘贴你的短视频脚本。建议包含：title、hook、summary、durationSec、scenes、cta。"></textarea>
+                  <textarea id="scriptText" placeholder="在这里直接粘贴你的短视频脚本。建议包含：标题、开场抓手、摘要、总时长、分段内容、行动引导。"></textarea>
                   <div class="micro-copy">支持自然语言脚本，也支持接近 JSON / Markdown 的结构化脚本。脚本模式将自动识别，无需手动选择。</div>
                 </div>
 
@@ -1210,7 +1513,7 @@ ${sharedPageStyles}
                     <strong id="derivedTitle">等待脚本解析</strong>
                   </div>
                   <div class="auto-card">
-                    <b>自动提取 Hook</b>
+                    <b>自动提取开场抓手</b>
                     <strong id="derivedHook">等待脚本解析</strong>
                   </div>
                   <div class="auto-card">
@@ -1224,46 +1527,57 @@ ${sharedPageStyles}
                 </div>
 
                 <div class="field">
-                  <label class="tip-label">自动识别场景 <span class="tip-icon" data-tip="系统会把脚本拆成 scenes，每个 scene 包含 voiceover、visualSuggestion 和 durationSec，供下一步分镜确认直接使用。">?</span></label>
+                  <label class="tip-label">自动识别分段 <span class="tip-icon" data-tip="系统会把脚本拆成若干内容段，每一段都会给出这一段要说什么、建议画面和建议时长，供下一步分镜确认直接使用。">?</span></label>
                   <div class="scene-outline" id="sceneOutline">
-                    <div class="summary-item empty">粘贴脚本后，这里会自动生成 scenes 草稿。</div>
+                    <div class="summary-item empty">粘贴脚本后，这里会自动生成分段草稿。</div>
                   </div>
                 </div>
 
-                <div class="field-grid workbench">
-                  <div class="field compact">
-                    <label class="tip-label" for="author">作者 <span class="tip-icon" data-tip="用于写入元数据和产物归属，不会直接影响镜头内容。">?</span></label>
-                    <input id="author" value="John" />
+                <details class="advanced-config">
+                  <summary>
+                    <div class="advanced-config-title">
+                      <strong>高级设置</strong>
+                      <span>默认情况下你不用改这里。只有当你要微调作者、渲染档位、画面风格或任务归属时，再展开查看。</span>
+                    </div>
+                    <span class="advanced-config-caret">展开查看</span>
+                  </summary>
+                  <div class="advanced-config-body">
+                    <div class="field-grid workbench">
+                      <div class="field compact">
+                        <label class="tip-label" for="author">作者 <span class="tip-icon" data-tip="用于写入元数据和产物归属，不会直接影响镜头内容。">?</span></label>
+                        <input id="author" value="John" />
+                      </div>
+                      <div class="field compact">
+                        <label class="tip-label" for="renderProfile">渲染档位 <span class="tip-icon" data-tip="标准档位用于日常生产；高质量档位适合正式发布；草稿档位用于快速预览。">?</span></label>
+                        <select id="renderProfile">
+                          <option value="draft">草稿</option>
+                          <option value="standard" selected>标准</option>
+                          <option value="high_quality">高质量</option>
+                        </select>
+                      </div>
+                      <div class="field compact">
+                        <label class="tip-label" for="stylePreset">画面风格 <span class="tip-icon" data-tip="这里决定整条视频的整体视觉方向，包括构图、字幕安全区、人物画风和画面氛围。">?</span></label>
+                        <select id="stylePreset">
+                          <option value="john_vertical_comic" selected>John 竖屏讲解风格</option>
+                        </select>
+                      </div>
+                      <div class="field compact">
+                        <label class="tip-label" for="personaPreset">主角形象 <span class="tip-icon" data-tip="用于锁定主角身份和形象连续性，保证不同场景里看到的都是同一个 John。">?</span></label>
+                        <select id="personaPreset">
+                          <option value="john_persona_v1" selected>John 专属人物形象</option>
+                        </select>
+                      </div>
+                      <div class="field compact">
+                        <label class="tip-label" for="ownerToken">任务归属标签 <span class="tip-icon" data-tip="用于标记这条任务属于哪个创作工作流或创作者，系统也会用它辅助任务去重。">?</span></label>
+                        <input id="ownerToken" value="john-ai-lab" placeholder="例如：john-content-studio" />
+                      </div>
+                      <div class="field compact">
+                        <label class="tip-label" for="title">备用标题 <span class="tip-icon" data-tip="只有在脚本自动抽取标题失败时，系统才会回退使用这里的标题。大多数情况下无需手动填写。">?</span></label>
+                        <input id="title" placeholder="如果自动抽取失败，可在这里补充标题" />
+                      </div>
+                    </div>
                   </div>
-                  <div class="field compact">
-                    <label class="tip-label" for="renderProfile">渲染档位 <span class="tip-icon" data-tip="标准档位用于日常生产；高质量档位适合正式发布；草稿档位用于快速预览。">?</span></label>
-                    <select id="renderProfile">
-                      <option value="draft">草稿</option>
-                      <option value="standard" selected>标准</option>
-                      <option value="high_quality">高质量</option>
-                    </select>
-                  </div>
-                  <div class="field compact">
-                    <label class="tip-label" for="stylePreset">视觉风格 <span class="tip-icon" data-tip="约束生成图片的整体风格、构图、字幕安全区和人物画风。">?</span></label>
-                    <select id="stylePreset">
-                      <option value="john_vertical_comic" selected>John 竖屏漫画</option>
-                    </select>
-                  </div>
-                  <div class="field compact">
-                    <label class="tip-label" for="personaPreset">人物预设 <span class="tip-icon" data-tip="用于锁定主角身份和形象连续性，保证不同场景仍然是同一个 John。">?</span></label>
-                    <select id="personaPreset">
-                      <option value="john_persona_v1" selected>John 人设 v1</option>
-                    </select>
-                  </div>
-                  <div class="field compact">
-                    <label class="tip-label" for="ownerToken">归属标识 <span class="tip-icon" data-tip="用于识别这条任务属于哪个工作流或哪个创作人，也会参与幂等和任务去重。">?</span></label>
-                    <input id="ownerToken" value="john-ai-lab" placeholder="例如：john-mobile-studio" />
-                  </div>
-                  <div class="field compact">
-                    <label class="tip-label" for="title">保底标题 <span class="tip-icon" data-tip="当脚本自动抽取标题失败时，会回退使用这里的标题。正常情况下无需手动填写。">?</span></label>
-                    <input id="title" placeholder="如自动抽取失败，可在这里补充标题" />
-                  </div>
-                </div>
+                </details>
 
                 ${
                   isAssetIntakeStep
@@ -1344,20 +1658,20 @@ ${sharedPageStyles}
                   </select>
                 </div>
                 <div class="field compact">
-                  <label for="stylePreset">视觉风格</label>
+                  <label for="stylePreset">画面风格</label>
                   <select id="stylePreset">
-                    <option value="john_vertical_comic" selected>John 竖屏漫画</option>
+                    <option value="john_vertical_comic" selected>John 竖屏讲解风格</option>
                   </select>
                 </div>
                 <div class="field compact">
-                  <label for="personaPreset">人物预设</label>
+                  <label for="personaPreset">主角形象</label>
                   <select id="personaPreset">
-                    <option value="john_persona_v1" selected>John 人设 v1</option>
+                    <option value="john_persona_v1" selected>John 专属人物形象</option>
                   </select>
                 </div>
                 <div class="field compact">
-                  <label for="ownerToken">归属标识</label>
-                  <input id="ownerToken" placeholder="例如：john-mobile-studio" />
+                  <label for="ownerToken">任务归属标签</label>
+                  <input id="ownerToken" placeholder="例如：john-content-studio" />
                 </div>
                 <div class="field full">
                   <label for="scriptText">脚本文本</label>
@@ -1374,7 +1688,7 @@ ${sharedPageStyles}
                     ${voicePresetCardsHtml}
                   </div>
                   <div class="inline-status" id="presetVoiceStatus">当前已应用：${defaultVoicePreset.chineseLabel}</div>
-                  <div class="hint">默认推荐使用 ${defaultVoiceProvider.displayName} 跑中文解说；如果后续做云端 SaaS 重度生产，可优先考虑 ${getTtsProviderProfile("f5-tts").displayName} 作为高拟真方案，${getTtsProviderProfile("melotts").displayName} 作为低成本 fallback。</div>
+                  <div class="hint">默认推荐使用 ${defaultVoiceProvider.displayName} 跑中文解说；如果后续做云端 SaaS 重度生产，可优先考虑 ${getTtsProviderProfile("f5-tts").displayName} 作为高拟真方案，${getTtsProviderProfile("melotts").displayName} 作为低成本备用方案。</div>
                 </div>
 
                 <div class="field full">
@@ -1412,20 +1726,20 @@ ${sharedPageStyles}
                   </select>
                 </div>
                 <div class="field compact">
-                  <label for="stylePreset">视觉风格</label>
+                  <label for="stylePreset">画面风格</label>
                   <select id="stylePreset">
-                    <option value="john_vertical_comic" selected>John 竖屏漫画</option>
+                    <option value="john_vertical_comic" selected>John 竖屏讲解风格</option>
                   </select>
                 </div>
                 <div class="field compact">
-                  <label for="personaPreset">人物预设</label>
+                  <label for="personaPreset">主角形象</label>
                   <select id="personaPreset">
-                    <option value="john_persona_v1" selected>John 人设 v1</option>
+                    <option value="john_persona_v1" selected>John 专属人物形象</option>
                   </select>
                 </div>
                 <div class="field compact">
-                  <label for="ownerToken">归属标识</label>
-                  <input id="ownerToken" placeholder="例如：john-mobile-studio" />
+                  <label for="ownerToken">任务归属标签</label>
+                  <input id="ownerToken" placeholder="例如：john-content-studio" />
                 </div>
                 <div class="field full">
                   <label for="scriptText">脚本文本</label>
@@ -1436,18 +1750,50 @@ ${sharedPageStyles}
               }
 
               <div class="editor-tools">
-                <div class="actions">
-                  <button class="primary" id="validateBtn">校验草稿</button>
-                  <button class="secondary" id="createJobBtn">创建任务</button>
-                  <button class="secondary" id="loadDemoBtn">载入演示内容</button>
+                <div class="workflow-actions">
+                  <section class="action-stage primary">
+                    <div class="action-stage-head">
+                      <div>
+                        <div class="action-stage-kicker">第 1 步</div>
+                        <div class="action-stage-title">先校验脚本草稿</div>
+                      </div>
+                      <span class="stage-chip warn" id="validateStageChip">等待校验</span>
+                    </div>
+                    <div class="action-stage-hint">先让系统确认脚本结构完整、分段可读、可以进入分镜预览。校验通过后，再进入创建任务。</div>
+                    <div class="actions">
+                      <button class="primary" id="validateBtn">开始校验</button>
+                    </div>
+                  </section>
+                  <section class="action-stage">
+                    <div class="action-stage-head">
+                      <div>
+                        <div class="action-stage-kicker">第 2 步</div>
+                        <div class="action-stage-title">再创建视频任务</div>
+                      </div>
+                      <span class="stage-chip warn" id="createStageChip">等待校验通过</span>
+                    </div>
+                    <div class="action-stage-hint">只有脚本通过校验后，才建议创建任务并开始 SSE 进度追踪与视频产物生成。</div>
+                    <div class="actions">
+                      <button class="secondary" id="createJobBtn" disabled>创建任务</button>
+                    </div>
+                  </section>
                 </div>
-                <span id="status" class="warn">等待输入</span>
+                <div class="support-actions">
+                  <div class="support-copy">想快速看完整流程时，可先载入演示内容，再按“先校验、后创建”的顺序走一遍。</div>
+                  <div class="actions">
+                    <button class="secondary" id="loadDemoBtn">载入演示内容</button>
+                  </div>
+                </div>
+                <div class="workflow-status">
+                  <span id="status" class="workflow-status-line">等待输入脚本</span>
+                  <span id="statusHint" class="workflow-status-hint">先粘贴脚本或载入演示内容，再执行第 1 步校验。</span>
+                </div>
               </div>
           </section>
 
           <section class="card storyboard-card" style="margin-top:14px">
               <div class="panel-title">分镜预览</div>
-              <p>这里显示脚本拆分后的场景预览，帮助你在创建任务前先理解节奏和镜头意图。编辑脚本后先点 Validate，就能即时看到场景化结果。</p>
+              <p>这里显示脚本拆分后的场景预览，帮助你在创建任务前先理解节奏和镜头意图。先完成校验，就能即时看到结构化分镜结果。</p>
               <div class="storyboard-grid" id="storyboardGrid">
                 <div class="summary-item empty">先校验草稿，再生成分镜预览。</div>
               </div>
@@ -1472,6 +1818,7 @@ ${sharedPageStyles}
             <section class="gate-card">
               <div class="panel-title" id="focusPanelTitle">当前这一步重点</div>
               <div class="gate-note" id="focusPanelNote">素材收集阶段先关注：脚本是否完整、场景拆分是否顺、声音方案是否选对。任务创建后，右侧才重点显示进度、预览和产物质量。</div>
+              <div class="gate-checklist" id="gateChecklist"></div>
               <div class="quality-list" id="summaryList"></div>
               <div class="error-list" id="errorList"></div>
             </section>
@@ -1496,8 +1843,8 @@ ${sharedPageStyles}
                   <p id="activeVoiceReferenceLabel">未使用自定义参考</p>
                 </div>
                 <div class="asset-item">
-                  <strong>当前视觉风格</strong>
-                  <p>John 竖屏漫画</p>
+                  <strong>当前画面风格</strong>
+                  <p>John 竖屏讲解风格</p>
                 </div>
               </div>
             </section>
@@ -1506,7 +1853,7 @@ ${sharedPageStyles}
               <div class="panel-title" id="nextGatePanelTitle">下一步 Gate 要求</div>
               <div class="gate-list" id="nextGateList">
                 <div class="gate-item"><strong>内容已保存</strong><p>草稿通过基础校验，字段完整。</p></div>
-                <div class="gate-item"><strong>结构评分 &gt; 70</strong><p>场景拆分合理，文案足以进入 Storyboard。</p></div>
+                <div class="gate-item"><strong>结构评分 &gt; 70</strong><p>场景拆分合理，文案足以进入分镜确认。</p></div>
                 <div class="gate-item"><strong>产物可继续生成</strong><p>创建任务后可跟踪 SSE，并最终看到 MP4 预览。</p></div>
               </div>
             </section>
@@ -1542,7 +1889,7 @@ ${sharedPageStyles}
                 <div class="summary-item">
                   <b style="display:block;margin-bottom:8px">产物质量摘要</b>
                   <div class="quality-list" id="jobQualitySummary">
-                    <div class="summary-item empty">任务完成后，这里会显示文件大小、时长、分辨率、音频、字幕、fallback 与合规状态。</div>
+                  <div class="summary-item empty">任务完成后，这里会显示文件大小、时长、分辨率、音频、字幕、备用渲染与合规状态。</div>
                   </div>
                 </div>
                 <div class="summary-item">
@@ -1570,6 +1917,7 @@ ${sharedPageStyles}
       <script>
         const ids = ["title", "author", "platform", "renderProfile", "scriptMode", "stylePreset", "personaPreset", "voiceMode", "ttsProviderId", "ownerToken", "customVoiceReference", "scriptText"];
         const statusEl = document.getElementById("status");
+        const statusHintEl = document.getElementById("statusHint");
         const summaryList = document.getElementById("summaryList");
         const errorList = document.getElementById("errorList");
         const draftJson = document.getElementById("draftJson");
@@ -1613,6 +1961,9 @@ ${sharedPageStyles}
         const validateBtn = document.getElementById("validateBtn");
         const createJobBtn = document.getElementById("createJobBtn");
         const loadDemoBtn = document.getElementById("loadDemoBtn");
+        const validateStageChip = document.getElementById("validateStageChip");
+        const createStageChip = document.getElementById("createStageChip");
+        const advancedConfig = document.querySelector(".advanced-config");
         const activeVoiceModeLabel = document.getElementById("activeVoiceModeLabel");
         const activeVoiceProviderLabel = document.getElementById("activeVoiceProviderLabel");
         const activeTtsRouteLabel = document.getElementById("activeTtsRouteLabel");
@@ -1624,6 +1975,7 @@ ${sharedPageStyles}
         const scriptCharactersLabel = document.getElementById("scriptCharactersLabel");
         const focusPanelTitle = document.getElementById("focusPanelTitle");
         const focusPanelNote = document.getElementById("focusPanelNote");
+        const gateChecklist = document.getElementById("gateChecklist");
         const selectedPlanPanelTitle = document.getElementById("selectedPlanPanelTitle");
         const nextGatePanelTitle = document.getElementById("nextGatePanelTitle");
         const nextGateList = document.getElementById("nextGateList");
@@ -1634,6 +1986,18 @@ ${sharedPageStyles}
         let recorderStream = null;
         let recorderChunks = [];
         let activeEventSource = null;
+
+        function syncAdvancedConfigLabel() {
+          if (!advancedConfig) return;
+          const caret = advancedConfig.querySelector(".advanced-config-caret");
+          if (!caret) return;
+          caret.textContent = advancedConfig.hasAttribute("open") ? "收起设置" : "展开查看";
+        }
+
+        advancedConfig?.addEventListener("toggle", syncAdvancedConfigLabel);
+        syncAdvancedConfigLabel();
+        setCreateJobAvailability(false);
+        syncGateAssistant("waiting_input");
 
         function clientProfileLabel(value) {
           if (value === "draft") return "草稿";
@@ -1904,6 +2268,154 @@ ${sharedPageStyles}
           button.disabled = false;
         }
 
+        function setStageChip(element, text, tone) {
+          if (!element) return;
+          element.textContent = text;
+          element.className = "stage-chip" + (tone ? " " + tone : "");
+        }
+
+        function setCreateJobAvailability(enabled) {
+          if (!createJobBtn) return;
+          createJobBtn.disabled = !enabled;
+          if (enabled) {
+            createJobBtn.classList.remove("secondary");
+            createJobBtn.classList.add("primary");
+          } else {
+            createJobBtn.classList.remove("primary");
+            createJobBtn.classList.add("secondary");
+          }
+        }
+
+        function setHeroStatus(text, tone) {
+          if (!heroStatus) return;
+          heroStatus.textContent = text;
+          heroStatus.className = "tiny-chip" + (tone ? " " + tone : "");
+        }
+
+        function setWorkflowStatus(line, hint) {
+          if (statusEl) statusEl.textContent = line;
+          if (statusHintEl) statusHintEl.textContent = hint;
+        }
+
+        function syncGateAssistant(statusKey) {
+          if (!gateBadge || !focusPanelNote || !nextGateList || !gateChecklist) return;
+
+          const assistantMap = {
+            waiting_input: {
+              badge: "先准备脚本",
+              note: "先把脚本贴进来或载入演示内容，然后完成第 1 步校验。右侧现在只需要帮你确认输入是否完整。",
+              checklist: [
+                { title: "脚本已输入", text: "先把可用脚本贴进来，系统才知道要处理什么。", done: false },
+                { title: "平台已确认", text: "至少明确这条内容准备发到哪些平台。", done: false },
+                { title: "进入校验阶段", text: "下一步应该先跑脚本校验，而不是直接创建任务。", done: false },
+              ],
+              gates: [
+                { title: "先有完整脚本", text: "至少要有主题、核心观点和基本结构，系统才能开始拆分。" },
+                { title: "知道发到哪些平台", text: "勾选平台后，后面才能更准确地做比例和发布适配。" },
+                { title: "不用急着创建任务", text: "现在先别盯产物，先把输入和结构理顺。" },
+              ],
+            },
+            validating: {
+              badge: "正在校验",
+              note: "系统正在检查脚本结构、分段可读性和进入分镜预览的准备情况。先等校验结论，再决定是否创建任务。",
+              checklist: [
+                { title: "脚本已输入", text: "草稿已经进入系统校验流程。", done: true },
+                { title: "结构检查进行中", text: "系统正在确认标题、分段和关键字段是否足够清晰。", done: false },
+                { title: "等待校验结论", text: "通过后再进入任务创建，未通过就先修正。", done: false },
+              ],
+              gates: [
+                { title: "等待结构检查完成", text: "系统会确认标题、开场抓手、摘要、行动引导和分段是否可读。" },
+                { title: "优先看是否通过", text: "通过后再创建任务，不通过就先修复问题。" },
+                { title: "不用提前切步骤", text: "这一刻最重要的是等出可执行的分镜输入。" },
+              ],
+            },
+            ready_to_create: {
+              badge: "可创建任务",
+              note: "草稿已经通过校验。现在重点不再是补字段，而是决定是否直接进入任务创建和 SSE 进度追踪。",
+              checklist: [
+                { title: "脚本校验通过", text: "结构和分段已经达到可继续生产的标准。", done: true },
+                { title: "分镜预览可读", text: "现在可以先快速扫一眼分镜节奏再决定是否创建任务。", done: true },
+                { title: "下一步创建任务", text: "创建任务后，系统才会真正进入视频生产流程。", done: false },
+              ],
+              gates: [
+                { title: "校验已通过", text: "脚本结构和分段已经达到可以继续生产的标准。" },
+                { title: "先看分镜是否顺", text: "确认预览节奏合理后，再点创建任务最稳妥。" },
+                { title: "可以进入第 2 步", text: "现在创建任务，系统就会开始真正的视频生成流程。" },
+              ],
+            },
+            creating_job: {
+              badge: "正在建任务",
+              note: "任务已经提交给系统。接下来右侧重点从草稿解释，切换为任务阶段、预览和产物反馈。",
+              checklist: [
+                { title: "脚本已通过校验", text: "现在不再回头看输入是否完整。", done: true },
+                { title: "任务创建中", text: "系统正在初始化任务并建立 SSE 进度通道。", done: false },
+                { title: "即将进入生产阶段", text: "创建成功后会进入解析、处理、装配和渲染流程。", done: false },
+              ],
+              gates: [
+                { title: "任务正在初始化", text: "系统会先创建任务，再建立 SSE 进度订阅。" },
+                { title: "马上切到生产视角", text: "接下来更重要的是阶段推进，而不是继续改脚本解释。" },
+                { title: "准备看进度和预览", text: "创建成功后，右侧会逐步出现任务摘要、质量和预览信息。" },
+              ],
+            },
+            processing_job: {
+              badge: "任务处理中",
+              note: "当前已经进入实际生产过程。右侧最重要的是任务阶段、产物状态和预览是否持续推进。",
+              checklist: [
+                { title: "任务已创建", text: "系统已经正式进入视频生产流程。", done: true },
+                { title: "阶段持续推进", text: "至少要看到解析、AI 处理、装配和渲染在前进。", done: false },
+                { title: "等待最终产物", text: "视频完成后，这里应该出现预览、质量和成本摘要。", done: false },
+              ],
+              gates: [
+                { title: "阶段要持续推进", text: "不能一直停在同一个阶段，至少要看到解析、处理、装配和渲染在前进。" },
+                { title: "预览要逐步可见", text: "任务完成后，页面里要能直接看到 MP4 预览和下载入口。" },
+                { title: "异常要能定位", text: "如果中断，右侧要能看出卡在哪一步，而不是只剩一个失败词。" },
+              ],
+            },
+            completed_job: {
+              badge: "可进入验收",
+              note: "任务已经完成。现在右侧的重点应该是预览、产物质量、成本和是否满足你的人工验收标准。",
+              checklist: [
+                { title: "任务已完成", text: "视频生产流程已经完整跑通。", done: true },
+                { title: "产物已可预览", text: "页面里应该能直接打开或下载 MP4。", done: true },
+                { title: "进入人工验收", text: "现在重点是你来确认最终观感和交付质量。", done: false },
+              ],
+              gates: [
+                { title: "MP4 可直接预览", text: "你应该能在页面里直接打开或下载视频，而不是只看到路径。" },
+                { title: "质量摘要可读", text: "时长、分辨率、音频、字幕和合规状态都要清楚可见。" },
+                { title: "可以进入人工验收", text: "确认产物没问题后，就可以进入你的人工验收环节。" },
+              ],
+            },
+            failed_job: {
+              badge: "等待修复",
+              note: "任务执行中断了。右侧现在最重要的是帮助你定位问题，而不是继续展示理想流程。",
+              checklist: [
+                { title: "任务已中断", text: "系统没有顺利跑完整个视频生产流程。", done: true },
+                { title: "先定位问题", text: "当前最关键的是确认卡在哪一步、为什么失败。", done: false },
+                { title: "修复后再重试", text: "解决输入、声音或环境问题后，再重新创建任务。", done: false },
+              ],
+              gates: [
+                { title: "先看卡在哪一步", text: "明确是解析、AI 处理、装配还是渲染阶段中断。" },
+                { title: "确认是否能重试", text: "修复脚本、声音或环境问题后，再决定是否重新创建任务。" },
+                { title: "别忽略右侧错误信息", text: "当前最关键的是错误定位，而不是继续改版式。" },
+              ],
+            },
+          };
+
+          const config = assistantMap[statusKey];
+          if (!config) return;
+          gateBadge.textContent = config.badge;
+          focusPanelNote.textContent = config.note;
+          gateChecklist.innerHTML = (config.checklist || []).map((item) => (
+            '<div class="gate-check ' + (item.done ? "done" : "pending") + '">' +
+              '<div class="gate-check-icon">' + (item.done ? "✓" : "•") + '</div>' +
+              '<div><strong>' + item.title + '</strong><p>' + item.text + '</p></div>' +
+            '</div>'
+          )).join("");
+          nextGateList.innerHTML = config.gates.map((item) => (
+            '<div class="gate-item"><strong>' + item.title + '</strong><p>' + item.text + '</p></div>'
+          )).join("");
+        }
+
         function markActiveVoiceCard(selectedCard) {
           document.querySelectorAll(".voice-card").forEach((item) => {
             item.classList.toggle("active", item === selectedCard);
@@ -2152,7 +2664,7 @@ ${sharedPageStyles}
           derivedDuration.textContent = derived.durationSec ? derived.durationSec + " 秒" : "等待脚本解析";
 
           if (!derived.scenes.length) {
-            sceneOutline.innerHTML = '<div class="summary-item empty">粘贴脚本后，这里会自动生成 scenes 草稿。</div>';
+            sceneOutline.innerHTML = '<div class="summary-item empty">粘贴脚本后，这里会自动生成分段草稿。</div>';
             return;
           }
 
@@ -2188,7 +2700,7 @@ ${sharedPageStyles}
           const ttsStrategy = detail?.ttsStrategySummary;
 
           if (!quality) {
-            jobQualitySummary.innerHTML = '<div class="summary-item empty">任务完成后，这里会显示文件大小、时长、分辨率、音频、字幕、fallback 与合规状态。</div>';
+            jobQualitySummary.innerHTML = '<div class="summary-item empty">任务完成后，这里会显示文件大小、时长、分辨率、音频、字幕、备用渲染与合规状态。</div>';
           } else {
             jobQualitySummary.innerHTML = [
               '<div class="quality-item pass">文件大小：' + (detail.qualitySummary.fileSizeLabel || "未生成") + '</div>',
@@ -2196,7 +2708,7 @@ ${sharedPageStyles}
               '<div class="quality-item pass">分辨率：' + (detail.qualitySummary.resolutionLabel || "未探测") + '</div>',
               '<div class="quality-item ' + ((detail.qualitySummary.audioPresenceLabel || "").includes("无") ? 'warn' : 'pass') + '">音频：' + (detail.qualitySummary.audioPresenceLabel || "未探测") + '</div>',
               '<div class="quality-item ' + ((detail.qualitySummary.subtitleStatusLabel || "").includes("缺失") ? 'warn' : 'pass') + '">字幕：' + (detail.qualitySummary.subtitleStatusLabel || "未知") + '</div>',
-              '<div class="quality-item ' + ((detail.qualitySummary.fallbackStatusLabel || "").includes("Fallback") ? 'warn' : 'pass') + '">渲染模式：' + (detail.qualitySummary.fallbackStatusLabel || "未知") + '</div>',
+              '<div class="quality-item ' + ((detail.qualitySummary.fallbackStatusLabel || "").includes("fallback") ? 'warn' : 'pass') + '">渲染模式：' + (detail.qualitySummary.fallbackStatusLabel || "未知") + '</div>',
               '<div class="quality-item ' + ((detail.qualitySummary.complianceStatusLabel || "").includes("拦截") ? 'warn' : 'pass') + '">合规：' + (detail.qualitySummary.complianceStatusLabel || "未知") + '</div>',
             ].join("");
           }
@@ -2300,8 +2812,8 @@ ${sharedPageStyles}
           const displayChecklist =
             CURRENT_STEP_ID === "asset_intake"
               ? [
-                  "脚本结构已能提取标题、Hook、摘要和 CTA。",
-                  "自动识别场景已生成可读的口播、画面建议和时长。",
+                  "脚本结构已能提取标题、开场抓手、摘要和行动引导。",
+                  "自动识别分段已生成可读的口播、画面建议和时长。",
                   "可以进入下一步分镜确认，不必再手填内部字段。",
                 ]
               : CURRENT_STEP_ID === "voice_generation"
@@ -2378,7 +2890,7 @@ ${sharedPageStyles}
             '    <span class="scene-title">' + card.title + '</span>',
             '    <span class="scene-duration">' + card.durationLabel + '</span>',
             '  </div>',
-            '  <div class="scene-visual">' + (card.visualHint || "No visual hint") + '</div>',
+            '  <div class="scene-visual">' + (card.visualHint || "暂时还没有画面建议") + '</div>',
             '  <div>' + card.narration + '</div>',
             '  <div class="scene-caption">字幕：' + card.subtitleStyle + ' · 转场：' + card.transition + '</div>',
             '</article>'
@@ -2399,17 +2911,23 @@ ${sharedPageStyles}
           renderErrors(result.errors ?? []);
 
           if (result.valid && result.summary && result.draft) {
-            statusEl.textContent = "可提交";
-            statusEl.className = "ok";
-            heroStatus.textContent = "可提交";
+            setWorkflowStatus("草稿校验通过", "现在可以进入第 2 步，直接创建视频任务。");
+            setHeroStatus("可创建任务", "ok");
+            setStageChip(validateStageChip, "已校验通过", "ready");
+            setStageChip(createStageChip, "可以创建任务", "ready");
+            setCreateJobAvailability(true);
+            syncGateAssistant("ready_to_create");
             renderSummary(result.summary);
             draftJson.textContent = JSON.stringify(result.draft, null, 2);
             draftJson.className = "";
             await renderStoryboardFromDraft(payload);
           } else {
-            statusEl.textContent = "草稿存在校验问题";
-            statusEl.className = "warn";
-            heroStatus.textContent = "待修正";
+            setWorkflowStatus("草稿还需要修正", "先补齐必填项并修复问题，再重新执行第 1 步校验。");
+            setHeroStatus("待修正", "warn");
+            setStageChip(validateStageChip, "需要修正", "warn");
+            setStageChip(createStageChip, "等待校验通过", "warn");
+            setCreateJobAvailability(false);
+            syncGateAssistant((payload.scriptText || "").trim() ? "validating" : "waiting_input");
             summaryList.innerHTML = '<div class="summary-item empty">必填项通过后，这里会显示质量摘要。</div>';
             if (CURRENT_STEP_ID === "voice_generation") {
               estimatedScenes.textContent = "5";
@@ -2441,7 +2959,10 @@ ${sharedPageStyles}
 
         validateBtn?.addEventListener("click", async () => {
           setButtonState(validateBtn, "校验中...", true);
-          heroStatus.textContent = "校验中";
+          setHeroStatus("校验中", "busy");
+          setWorkflowStatus("正在校验脚本草稿", "系统正在检查结构完整性、分段可读性和进入分镜的准备情况。");
+          setStageChip(validateStageChip, "校验中...", "warn");
+          syncGateAssistant("validating");
           try {
             await sync();
           } finally {
@@ -2459,11 +2980,11 @@ ${sharedPageStyles}
             document.getElementById("voiceMode").value = selectedVoiceMode;
             document.getElementById("ttsProviderId").value = inferProviderIdByVoiceMode(selectedVoiceMode);
             markActiveVoiceCard(card);
-            heroStatus.textContent = "应用声音中";
+            setHeroStatus("应用声音中", "busy");
             syncVoiceStatus();
             await sync();
             setInlineStatus(presetVoiceStatus, "已应用：" + voiceName, "success");
-            heroStatus.textContent = "声音已应用";
+            setHeroStatus("声音已应用", "ok");
             resetButtonState(event.currentTarget);
             event.currentTarget.textContent = "已应用";
           appendEvent("已应用声音方案：" + voiceName);
@@ -2568,9 +3089,9 @@ ${sharedPageStyles}
           document.getElementById("voiceMode").value = "custom_reference";
           document.getElementById("ttsProviderId").value = "cosyvoice-mlx";
           markActiveVoiceCard(null);
-          heroStatus.textContent = "应用自定义声音中";
+          setHeroStatus("应用自定义声音中", "busy");
           await sync();
-          heroStatus.textContent = "已应用自定义声音";
+          setHeroStatus("已应用自定义声音", "ok");
           appendEvent("已应用自定义声音参考。");
           setInlineStatus(customVoiceStatus, "已应用你的声音。", "success");
           resetButtonState(applyCustomVoiceBtn);
@@ -2637,7 +3158,10 @@ ${sharedPageStyles}
         createJobBtn?.addEventListener("click", async () => {
           const payload = collect();
           setButtonState(createJobBtn, "创建中...", true);
-          heroStatus.textContent = "创建任务中";
+          setHeroStatus("创建任务中", "busy");
+          setWorkflowStatus("正在创建视频任务", "任务创建后会自动开始 SSE 进度追踪，并驱动后续视频生成。");
+          setStageChip(createStageChip, "创建中...", "warn");
+          syncGateAssistant("creating_job");
           const response = await fetch("/api/jobs", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -2648,7 +3172,10 @@ ${sharedPageStyles}
           if (!response.ok || !result.ok) {
             renderErrors([result.error || "创建任务失败。"]);
             resetButtonState(createJobBtn);
-            heroStatus.textContent = "创建失败";
+            setHeroStatus("创建失败", "warn");
+            setWorkflowStatus("创建任务失败", "请先检查脚本或配置问题，修复后再次创建任务。");
+            setStageChip(createStageChip, "创建失败，请重试", "warn");
+            syncGateAssistant("failed_job");
             return;
           }
 
@@ -2663,10 +3190,13 @@ ${sharedPageStyles}
           });
           updateWizardRail("PARSING");
           renderStoryboard(result.storyboard);
-          heroStatus.textContent = "PARSING";
-          appendEvent("PARSING • 任务已创建，正在建立进度订阅。");
+          setHeroStatus("解析中", "busy");
+          setWorkflowStatus("任务已创建，正在解析内容", "系统已经开始建立进度订阅，接下来会依次进入 AI 处理、装配和渲染阶段。");
+          syncGateAssistant("processing_job");
+          appendEvent("解析中 • 任务已创建，正在建立进度订阅。");
           appendEvent("已创建任务 " + result.job.id + "，并开始订阅 SSE 进度。");
           setButtonState(createJobBtn, "任务已创建", true);
+          setStageChip(createStageChip, "任务已创建", "ready");
 
           if (activeEventSource) {
             activeEventSource.close();
@@ -2689,10 +3219,27 @@ ${sharedPageStyles}
             updateWizardRail(payload.state);
             renderPreview(detail);
             renderJobQuality(detail);
-            heroStatus.textContent = payload.state;
+            if (payload.state === "COMPLETED") {
+              setHeroStatus("任务已完成", "ok");
+              setWorkflowStatus("视频任务已完成", "现在可以预览 MP4、查看产物质量，并继续进入后续验收。");
+              syncGateAssistant("completed_job");
+            } else if (payload.state === "FAILED" || payload.state === "INTERRUPTED") {
+              setHeroStatus("任务异常", "warn");
+              setWorkflowStatus("任务执行中断", "请查看右侧任务进度和错误信息，确认问题后重新创建或继续修复。");
+              syncGateAssistant("failed_job");
+            } else {
+              setHeroStatus("处理中", "busy");
+              setWorkflowStatus("任务处理中", "系统正在持续推进当前任务，可在右侧查看阶段、预览和产物状态。");
+              syncGateAssistant("processing_job");
+            }
             appendEvent(payload.state + " • " + payload.message);
             if (payload.state === "COMPLETED" || payload.state === "FAILED" || payload.state === "INTERRUPTED") {
               resetButtonState(createJobBtn);
+              if (payload.state === "COMPLETED") {
+                setStageChip(createStageChip, "任务已完成", "ready");
+              } else {
+                setStageChip(createStageChip, "任务中断，请重试", "warn");
+              }
             }
           });
         });
@@ -2888,6 +3435,18 @@ ${sharedPageStyles}
               <div class="detail-list" id="checkpointReadableSummary"></div>
             </div>
             <div class="summary-item">
+              <b style="display:block;margin-bottom:8px">质量摘要</b>
+              <div class="detail-list" id="qualitySummary"></div>
+            </div>
+            <div class="summary-item">
+              <b style="display:block;margin-bottom:8px">成本估算</b>
+              <div class="detail-list" id="costSummary"></div>
+            </div>
+            <div class="summary-item">
+              <b style="display:block;margin-bottom:8px">声音策略</b>
+              <div class="detail-list" id="ttsStrategySummary"></div>
+            </div>
+            <div class="summary-item">
               <b style="display:block;margin-bottom:8px">原始检查点</b>
               <pre id="checkpointSummary"></pre>
             </div>
@@ -2926,23 +3485,12 @@ ${sharedPageStyles}
             row.innerHTML = [
               '<div class="job-row-top">',
               '  <span class="job-title">' + job.title + '</span>',
-              '  <span class="badge ' + toneClass(job.statusTone) + '">' + ({
-                QUEUED: "排队中",
-                PARSING: "解析中",
-                AI_PROCESSING: "AI处理中",
-                ASSEMBLING: "装配中",
-                RENDERING: "渲染中",
-                POST_PROCESSING: "后处理",
-                COMPLETED: "已完成",
-                FAILED: "失败",
-                INTERRUPTED: "已中断",
-                UNKNOWN: "未知",
-              }[job.state] || job.state) + '</span>',
+              '  <span class="badge ' + toneClass(job.statusTone) + '">' + job.stateLabel + '</span>',
               '</div>',
               '<div class="job-meta">' +
-                '<span>' + job.platform + '</span>' +
+                '<span>' + job.platformLabel + '</span>' +
                 '<span>•</span>' +
-                '<span>' + job.renderProfile + '</span>' +
+                '<span>' + job.renderProfileLabel + '</span>' +
                 '<span>•</span>' +
                 '<span>' + job.updatedLabel + '</span>' +
               '</div>',
@@ -2964,19 +3512,7 @@ ${sharedPageStyles}
         }
 
         function renderDetail(detail) {
-          const stateLabelMap = {
-            QUEUED: "排队中",
-            PARSING: "解析中",
-            AI_PROCESSING: "AI处理中",
-            ASSEMBLING: "装配中",
-            RENDERING: "渲染中",
-            POST_PROCESSING: "后处理",
-            COMPLETED: "已完成",
-            FAILED: "失败",
-            INTERRUPTED: "已中断",
-            UNKNOWN: "未知",
-          };
-          document.getElementById("detailStatus").textContent = (stateLabelMap[detail.state] || detail.state) + " • " + detail.currentStep;
+          document.getElementById("detailStatus").textContent = detail.stateLabel + " • " + detail.currentStep;
           document.getElementById("detailStatus").className =
             detail.state === "COMPLETED" ? "ok" : (detail.state === "FAILED" || detail.state === "INTERRUPTED" ? "warn" : "ok");
 
@@ -2987,7 +3523,7 @@ ${sharedPageStyles}
             ["档位", detail.renderProfile],
             ["进度", detail.progress + "%"],
             ["TTS 引擎", detail.ttsStrategySummary.providerLabel],
-            ["TTS 路线", detail.ttsStrategySummary.deploymentLabel],
+            ["TTS 路线", detail.ttsStrategySummary.routeLabel],
             ["更新时间", detail.updatedLabel],
             ["创建时间", detail.createdLabel],
           ];
@@ -2998,6 +3534,28 @@ ${sharedPageStyles}
           document.getElementById("checkpointReadableSummary").innerHTML = detail.checkpointReadableSummary
             .map((item) => '<div class="summary-item">' + item + '</div>')
             .join("");
+          document.getElementById("qualitySummary").innerHTML = [
+            '文件大小：' + detail.qualitySummary.fileSizeLabel,
+            '视频时长：' + detail.qualitySummary.durationLabel,
+            '分辨率：' + detail.qualitySummary.resolutionLabel,
+            '音频状态：' + detail.qualitySummary.audioPresenceLabel,
+            '字幕状态：' + detail.qualitySummary.subtitleStatusLabel,
+            '产物来源：' + detail.qualitySummary.fallbackStatusLabel,
+            '合规状态：' + detail.qualitySummary.complianceStatusLabel,
+          ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
+          document.getElementById("costSummary").innerHTML = [
+            '主图成本：' + detail.costSummary.gptImageUsd,
+            '补画面成本：' + detail.costSummary.wanxUsd,
+            '语音成本：' + detail.costSummary.ttsUsd,
+            '总成本：' + detail.costSummary.totalUsd,
+          ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
+          document.getElementById("ttsStrategySummary").innerHTML = [
+            '声音模式：' + detail.ttsStrategySummary.voiceModeLabel,
+            'TTS 引擎：' + detail.ttsStrategySummary.providerLabel,
+            '声音路线：' + detail.ttsStrategySummary.routeLabel,
+            '声音应用方式：' + detail.ttsStrategySummary.cloningLabel,
+            '部署策略：' + detail.ttsStrategySummary.deploymentLabel,
+          ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
           document.getElementById("checkpointSummary").textContent = detail.checkpointSummary;
           document.getElementById("errorSummary").innerHTML = detail.errorSummary
             .map((item) => '<div class="summary-item">' + item + '</div>')
@@ -3753,7 +4311,16 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 404, { ok: false, error: "Job not found" });
       return;
     }
-    sendJson(res, 200, buildJobDetailView(record));
+    sendJson(res, 200, {
+      ...buildJobDetailView(record),
+      storyboard: null,
+      manifest: null,
+      outputPaths: null,
+      previewUrl: record.outputs?.find((item) => item.kind === "video")?.url ?? null,
+      probe: null,
+      rawQualitySummary: record.qualitySummary ?? null,
+      rawCostSummary: record.costSummary ?? null,
+    });
     return;
   }
 
