@@ -18,6 +18,11 @@ import {
   type VoiceMode,
   type VoicePresetId,
 } from "../audio/voice-presets.js";
+import {
+  TTS_PROVIDER_IDS,
+  getTtsProviderProfile,
+  type TtsProviderProfile,
+} from "../audio/tts-providers.js";
 
 export const SCRIPT_MODES = ["markdown", "plain_text"] as const;
 
@@ -34,6 +39,7 @@ export type WizardConfigInput = {
   stylePreset?: string;
   personaPreset?: string;
   voiceMode?: string;
+  ttsProviderId?: string;
   customVoiceReference?: string;
 };
 
@@ -50,6 +56,7 @@ export type WizardConfigDraft = {
   voiceMode: VoiceMode;
   customVoiceReference?: string;
   ttsVoice: string;
+  ttsProviderId: TtsProviderProfile["id"];
   estimatedScenes: number;
 };
 
@@ -64,6 +71,8 @@ export type WizardSummary = {
   voiceMode: VoiceMode;
   customVoiceReference?: string;
   ttsVoice: string;
+  ttsProviderId: TtsProviderProfile["id"];
+  ttsProviderProfile: TtsProviderProfile;
   estimatedScenes: number;
   scriptCharacters: number;
   checklist: string[];
@@ -141,6 +150,7 @@ export function validateWizardConfig(input: WizardConfigInput) {
   const stylePreset = input.stylePreset?.trim() ?? DEFAULT_STYLE_PRESET;
   const personaPreset = input.personaPreset?.trim() ?? DEFAULT_PERSONA_PRESET;
   const voiceMode = input.voiceMode?.trim() ?? DEFAULT_VOICE_MODE;
+  const requestedTtsProviderId = input.ttsProviderId?.trim();
   const customVoiceReference = input.customVoiceReference?.trim();
 
   if (!title) {
@@ -176,6 +186,20 @@ export function validateWizardConfig(input: WizardConfigInput) {
     errors.push("customVoiceReference is required when voiceMode is custom_reference");
   }
 
+  if (requestedTtsProviderId && !TTS_PROVIDER_IDS.includes(requestedTtsProviderId as TtsProviderProfile["id"])) {
+    errors.push(`ttsProviderId must be one of: ${TTS_PROVIDER_IDS.join(", ")}`);
+  }
+
+  const resolvedProviderId = requestedTtsProviderId
+    || (isCustomVoiceMode(voiceMode) ? "cosyvoice-mlx" : getVoicePreset(voiceMode as VoicePresetId).providerId);
+
+  if (isCustomVoiceMode(voiceMode)) {
+    const providerProfile = getTtsProviderProfile(resolvedProviderId);
+    if (!providerProfile.supportsVoiceCloning) {
+      errors.push(`ttsProviderId "${resolvedProviderId}" does not support custom voice cloning`);
+    }
+  }
+
   if (!author) {
     errors.push("author is required");
   }
@@ -206,6 +230,10 @@ export function normalizeWizardConfig(input: WizardConfigInput): WizardConfigDra
   const ttsVoice = isCustomVoiceMode(voiceMode)
     ? "custom-reference-voice"
     : getVoicePreset(voiceMode).ttsVoice;
+  const inferredTtsProviderId = isCustomVoiceMode(voiceMode)
+    ? "cosyvoice-mlx"
+    : getVoicePreset(voiceMode).providerId;
+  const ttsProviderId = (input.ttsProviderId?.trim() || inferredTtsProviderId) as TtsProviderProfile["id"];
 
   return {
     title: input.title!.trim(),
@@ -220,11 +248,13 @@ export function normalizeWizardConfig(input: WizardConfigInput): WizardConfigDra
     voiceMode,
     customVoiceReference: input.customVoiceReference?.trim() || undefined,
     ttsVoice,
+    ttsProviderId,
     estimatedScenes: estimateScenes(scriptText, scriptMode),
   };
 }
 
 export function summarizeWizardConfig(input: WizardConfigDraft): WizardSummary {
+  const providerProfile = getTtsProviderProfile(input.ttsProviderId);
   return {
     title: input.title,
     platform: input.platform,
@@ -236,6 +266,8 @@ export function summarizeWizardConfig(input: WizardConfigDraft): WizardSummary {
     voiceMode: input.voiceMode,
     customVoiceReference: input.customVoiceReference,
     ttsVoice: input.ttsVoice,
+    ttsProviderId: input.ttsProviderId,
+    ttsProviderProfile: providerProfile,
     estimatedScenes: input.estimatedScenes,
     scriptCharacters: input.scriptText.length,
     checklist: [
@@ -246,6 +278,7 @@ export function summarizeWizardConfig(input: WizardConfigDraft): WizardSummary {
       `Persona preset: ${input.personaPreset}`,
       `Voice mode: ${input.voiceMode}`,
       `TTS voice: ${input.ttsVoice}`,
+      `TTS provider: ${input.ttsProviderId}`,
       `Custom voice reference: ${input.customVoiceReference ?? "none"}`,
       `Estimated scenes: ${input.estimatedScenes}`,
     ],

@@ -32,6 +32,8 @@ export type ContentMetadata = {
   created_at: string;
   author: string;
   copyright_license: string;
+  tts_provider_id?: string;
+  tts_route_label?: string;
 };
 
 export type ContentManifest = {

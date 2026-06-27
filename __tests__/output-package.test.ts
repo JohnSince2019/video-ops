@@ -60,6 +60,11 @@ test("metadata.json contains platform metadata, render profile, duration, and as
     renderPlan,
     platformMetadata,
     coverPath: "output/cover.png",
+    ttsRouteSummary: {
+      providerId: "cosyvoice-mlx",
+      routeLabel: "默认中文解说路线",
+      voiceLabel: "zh-CN-male-yunze",
+    },
   });
 
   const parsed = JSON.parse(output.metadataFile.content);
@@ -68,6 +73,8 @@ test("metadata.json contains platform metadata, render profile, duration, and as
   assert.equal(parsed.timelineDurationMs, 9300);
   assert.equal(parsed.videoPath, "output/video-standard.mp4");
   assert.equal(parsed.coverPath, "output/cover.png");
+  assert.equal(parsed.ttsRouteSummary.providerId, "cosyvoice-mlx");
+  assert.equal(parsed.ttsRouteSummary.routeLabel, "默认中文解说路线");
 });
 
 test("returns explicit errors for missing video, cover, and metadata inputs", () => {

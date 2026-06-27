@@ -97,6 +97,7 @@ async function main() {
     preview: {},
     qualitySummary: [],
     costSummary: [],
+    ttsStrategySummary: [],
   };
 
   try {
@@ -166,10 +167,15 @@ async function main() {
 
     await page.goto(`${APP_URL}?step=voice_generation`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('.voice-card[data-voice-mode="male_clear_teacher"]');
+    await page.locator("#ttsProviderIdVisible").selectOption("f5-tts");
+    await page.waitForFunction(() => {
+      return document.querySelector("#ttsProviderId")?.value === "f5-tts";
+    }, { timeout: 10000 });
 
     await page.locator('.voice-card[data-voice-mode="male_clear_teacher"] .voice-apply-btn').click();
     const selectedVoice = await page.locator("#voiceMode").inputValue();
     assert.equal(selectedVoice, "male_clear_teacher");
+    assert.equal(await page.locator("#ttsProviderId").inputValue(), "cosyvoice-mlx");
     console.log("[e2e] voice applied");
 
     const previewResponsePromise = page.waitForResponse((response) =>
@@ -269,6 +275,11 @@ async function main() {
         item.textContent?.includes("总成本："),
       );
     }, { timeout: 30000 });
+    await page.waitForFunction(() => {
+      return Array.from(document.querySelectorAll("#jobTtsStrategySummary .quality-item")).some((item) =>
+        item.textContent?.includes("TTS 引擎："),
+      );
+    }, { timeout: 30000 });
     const videoSrc = await page.locator("#previewStage video").getAttribute("src");
     const previewLinks = await page.locator("#previewLinks a").allInnerTexts();
     const finalStatusLabels = await page.locator(".step-item .step-status-label").allInnerTexts();
@@ -288,6 +299,9 @@ async function main() {
     result.costSummary = (await page.locator("#jobCostSummary .quality-item").allInnerTexts()).map((item) =>
       item.trim(),
     );
+    result.ttsStrategySummary = (await page.locator("#jobTtsStrategySummary .quality-item").allInnerTexts()).map((item) =>
+      item.trim(),
+    );
 
     assert.ok(videoSrc && videoSrc.endsWith(".mp4"));
     assert.ok(result.preview.previewLinks.includes("打开 MP4"));
@@ -305,6 +319,10 @@ async function main() {
     assert.ok(result.costSummary.some((item) => item.includes("Wanx：")), "missing wanx cost");
     assert.ok(result.costSummary.some((item) => item.includes("TTS：")), "missing tts cost");
     assert.ok(result.costSummary.some((item) => item.includes("总成本：")), "missing total cost");
+    assert.ok(result.ttsStrategySummary.some((item) => item.includes("声音模式：")), "missing tts voice mode summary");
+    assert.ok(result.ttsStrategySummary.some((item) => item.includes("TTS 引擎：")), "missing tts provider summary");
+    assert.ok(result.ttsStrategySummary.some((item) => item.includes("音色策略：")), "missing tts cloning summary");
+    assert.ok(result.ttsStrategySummary.some((item) => item.includes("部署策略：")), "missing tts deployment summary");
 
     for (const item of [
       { stepId: "asset_intake", title: "素材收集" },

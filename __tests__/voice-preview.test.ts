@@ -7,7 +7,7 @@ import { ensureVoicePreviewAsset, getVoicePreviewMeta } from "../lib/audio/voice
 test("voice preview metadata exposes stable labels and real-preview flag", () => {
   const presetMeta = getVoicePreviewMeta("male_coach_deep");
   assert.equal(presetMeta.isPreviewPlaceholder, false);
-  assert.match(presetMeta.label, /John Coach Male/);
+  assert.match(presetMeta.label, /John Coach Male|男声教练沉稳/);
 
   const customMeta = getVoicePreviewMeta("custom_reference");
   assert.equal(customMeta.isPreviewPlaceholder, false);

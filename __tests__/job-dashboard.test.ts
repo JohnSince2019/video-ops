@@ -13,6 +13,10 @@ test("task list normalization exposes state, platform, profile, progress, and up
       renderProfile: "standard",
       updatedAt: "2026-06-27T02:10:00.000Z",
       progress: 42,
+      lastCheckpoint: {
+        ttsProviderId: "f5-tts",
+        ttsRouteLabel: "高拟真 SaaS 生产路线",
+      },
     },
   ]);
 
@@ -22,6 +26,8 @@ test("task list normalization exposes state, platform, profile, progress, and up
   assert.equal(list[0]?.renderProfile, "standard");
   assert.equal(list[0]?.progressLabel, "42%");
   assert.equal(list[0]?.updatedLabel, "2026-06-27 02:10");
+  assert.equal(list[0]?.ttsProviderLabel, "F5-TTS");
+  assert.equal(list[0]?.ttsRouteLabel, "高拟真 SaaS 生产路线");
 });
 
 test("task detail output includes step, progress, errors, checkpoint, and outputs", () => {
@@ -35,7 +41,7 @@ test("task detail output includes step, progress, errors, checkpoint, and output
     createdAt: "2026-06-27T02:00:00.000Z",
     progress: 73,
     currentStep: "tts_generation",
-    lastCheckpoint: { step: "image_generation", scene: 3 },
+    lastCheckpoint: { step: "image_generation", scene: 3, voiceMode: "male_clear_teacher", ttsProviderId: "cosyvoice-mlx", ttsRouteLabel: "默认中文解说路线" },
     qualitySummary: {
       fileSizeBytes: 1_572_864,
       durationSec: 14.2,
@@ -63,6 +69,11 @@ test("task detail output includes step, progress, errors, checkpoint, and output
   assert.equal(detail.errorSummary[0], "tts_generation: cosyvoice timeout (retry 2)");
   assert.equal(detail.outputsSummary[0], "cover: output/cover.png");
   assert.match(detail.checkpointSummary, /image_generation/);
+  assert.equal(detail.ttsStrategySummary.voiceModeLabel, "男声老师清晰");
+  assert.equal(detail.ttsStrategySummary.providerLabel, "CosyVoice MLX");
+  assert.equal(detail.ttsStrategySummary.routeLabel, "默认中文解说路线");
+  assert.equal(detail.ttsStrategySummary.cloningLabel, "使用预设音色");
+  assert.equal(detail.ttsStrategySummary.deploymentLabel, "本地与云端都可落地");
   assert.equal(detail.qualitySummary.fileSizeLabel, "1.50 MB");
   assert.equal(detail.qualitySummary.durationLabel, "14.2s");
   assert.equal(detail.qualitySummary.fallbackStatusLabel, "Fallback · ffmpeg render failed");
@@ -86,6 +97,8 @@ test("task detail checkpoint summary includes custom voice reference when presen
       voiceMode: "custom_reference",
       customVoiceReference: "john-custom-reference.wav",
       ttsVoice: "custom-reference-voice",
+      ttsProviderId: "cosyvoice-mlx",
+      ttsRouteLabel: "自定义声音克隆路线",
     },
     outputs: [],
     errors: [],
@@ -93,6 +106,8 @@ test("task detail checkpoint summary includes custom voice reference when presen
 
   assert.match(detail.checkpointSummary, /john-custom-reference\.wav/);
   assert.match(detail.checkpointSummary, /custom-reference-voice/);
+  assert.equal(detail.ttsStrategySummary.cloningLabel, "使用参考音频克隆");
+  assert.equal(detail.ttsStrategySummary.routeLabel, "自定义声音克隆路线");
 });
 
 test("unknown state and missing fields fall back to safe display values", () => {
@@ -115,6 +130,7 @@ test("unknown state and missing fields fall back to safe display values", () => 
   assert.equal(detail.currentStep, "No active step");
   assert.equal(detail.errorSummary[0], "No errors recorded.");
   assert.equal(detail.outputsSummary[0], "No output bundle available yet.");
+  assert.equal(detail.ttsStrategySummary.providerLabel, "未设置");
   assert.equal(detail.qualitySummary.fileSizeLabel, "未生成");
   assert.equal(detail.costSummary.totalUsd, "$0.0000");
 });

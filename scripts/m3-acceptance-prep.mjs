@@ -78,6 +78,7 @@ async function refreshAcceptanceScreenshots() {
   try {
     await page.goto(appUrl, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".step-item", { timeout: 10000 });
+    const hasProviderSelectOnInitial = await page.locator("#ttsProviderIdVisible").count().catch(() => 0);
     const initialShot = await page.screenshot({ fullPage: true });
     await fs.writeFile(path.join(acceptanceDir, "workbench-initial.png"), initialShot);
 
@@ -87,7 +88,12 @@ async function refreshAcceptanceScreenshots() {
       const value = document.querySelector("#derivedTitle")?.textContent?.trim();
       return value && value !== "等待脚本解析";
     }, { timeout: 10000 });
+    await page.goto(`${appUrl}?step=voice_generation`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('.voice-card[data-voice-mode="male_clear_teacher"] .voice-apply-btn', { timeout: 10000 });
+    await page.locator("#ttsProviderIdVisible").selectOption("f5-tts");
+    const selectedProviderBeforePreset = await page.locator("#ttsProviderIdVisible").inputValue();
     await page.locator('.voice-card[data-voice-mode="male_clear_teacher"] .voice-apply-btn').click();
+    const selectedProviderAfterPreset = await page.locator("#ttsProviderId").inputValue();
     await page.locator("#createJobBtn").click();
     await page.waitForFunction(() => {
       return Array.from(document.querySelectorAll("#jobQualitySummary .quality-item")).some((item) =>
@@ -97,6 +103,11 @@ async function refreshAcceptanceScreenshots() {
 
     const completedShot = await page.screenshot({ fullPage: true });
     await fs.writeFile(path.join(acceptanceDir, "workbench-completed.png"), completedShot);
+    return {
+      hasProviderSelectOnInitial: Boolean(hasProviderSelectOnInitial),
+      selectedProviderBeforePreset,
+      selectedProviderAfterPreset,
+    };
   } finally {
     await browser.close();
   }
@@ -107,7 +118,7 @@ async function main() {
   const acceptanceRoot = await ensureAcceptanceDir();
   await checkServerHealth();
   const result = await runWizardE2E();
-  await refreshAcceptanceScreenshots();
+  const screenshotMeta = await refreshAcceptanceScreenshots();
 
   const summary = {
     generatedAt: new Date().toISOString(),
@@ -118,6 +129,7 @@ async function main() {
     wizardE2EAttempt: result.attempt,
     latestPreviewVideoSrc: result.previewVideoSrc,
     refreshedAcceptanceScreenshots: true,
+    providerSelectionEvidence: screenshotMeta,
     screenshots: {
       initial: path.join(acceptanceRoot, "workbench-initial.png"),
       completed: path.join(acceptanceRoot, "workbench-completed.png"),
@@ -125,11 +137,12 @@ async function main() {
     wizardE2ESummary: result.parsedResult
       ? {
           stepTitles: result.parsedResult.stepTitles ?? [],
-          navigationChecks: result.parsedResult.navigationChecks ?? [],
-          qualitySummary: result.parsedResult.qualitySummary ?? [],
-          costSummary: result.parsedResult.costSummary ?? [],
-          latestPreviewLinks: result.parsedResult.preview?.previewLinks ?? [],
-        }
+        navigationChecks: result.parsedResult.navigationChecks ?? [],
+        qualitySummary: result.parsedResult.qualitySummary ?? [],
+        costSummary: result.parsedResult.costSummary ?? [],
+        ttsStrategySummary: result.parsedResult.ttsStrategySummary ?? [],
+        latestPreviewLinks: result.parsedResult.preview?.previewLinks ?? [],
+      }
       : null,
   };
 

@@ -403,6 +403,11 @@ export async function renderJobArtifacts(input: {
     providerMetadata: {
       render: providerMetadata,
     },
+    ttsRouteSummary: {
+      providerId: input.manifest.metadata.tts_provider_id,
+      routeLabel: input.manifest.metadata.tts_route_label,
+      voiceLabel: input.manifest.scenes[0]?.audio.tts_voice,
+    },
   });
 
   await fs.writeFile(outputPackage.metadataFile.path, outputPackage.metadataFile.content);

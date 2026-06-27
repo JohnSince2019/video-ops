@@ -30,6 +30,11 @@ export type OutputPackage = {
       image?: import("../providers/provider-types.js").ProviderExecutionMetadata;
       tts?: import("../providers/provider-types.js").ProviderExecutionMetadata;
     };
+    ttsRouteSummary?: {
+      providerId?: string;
+      routeLabel?: string;
+      voiceLabel?: string;
+    };
   };
 };
 
@@ -50,6 +55,7 @@ export function buildOutputPackage(input: {
   coverPath: string;
   metadataPath?: string;
   providerMetadata?: OutputPackage["metadata"]["providerMetadata"];
+  ttsRouteSummary?: OutputPackage["metadata"]["ttsRouteSummary"];
 }) {
   if (!input.renderPlan) {
     throw new Error("Render plan is required for output packaging.");
@@ -77,6 +83,7 @@ export function buildOutputPackage(input: {
     ffmpegArgs: input.renderPlan.ffmpegArgs,
     clipCount: input.renderPlan.clips.length,
     providerMetadata: input.providerMetadata,
+    ttsRouteSummary: input.ttsRouteSummary,
   };
 
   return {

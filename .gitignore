@@ -99,3 +99,4 @@ Thumbs.db
 .local/
 .tmp/
 .cache/
+tmp/

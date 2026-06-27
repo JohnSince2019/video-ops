@@ -13,6 +13,12 @@ import {
   getCustomVoiceReferenceRoot,
   saveCustomVoiceReference,
 } from "./lib/audio/custom-voice-reference.ts";
+import {
+  getCustomVoiceAuthorizationNotice,
+  getVoicePreset,
+  listVoicePresets,
+} from "./lib/audio/voice-presets.ts";
+import { getTtsProviderProfile, listTtsProviderProfiles } from "./lib/audio/tts-providers.ts";
 import { ensureVoicePreviewAsset, getVoicePreviewMeta } from "./lib/audio/voice-preview.ts";
 import { buildJobDetailView, buildJobListView } from "./lib/ui/job-dashboard.ts";
 import { buildComplianceReport, exportComplianceReportJson } from "./lib/compliance/compliance-report.ts";
@@ -34,6 +40,64 @@ const createdJobs = new Map();
 const workspaceRoot = process.cwd();
 const voicePreviewRoot = path.join(workspaceRoot, "tmp", "voice-previews");
 const customVoiceReferenceRoot = getCustomVoiceReferenceRoot();
+const voicePresetCardsHtml = listVoicePresets()
+  .map((preset, index) => {
+    const provider = getTtsProviderProfile(preset.providerId);
+    const qualityLabel =
+      provider.qualityTier === "premium"
+        ? "高保真"
+        : provider.qualityTier === "production"
+          ? "生产级"
+          : "轻量兜底";
+    const deploymentLabel =
+      provider.deploymentMode === "cloud_ready"
+        ? "适合云端 SaaS"
+        : provider.deploymentMode === "hybrid"
+          ? "本地与云端都可落地"
+          : "更适合本地工作站";
+
+    return `
+      <article class="voice-card${index === 0 ? " active" : ""}" data-voice-mode="${preset.id}">
+        <div class="voice-card-top">
+          <strong>${preset.chineseLabel}</strong>
+          <span class="voice-quality-chip">${qualityLabel}</span>
+        </div>
+        <small>${preset.description}</small>
+        <div class="voice-meta-list">
+          <span>适合内容：${preset.chineseUseCase}</span>
+          <span>声音引擎：${provider.displayName}</span>
+          <span>自然度：${provider.naturalnessLabel}</span>
+          <span>音色克隆：${provider.supportsVoiceCloning ? "支持" : "暂不支持"}</span>
+          <span>部署方式：${deploymentLabel}</span>
+        </div>
+        <div class="voice-actions">
+          <button type="button" class="secondary voice-preview-btn">试听</button>
+          <button type="button" class="${index === 0 ? "primary" : "secondary"} voice-apply-btn">应用该声音</button>
+        </div>
+      </article>`;
+  })
+  .join("");
+const defaultVoicePreset = getVoicePreset("male_coach_deep");
+const defaultVoiceProvider = getTtsProviderProfile(defaultVoicePreset.providerId);
+const customVoiceAuthorizationNotice = getCustomVoiceAuthorizationNotice();
+const ttsProviderSelectOptionsHtml = listTtsProviderProfiles()
+  .map((provider) => {
+    const deploymentLabel =
+      provider.deploymentMode === "hybrid"
+        ? "本地与云端"
+        : provider.deploymentMode === "cloud_ready"
+          ? "云端 SaaS"
+          : "本地工作站";
+    const qualityLabel =
+      provider.qualityTier === "premium"
+        ? "高保真"
+        : provider.qualityTier === "production"
+          ? "生产级"
+          : "轻量兜底";
+
+    return `<option value="${provider.id}"${provider.id === defaultVoiceProvider.id ? " selected" : ""}>${provider.displayName} · ${qualityLabel} · ${deploymentLabel}</option>`;
+  })
+  .join("");
 
 const sharedPageStyles = `
   .workspace-page {
@@ -686,6 +750,21 @@ ${sharedPageStyles}
         display: grid;
         gap: 8px;
       }
+      .voice-card-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .voice-quality-chip {
+        border-radius: 999px;
+        padding: 4px 8px;
+        background: #efe9ff;
+        color: #5a43b5;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
       .voice-card.active {
         border-color: #d9d2ff;
         background: #f8f6ff;
@@ -699,6 +778,12 @@ ${sharedPageStyles}
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
+      }
+      .voice-meta-list {
+        display: grid;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--muted);
       }
       .micro-copy {
         font-size: 12px;
@@ -1104,6 +1189,7 @@ ${sharedPageStyles}
                   <input id="platform" type="hidden" value="douyin" />
                   <input id="scriptMode" type="hidden" value="plain_text" />
                   <input id="voiceMode" type="hidden" value="male_coach_deep" />
+                  <input id="ttsProviderId" type="hidden" value="${defaultVoiceProvider.id}" />
                   <textarea id="scriptText" placeholder="在这里直接粘贴你的短视频脚本。建议包含：title、hook、summary、durationSec、scenes、cta。"></textarea>
                   <div class="micro-copy">支持自然语言脚本，也支持接近 JSON / Markdown 的结构化脚本。脚本模式将自动识别，无需手动选择。</div>
                 </div>
@@ -1205,49 +1291,14 @@ ${sharedPageStyles}
                     ? `
                 <div class="field">
                   <label class="tip-label">声音方案 <span class="tip-icon" data-tip="先试听，再点应用该声音。也可以输入你自己的参考音频并应用为本次任务音色。">?</span></label>
-                  <div class="voice-preset-grid">
-                    <article class="voice-card active" data-voice-mode="male_coach_deep">
-                      <strong>男声教练沉稳</strong>
-                      <small>适合训练、方法论和动作纠正视频。</small>
-                      <div class="voice-actions">
-                        <button type="button" class="secondary voice-preview-btn">试听</button>
-                        <button type="button" class="primary voice-apply-btn">应用该声音</button>
-                      </div>
-                    </article>
-                    <article class="voice-card" data-voice-mode="male_clear_teacher">
-                      <strong>男声老师清晰</strong>
-                      <small>适合知识拆解、SOP 教学和框架讲解。</small>
-                      <div class="voice-actions">
-                        <button type="button" class="secondary voice-preview-btn">试听</button>
-                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
-                      </div>
-                    </article>
-                    <article class="voice-card" data-voice-mode="female_warm_narrator">
-                      <strong>女声旁白温和</strong>
-                      <small>适合平稳叙述、总结和温和解释类视频。</small>
-                      <div class="voice-actions">
-                        <button type="button" class="secondary voice-preview-btn">试听</button>
-                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
-                      </div>
-                    </article>
-                    <article class="voice-card" data-voice-mode="female_energetic_creator">
-                      <strong>女声创作者活力</strong>
-                      <small>适合钩子开场、节奏更快的短视频表达。</small>
-                      <div class="voice-actions">
-                        <button type="button" class="secondary voice-preview-btn">试听</button>
-                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
-                      </div>
-                    </article>
-                    <article class="voice-card" data-voice-mode="male_storytelling_soft">
-                      <strong>男声叙事柔和</strong>
-                      <small>适合复盘、成长故事和更平稳的经验分享。</small>
-                      <div class="voice-actions">
-                        <button type="button" class="secondary voice-preview-btn">试听</button>
-                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
-                      </div>
-                    </article>
+                  <div class="field compact" style="margin-bottom:12px">
+                    <label class="tip-label" for="ttsProviderIdVisible">TTS 引擎 <span class="tip-icon" data-tip="这里决定最终任务优先走哪套 TTS provider。你可以按自然度、是否支持克隆、以及是否要考虑云端 SaaS 部署来切换。">?</span></label>
+                    <select id="ttsProviderIdVisible">${ttsProviderSelectOptionsHtml}</select>
                   </div>
-                  <div class="inline-status" id="presetVoiceStatus">当前已应用：男声教练沉稳</div>
+                  <div class="voice-preset-grid">
+                    ${voicePresetCardsHtml}
+                  </div>
+                  <div class="inline-status" id="presetVoiceStatus">当前已应用：${defaultVoicePreset.chineseLabel}</div>
                 </div>
 
                 <div class="field full">
@@ -1262,7 +1313,7 @@ ${sharedPageStyles}
                     <button type="button" class="secondary" id="previewCustomVoiceBtn">试听我的声音</button>
                   </div>
                   <div class="inline-status" id="customVoiceStatus">上传或录音后，可应用为本次任务音色。</div>
-                  <div class="hint">仅支持你本人或已明确授权的声音参考。应用自定义声音前，需要你确认使用授权。</div>
+                  <div class="hint">${customVoiceAuthorizationNotice}</div>
                 </div>
                     `
                     : ""
@@ -1275,6 +1326,7 @@ ${sharedPageStyles}
                 <input id="platform" type="hidden" value="douyin" />
                 <input id="scriptMode" type="hidden" value="plain_text" />
                 <input id="voiceMode" type="hidden" value="male_coach_deep" />
+                <input id="ttsProviderId" type="hidden" value="${defaultVoiceProvider.id}" />
                 <div class="field compact">
                   <label for="title">标题</label>
                   <input id="title" placeholder="例如：AI 如何让研发效率提升 3 倍" />
@@ -1314,49 +1366,15 @@ ${sharedPageStyles}
 
                 <div class="field full">
                   <label class="tip-label">声音方案 <span class="tip-icon" data-tip="完整试听、应用、录音、自定义声音操作都集中在这一步完成。">?</span></label>
-                  <div class="voice-preset-grid">
-                    <article class="voice-card active" data-voice-mode="male_coach_deep">
-                      <strong>男声教练沉稳</strong>
-                      <small>适合训练、方法论和动作纠正视频。</small>
-                      <div class="voice-actions">
-                        <button type="button" class="secondary voice-preview-btn">试听</button>
-                        <button type="button" class="primary voice-apply-btn">应用该声音</button>
-                      </div>
-                    </article>
-                    <article class="voice-card" data-voice-mode="male_clear_teacher">
-                      <strong>男声老师清晰</strong>
-                      <small>适合知识拆解、SOP 教学和框架讲解。</small>
-                      <div class="voice-actions">
-                        <button type="button" class="secondary voice-preview-btn">试听</button>
-                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
-                      </div>
-                    </article>
-                    <article class="voice-card" data-voice-mode="female_warm_narrator">
-                      <strong>女声旁白温和</strong>
-                      <small>适合平稳叙述、总结和温和解释类视频。</small>
-                      <div class="voice-actions">
-                        <button type="button" class="secondary voice-preview-btn">试听</button>
-                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
-                      </div>
-                    </article>
-                    <article class="voice-card" data-voice-mode="female_energetic_creator">
-                      <strong>女声创作者活力</strong>
-                      <small>适合钩子开场、节奏更快的短视频表达。</small>
-                      <div class="voice-actions">
-                        <button type="button" class="secondary voice-preview-btn">试听</button>
-                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
-                      </div>
-                    </article>
-                    <article class="voice-card" data-voice-mode="male_storytelling_soft">
-                      <strong>男声叙事柔和</strong>
-                      <small>适合复盘、成长故事和更平稳的经验分享。</small>
-                      <div class="voice-actions">
-                        <button type="button" class="secondary voice-preview-btn">试听</button>
-                        <button type="button" class="secondary voice-apply-btn">应用该声音</button>
-                      </div>
-                    </article>
+                  <div class="field compact" style="margin-bottom:12px">
+                    <label class="tip-label" for="ttsProviderIdVisible">TTS 引擎 <span class="tip-icon" data-tip="这里决定最终任务优先走哪套 TTS provider。你可以按自然度、是否支持克隆、以及是否要考虑云端 SaaS 部署来切换。">?</span></label>
+                    <select id="ttsProviderIdVisible">${ttsProviderSelectOptionsHtml}</select>
                   </div>
-                  <div class="inline-status" id="presetVoiceStatus">当前已应用：男声教练沉稳</div>
+                  <div class="voice-preset-grid">
+                    ${voicePresetCardsHtml}
+                  </div>
+                  <div class="inline-status" id="presetVoiceStatus">当前已应用：${defaultVoicePreset.chineseLabel}</div>
+                  <div class="hint">默认推荐使用 ${defaultVoiceProvider.displayName} 跑中文解说；如果后续做云端 SaaS 重度生产，可优先考虑 ${getTtsProviderProfile("f5-tts").displayName} 作为高拟真方案，${getTtsProviderProfile("melotts").displayName} 作为低成本 fallback。</div>
                 </div>
 
                 <div class="field full">
@@ -1371,7 +1389,7 @@ ${sharedPageStyles}
                     <button type="button" class="secondary" id="previewCustomVoiceBtn">试听我的声音</button>
                   </div>
                   <div class="inline-status" id="customVoiceStatus">上传或录音后，可应用为本次任务音色。</div>
-                  <div class="hint">仅支持你本人或已明确授权的声音参考。应用自定义声音前，需要你确认使用授权。</div>
+                  <div class="hint">${customVoiceAuthorizationNotice}</div>
                 </div>
               </div>
                     `
@@ -1466,6 +1484,14 @@ ${sharedPageStyles}
                   <p id="activeVoiceModeLabel">男声教练沉稳</p>
                 </div>
                 <div class="asset-item">
+                  <strong>当前声音引擎</strong>
+                  <p id="activeVoiceProviderLabel">${defaultVoiceProvider.displayName} · ${defaultVoiceProvider.deploymentMode === "hybrid" ? "本地与云端都可落地" : defaultVoiceProvider.deploymentMode === "cloud_ready" ? "适合云端 SaaS" : "更适合本地工作站"}</p>
+                </div>
+                <div class="asset-item">
+                  <strong>当前 TTS 路线</strong>
+                  <p id="activeTtsRouteLabel">默认推荐路线</p>
+                </div>
+                <div class="asset-item">
                   <strong>当前声音参考</strong>
                   <p id="activeVoiceReferenceLabel">未使用自定义参考</p>
                 </div>
@@ -1495,7 +1521,13 @@ ${sharedPageStyles}
                 <div class="event-item-compact">这里只保留最新几条关键进度，不再堆满所有试听和录音操作。</div>
               </div>
               <div class="summary-item">
-                <b style="display:block;margin-bottom:8px">当前任务快照</b>
+                <b style="display:block;margin-bottom:8px">当前任务摘要</b>
+                <div class="quality-list" id="jobReadableSnapshot">
+                  <div class="summary-item empty">创建任务后，这里会用大白话展示当前阶段、TTS 引擎、声音模式和关键进度。</div>
+                </div>
+              </div>
+              <div class="summary-item">
+                <b style="display:block;margin-bottom:8px">原始任务快照</b>
                 <pre id="jobStatus" class="mono-box empty">尚未创建任务。</pre>
               </div>
             </section>
@@ -1520,6 +1552,12 @@ ${sharedPageStyles}
                   </div>
                 </div>
                 <div class="summary-item">
+                  <b style="display:block;margin-bottom:8px">声音策略摘要</b>
+                  <div class="quality-list" id="jobTtsStrategySummary">
+                    <div class="summary-item empty">创建任务后，这里会显示当前任务使用的声音模式、TTS 引擎、克隆方式和部署策略。</div>
+                  </div>
+                </div>
+                <div class="summary-item">
                   <b style="display:block;margin-bottom:8px">标准化草稿 JSON</b>
                   <pre id="draftJson" class="mono-box empty">当前还没有有效草稿。</pre>
                 </div>
@@ -1530,12 +1568,13 @@ ${sharedPageStyles}
       </section>
 
       <script>
-        const ids = ["title", "author", "platform", "renderProfile", "scriptMode", "stylePreset", "personaPreset", "voiceMode", "ownerToken", "customVoiceReference", "scriptText"];
+        const ids = ["title", "author", "platform", "renderProfile", "scriptMode", "stylePreset", "personaPreset", "voiceMode", "ttsProviderId", "ownerToken", "customVoiceReference", "scriptText"];
         const statusEl = document.getElementById("status");
         const summaryList = document.getElementById("summaryList");
         const errorList = document.getElementById("errorList");
         const draftJson = document.getElementById("draftJson");
         const jobStatus = document.getElementById("jobStatus");
+        const jobReadableSnapshot = document.getElementById("jobReadableSnapshot");
         const estimatedScenes = document.getElementById("estimatedScenes");
         const scriptCharacters = document.getElementById("scriptCharacters");
         const qualityScore = document.getElementById("qualityScore");
@@ -1553,6 +1592,7 @@ ${sharedPageStyles}
         const previewLinks = document.getElementById("previewLinks");
         const jobQualitySummary = document.getElementById("jobQualitySummary");
         const jobCostSummary = document.getElementById("jobCostSummary");
+        const jobTtsStrategySummary = document.getElementById("jobTtsStrategySummary");
         const progressValue = document.getElementById("progressValue");
         const jobStateChip = document.getElementById("jobStateChip");
         const jobStepChip = document.getElementById("jobStepChip");
@@ -1561,6 +1601,7 @@ ${sharedPageStyles}
         const currentModeChip = document.getElementById("currentModeChip");
         const currentProfileChip = document.getElementById("currentProfileChip");
         const heroStatus = document.getElementById("heroStatus");
+        const ttsProviderSelect = document.getElementById("ttsProviderIdVisible");
         const customVoiceReferenceInput = document.getElementById("customVoiceReference");
         const customVoiceFileInput = document.getElementById("customVoiceFile");
         const recordVoiceBtn = document.getElementById("recordVoiceBtn");
@@ -1573,6 +1614,8 @@ ${sharedPageStyles}
         const createJobBtn = document.getElementById("createJobBtn");
         const loadDemoBtn = document.getElementById("loadDemoBtn");
         const activeVoiceModeLabel = document.getElementById("activeVoiceModeLabel");
+        const activeVoiceProviderLabel = document.getElementById("activeVoiceProviderLabel");
+        const activeTtsRouteLabel = document.getElementById("activeTtsRouteLabel");
         const activeVoiceReferenceLabel = document.getElementById("activeVoiceReferenceLabel");
         const overviewPanelTitle = document.getElementById("overviewPanelTitle");
         const qualityScoreSuffix = document.getElementById("qualityScoreSuffix");
@@ -1610,6 +1653,58 @@ ${sharedPageStyles}
           if (value === "male_storytelling_soft") return "男声叙事柔和";
           if (value === "custom_reference") return "自定义声音";
           return "未选择";
+        }
+
+        function clientVoiceProviderLabel(value) {
+          const providerMap = {
+            male_coach_deep: "CosyVoice MLX · 本地与云端都可落地",
+            male_clear_teacher: "CosyVoice MLX · 本地与云端都可落地",
+            female_warm_narrator: "CosyVoice MLX · 本地与云端都可落地",
+            female_energetic_creator: "F5-TTS · 适合云端 SaaS",
+            male_storytelling_soft: "MeloTTS · 适合作为低成本 fallback",
+            custom_reference: "CosyVoice MLX · 支持参考音频克隆",
+          };
+
+          return providerMap[value] || "未设置";
+        }
+
+        function clientTtsProviderDisplay(value) {
+          const providerMap = {
+            "cosyvoice-mlx": "CosyVoice MLX · 本地与云端都可落地",
+            "f5-tts": "F5-TTS · 适合云端 SaaS",
+            melotts: "MeloTTS · 适合作为低成本 fallback",
+          };
+
+          return providerMap[value] || "未设置";
+        }
+
+        function clientTtsRouteLabel(providerId, voiceMode) {
+          if (voiceMode === "custom_reference") {
+            return "自定义声音克隆路线";
+          }
+          if (providerId === "f5-tts") {
+            return "高拟真 SaaS 生产路线";
+          }
+          if (providerId === "melotts") {
+            return "低成本批量兜底路线";
+          }
+          if (providerId === "cosyvoice-mlx") {
+            return "默认中文解说路线";
+          }
+          return "未设置";
+        }
+
+        function inferProviderIdByVoiceMode(voiceMode) {
+          const providerMap = {
+            male_coach_deep: "cosyvoice-mlx",
+            male_clear_teacher: "cosyvoice-mlx",
+            female_warm_narrator: "cosyvoice-mlx",
+            female_energetic_creator: "f5-tts",
+            male_storytelling_soft: "melotts",
+            custom_reference: "cosyvoice-mlx",
+          };
+
+          return providerMap[voiceMode] || "cosyvoice-mlx";
         }
 
         function renderStepGate() {
@@ -1769,12 +1864,22 @@ ${sharedPageStyles}
 
         function syncVoiceStatus() {
           const voiceModeValue = document.getElementById("voiceMode").value;
+          const ttsProviderIdValue = document.getElementById("ttsProviderId").value;
           const customReferenceValue = customVoiceReferenceInput?.value?.trim() || "";
           if (activeVoiceModeLabel) {
             activeVoiceModeLabel.textContent = clientVoiceModeLabel(voiceModeValue);
           }
+          if (activeVoiceProviderLabel) {
+            activeVoiceProviderLabel.textContent = clientTtsProviderDisplay(ttsProviderIdValue) || clientVoiceProviderLabel(voiceModeValue);
+          }
+          if (activeTtsRouteLabel) {
+            activeTtsRouteLabel.textContent = clientTtsRouteLabel(ttsProviderIdValue, voiceModeValue);
+          }
           if (activeVoiceReferenceLabel) {
             activeVoiceReferenceLabel.textContent = customReferenceValue || "未使用自定义参考";
+          }
+          if (ttsProviderSelect) {
+            ttsProviderSelect.value = ttsProviderIdValue || "${defaultVoiceProvider.id}";
           }
         }
 
@@ -2080,6 +2185,7 @@ ${sharedPageStyles}
         function renderJobQuality(detail) {
           const quality = detail?.qualitySummary;
           const cost = detail?.costSummary;
+          const ttsStrategy = detail?.ttsStrategySummary;
 
           if (!quality) {
             jobQualitySummary.innerHTML = '<div class="summary-item empty">任务完成后，这里会显示文件大小、时长、分辨率、音频、字幕、fallback 与合规状态。</div>';
@@ -2106,11 +2212,34 @@ ${sharedPageStyles}
             '<div class="quality-item pass">TTS：' + detail.costSummary.ttsUsd + '</div>',
             '<div class="quality-item pass">总成本：' + detail.costSummary.totalUsd + '</div>',
           ].join("");
+
+          if (!ttsStrategy) {
+            jobTtsStrategySummary.innerHTML = '<div class="summary-item empty">创建任务后，这里会显示当前任务使用的声音模式、TTS 引擎、克隆方式和部署策略。</div>';
+            return;
+          }
+
+          jobTtsStrategySummary.innerHTML = [
+            '<div class="quality-item pass">声音模式：' + (ttsStrategy.voiceModeLabel || "未设置") + '</div>',
+            '<div class="quality-item pass">TTS 引擎：' + (ttsStrategy.providerLabel || "未设置") + '</div>',
+            '<div class="quality-item pass">音色策略：' + (ttsStrategy.cloningLabel || "未设置") + '</div>',
+            '<div class="quality-item pass">部署策略：' + (ttsStrategy.deploymentLabel || "未设置") + '</div>',
+          ].join("");
         }
 
         function renderJobSnapshot(snapshot) {
           jobStatus.textContent = JSON.stringify(snapshot, null, 2);
           jobStatus.className = "";
+          if (jobReadableSnapshot) {
+            const readableItems = Array.isArray(snapshot.checkpointReadableSummary) && snapshot.checkpointReadableSummary.length
+              ? snapshot.checkpointReadableSummary
+              : [
+                  snapshot.currentStep ? "当前阶段：" + snapshot.currentStep : "当前阶段：暂无",
+                  snapshot.state ? "任务状态：" + snapshot.state : "任务状态：暂无",
+                ];
+            jobReadableSnapshot.innerHTML = readableItems
+              .map((item) => '<div class="quality-item pass">' + item + '</div>')
+              .join("");
+          }
           if (typeof snapshot.progress === "number") {
             progressValue.style.width = snapshot.progress + "%";
           }
@@ -2328,6 +2457,7 @@ ${sharedPageStyles}
             setButtonState(event.currentTarget, "应用中...", true);
             setInlineStatus(presetVoiceStatus, "正在应用：" + voiceName, "busy");
             document.getElementById("voiceMode").value = selectedVoiceMode;
+            document.getElementById("ttsProviderId").value = inferProviderIdByVoiceMode(selectedVoiceMode);
             markActiveVoiceCard(card);
             heroStatus.textContent = "应用声音中";
             syncVoiceStatus();
@@ -2436,6 +2566,7 @@ ${sharedPageStyles}
           setButtonState(applyCustomVoiceBtn, "应用中...", true);
           setInlineStatus(customVoiceStatus, "正在应用你的声音...", "busy");
           document.getElementById("voiceMode").value = "custom_reference";
+          document.getElementById("ttsProviderId").value = "cosyvoice-mlx";
           markActiveVoiceCard(null);
           heroStatus.textContent = "应用自定义声音中";
           await sync();
@@ -2572,6 +2703,8 @@ ${sharedPageStyles}
           document.getElementById("renderProfile").value = "standard";
           document.getElementById("stylePreset").value = "john_vertical_comic";
           document.getElementById("personaPreset").value = "john_persona_v1";
+          document.getElementById("ttsProviderId").value = "cosyvoice-mlx";
+          if (ttsProviderSelect) ttsProviderSelect.value = "cosyvoice-mlx";
           document.getElementById("ownerToken").value = "john-ai-lab";
           document.getElementById("customVoiceReference").value = "";
           document.getElementById("scriptText").value = "title: 卧推肩疼？先看手肘角度\\nhook: 你卧推一发力肩膀就疼，问题可能不在肩，而在手肘开太大。\\nsummary: 用 45 到 60 度的手肘夹角，让肩更稳、胸更容易发力。\\ndurationSec: 32\\n\\nscene 1\\nvoiceover: 卧推肩疼，很多人第一反应是肩有问题，其实常见原因是手肘开得太平。\\nvisualSuggestion: John 在卧推凳上示范错误动作，手肘外展接近 90 度。\\ndurationSec: 8\\n\\nscene 2\\nvoiceover: 更稳的做法是让上臂和躯干保持大约 45 到 60 度，这样肩膀压力会小很多。\\nvisualSuggestion: John 用线条标出手肘夹角，展示正确角度区间。\\ndurationSec: 12\\n\\nscene 3\\nvoiceover: 下次训练前先录一组侧面视频，对照这个角度检查自己，再决定要不要加重量。\\nvisualSuggestion: John 看回放纠正动作，画面叠加角度参考线。\\ndurationSec: 12\\n\\ncta: 如果你想继续看这种动作纠错短视频，评论区告诉我你最想修哪个动作。";
@@ -2580,6 +2713,15 @@ ${sharedPageStyles}
           await sync();
           resetButtonState(loadDemoBtn);
           setInlineStatus(customVoiceStatus, "演示脚本已载入，可继续试听和创建任务。", "success");
+        });
+
+        ttsProviderSelect?.addEventListener("change", async (event) => {
+          const selectedProvider = event.currentTarget.value;
+          document.getElementById("ttsProviderId").value = selectedProvider;
+          syncVoiceStatus();
+          saveDraftToStorage();
+          appendEvent("已切换 TTS 引擎：" + selectedProvider);
+          await sync();
         });
 
         restoreDraftFromStorage();
@@ -2650,8 +2792,8 @@ function renderJobDashboardPage() {
   const detail = buildJobDetailView(jobRecords[0] ?? demoJobs[0]);
 
   return renderZenPageShell({
-    title: "Job Management Panel",
-    eyebrow: "Video-Ops / Sprint 3 / JOH-33",
+    title: "任务总控台",
+    eyebrow: "Video-Ops / 任务面板",
     navItems: pageNav("/jobs"),
     extraStyles: `
 ${sharedPageStyles}
@@ -2714,43 +2856,47 @@ ${sharedPageStyles}
     body: `
       <section class="hero">
         <article class="card">
-          <p>这里是 Video-Ops 的任务总控台。用户创建视频后，不再只能“等结果”，而是可以看到任务列表、状态分层、最近更新时间，以及每个任务当前卡在哪一步。</p>
+          <p>这里是 Video-Ops 的任务总控台。你可以直接看到每条视频当前卡在哪一步、用了哪套 TTS 引擎、走的是哪条声音路线，以及最终有没有真正生成可交付产物。</p>
           <div class="hero-grid">
-            <div class="stat"><b>Total Jobs</b><span>${list.length}</span></div>
-            <div class="stat"><b>Processing</b><span>${list.filter((item) => item.statusTone === "running").length}</span></div>
-            <div class="stat"><b>Completed</b><span>${list.filter((item) => item.statusTone === "success").length}</span></div>
-            <div class="stat"><b>Attention Needed</b><span>${list.filter((item) => item.statusTone === "error").length}</span></div>
+            <div class="stat"><b>任务总数</b><span>${list.length}</span></div>
+            <div class="stat"><b>处理中</b><span>${list.filter((item) => item.statusTone === "running").length}</span></div>
+            <div class="stat"><b>已完成</b><span>${list.filter((item) => item.statusTone === "success").length}</span></div>
+            <div class="stat"><b>需要关注</b><span>${list.filter((item) => item.statusTone === "error").length}</span></div>
           </div>
         </article>
         <aside class="card">
           <p>手动验收重点：</p>
           <div class="summary-list">
-            <div class="summary-item">1. 左侧可以看到多个任务，状态颜色有明显区分。</div>
-            <div class="summary-item">2. 点击不同任务后，右侧详情会切换。</div>
-            <div class="summary-item">3. 详情区能看到进度、步骤、checkpoint、错误和输出摘要。</div>
+            <div class="summary-item">1. 左侧能直接看出任务状态、TTS 引擎和声音路线。</div>
+            <div class="summary-item">2. 点击不同任务后，右侧详情会切换到对应的视频生产上下文。</div>
+            <div class="summary-item">3. 详情区不只显示原始 checkpoint，还要能让你用大白话读懂任务当前配置。</div>
           </div>
         </aside>
       </section>
 
       <section class="jobs-layout">
         <section class="card">
-          <p>Task List</p>
+          <p>任务列表</p>
           <div class="job-list" id="jobList"></div>
         </section>
         <aside class="card detail-card">
-          <p><span id="detailStatus" class="ok">Selected Job</span></p>
+          <p><span id="detailStatus" class="ok">已选任务</span></p>
           <div class="detail-grid" id="detailGrid"></div>
           <div class="detail-section">
             <div class="summary-item">
-              <b style="display:block;margin-bottom:8px">Checkpoint</b>
+              <b style="display:block;margin-bottom:8px">任务摘要</b>
+              <div class="detail-list" id="checkpointReadableSummary"></div>
+            </div>
+            <div class="summary-item">
+              <b style="display:block;margin-bottom:8px">原始检查点</b>
               <pre id="checkpointSummary"></pre>
             </div>
             <div class="summary-item">
-              <b style="display:block;margin-bottom:8px">Errors</b>
+              <b style="display:block;margin-bottom:8px">错误信息</b>
               <div class="detail-list" id="errorSummary"></div>
             </div>
             <div class="summary-item">
-              <b style="display:block;margin-bottom:8px">Outputs</b>
+              <b style="display:block;margin-bottom:8px">产物输出</b>
               <div class="detail-list" id="outputsSummary"></div>
             </div>
           </div>
@@ -2780,7 +2926,18 @@ ${sharedPageStyles}
             row.innerHTML = [
               '<div class="job-row-top">',
               '  <span class="job-title">' + job.title + '</span>',
-              '  <span class="badge ' + toneClass(job.statusTone) + '">' + job.state + '</span>',
+              '  <span class="badge ' + toneClass(job.statusTone) + '">' + ({
+                QUEUED: "排队中",
+                PARSING: "解析中",
+                AI_PROCESSING: "AI处理中",
+                ASSEMBLING: "装配中",
+                RENDERING: "渲染中",
+                POST_PROCESSING: "后处理",
+                COMPLETED: "已完成",
+                FAILED: "失败",
+                INTERRUPTED: "已中断",
+                UNKNOWN: "未知",
+              }[job.state] || job.state) + '</span>',
               '</div>',
               '<div class="job-meta">' +
                 '<span>' + job.platform + '</span>' +
@@ -2789,8 +2946,13 @@ ${sharedPageStyles}
                 '<span>•</span>' +
                 '<span>' + job.updatedLabel + '</span>' +
               '</div>',
+              '<div class="job-meta" style="margin-top:8px">' +
+                '<span>TTS：' + job.ttsProviderLabel + '</span>' +
+                '<span>•</span>' +
+                '<span>路线：' + job.ttsRouteLabel + '</span>' +
+              '</div>',
               '<div class="progress-bar"><div class="progress-fill" style="width:' + job.progressLabel + ';"></div></div>',
-              '<div class="hint" style="margin-top:8px">Progress ' + job.progressLabel + '</div>'
+              '<div class="hint" style="margin-top:8px">任务进度 ' + job.progressLabel + '</div>'
             ].join("");
             row.addEventListener("click", async () => {
               const detail = await fetchDetail(job.id);
@@ -2802,23 +2964,40 @@ ${sharedPageStyles}
         }
 
         function renderDetail(detail) {
-          document.getElementById("detailStatus").textContent = detail.state + " • " + detail.currentStep;
+          const stateLabelMap = {
+            QUEUED: "排队中",
+            PARSING: "解析中",
+            AI_PROCESSING: "AI处理中",
+            ASSEMBLING: "装配中",
+            RENDERING: "渲染中",
+            POST_PROCESSING: "后处理",
+            COMPLETED: "已完成",
+            FAILED: "失败",
+            INTERRUPTED: "已中断",
+            UNKNOWN: "未知",
+          };
+          document.getElementById("detailStatus").textContent = (stateLabelMap[detail.state] || detail.state) + " • " + detail.currentStep;
           document.getElementById("detailStatus").className =
             detail.state === "COMPLETED" ? "ok" : (detail.state === "FAILED" || detail.state === "INTERRUPTED" ? "warn" : "ok");
 
           const grid = document.getElementById("detailGrid");
           const items = [
-            ["Title", detail.title],
-            ["Platform", detail.platform],
-            ["Profile", detail.renderProfile],
-            ["Progress", detail.progress + "%"],
-            ["Updated", detail.updatedLabel],
-            ["Created", detail.createdLabel],
+            ["标题", detail.title],
+            ["平台", detail.platform],
+            ["档位", detail.renderProfile],
+            ["进度", detail.progress + "%"],
+            ["TTS 引擎", detail.ttsStrategySummary.providerLabel],
+            ["TTS 路线", detail.ttsStrategySummary.deploymentLabel],
+            ["更新时间", detail.updatedLabel],
+            ["创建时间", detail.createdLabel],
           ];
           grid.innerHTML = items.map(([k, v]) =>
             '<div class="detail-kv"><b>' + k + '</b><span>' + v + '</span></div>'
           ).join("");
 
+          document.getElementById("checkpointReadableSummary").innerHTML = detail.checkpointReadableSummary
+            .map((item) => '<div class="summary-item">' + item + '</div>')
+            .join("");
           document.getElementById("checkpointSummary").textContent = detail.checkpointSummary;
           document.getElementById("errorSummary").innerHTML = detail.errorSummary
             .map((item) => '<div class="summary-item">' + item + '</div>')
@@ -3221,6 +3400,15 @@ function emitJobProgress(jobId, state, progress, step, message, meta = {}) {
   );
 }
 
+function mergeCheckpoint(base, patch) {
+  const baseValue = base && typeof base === "object" ? base : {};
+  const patchValue = patch && typeof patch === "object" ? patch : {};
+  return {
+    ...baseValue,
+    ...patchValue,
+  };
+}
+
 async function runCreatedJobLifecycle(jobId) {
   const job = getCreatedJob(jobId);
   if (!job) {
@@ -3243,11 +3431,11 @@ async function runCreatedJobLifecycle(jobId) {
         progress: item.progress,
         currentStep: item.step,
         updatedAt: new Date().toISOString(),
-        lastCheckpoint: {
+        lastCheckpoint: mergeCheckpoint(current.record.lastCheckpoint, {
           step: item.step,
           progress: item.progress,
           storyboardScenes: current.storyboard.summary.totalScenes,
-        },
+        }),
       },
     }));
 
@@ -3283,13 +3471,13 @@ async function runCreatedJobLifecycle(jobId) {
         progress: 100,
         currentStep: "done",
         updatedAt: new Date().toISOString(),
-        lastCheckpoint: {
+        lastCheckpoint: mergeCheckpoint(current.record.lastCheckpoint, {
           step: "done",
           progress: 100,
           previewUrl: rendered.previewUrl,
           provider: rendered.providerMetadata.provider,
           probe: rendered.probe ?? null,
-        },
+        }),
         qualitySummary: {
           ...(current.record.qualitySummary ?? {}),
           durationSec: rendered.probe?.durationSec ?? null,
@@ -3328,10 +3516,10 @@ async function runCreatedJobLifecycle(jobId) {
         progress: current.record.progress ?? 0,
         currentStep: "render_failed",
         updatedAt: new Date().toISOString(),
-        lastCheckpoint: {
+        lastCheckpoint: mergeCheckpoint(current.record.lastCheckpoint, {
           step: "render_failed",
           error: message,
-        },
+        }),
         errors: [
           ...(current.record.errors ?? []),
           { stepName: "render", errorMessage: message, retryCount: 0 },

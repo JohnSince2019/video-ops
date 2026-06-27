@@ -19,6 +19,7 @@ test("creates a queued job, manifest, storyboard, and output paths from a plain 
   });
 
   const created = createVideoJobFromDraft(draft);
+  const checkpoint = created.record.lastCheckpoint as { ttsProviderId?: string } | null;
 
   assert.match(created.record.id, /^job-/);
   assert.equal(created.record.state, "QUEUED");
@@ -27,6 +28,9 @@ test("creates a queued job, manifest, storyboard, and output paths from a plain 
   assert.equal(created.manifest.title, "Bench Press Demo");
   assert.equal(created.manifest.scenes.length, 2);
   assert.equal(created.manifest.scenes[0]?.audio.tts_voice, "zh-CN-male-yunze");
+  assert.equal(created.manifest.metadata.tts_provider_id, "cosyvoice-mlx");
+  assert.equal(created.manifest.metadata.tts_route_label, "默认中文解说路线");
+  assert.equal(checkpoint?.ttsProviderId, "cosyvoice-mlx");
   assert.equal(created.storyboard.summary.totalScenes, 2);
   assert.equal(created.outputPaths.videoPath.includes(`/jobs/${created.record.id}/video.mp4`), true);
 });
@@ -60,11 +64,14 @@ test("creates a manifest from markdown drafts and records style/voice checkpoint
   });
 
   const created = createVideoJobFromDraft(draft);
+  const checkpoint = created.record.lastCheckpoint as { ttsProviderId?: string } | null;
 
   assert.equal(created.manifest.platform, "xiaohongshu");
   assert.equal(created.manifest.scenes.length, 1);
+  assert.equal(created.manifest.metadata.tts_provider_id, "cosyvoice-mlx");
   assert.equal(created.storyboard.cards[0]?.title, "Scene 1");
   assert.match(JSON.stringify(created.record.lastCheckpoint), /john_vertical_comic/i);
+  assert.equal(checkpoint?.ttsProviderId, "cosyvoice-mlx");
 });
 
 test("custom voice reference is preserved in job checkpoint metadata", () => {
@@ -83,8 +90,11 @@ test("custom voice reference is preserved in job checkpoint metadata", () => {
   });
 
   const created = createVideoJobFromDraft(draft);
+  const checkpoint = created.record.lastCheckpoint as { ttsProviderId?: string } | null;
 
   assert.match(JSON.stringify(created.record.lastCheckpoint), /john-custom-reference\.wav/);
   assert.match(JSON.stringify(created.record.lastCheckpoint), /custom-reference-voice/);
+  assert.equal(checkpoint?.ttsProviderId, "cosyvoice-mlx");
+  assert.equal(created.manifest.metadata.tts_route_label, "自定义声音克隆路线");
   assert.equal(created.manifest.scenes[0]?.audio.reference_audio_path?.endsWith("john-custom-reference.wav"), true);
 });

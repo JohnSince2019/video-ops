@@ -11,6 +11,8 @@ export type TextFallbackOptions = {
   author?: string;
   copyrightLicense?: string;
   ttsVoice?: string;
+  ttsProviderId?: string;
+  ttsRouteLabel?: string;
   referenceAudioPath?: string;
   mood?: ContentScene["mood"];
   scriptType?: ContentScene["script_type"];
@@ -24,6 +26,8 @@ const DEFAULTS: Required<TextFallbackOptions> = {
   author: "John",
   copyrightLicense: "commercial",
   ttsVoice: "zh-CN-female-yunyang",
+  ttsProviderId: "cosyvoice-mlx",
+  ttsRouteLabel: "默认中文解说路线",
   referenceAudioPath: "",
   mood: "calm",
   scriptType: "narration",
@@ -149,6 +153,8 @@ export function parseTextToSceneGraph(
       created_at: new Date().toISOString(),
       author: options.author,
       copyright_license: options.copyrightLicense,
+      tts_provider_id: options.ttsProviderId,
+      tts_route_label: options.ttsRouteLabel,
     },
   };
 }

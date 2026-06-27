@@ -42,9 +42,24 @@ function toManifest(draft: WizardConfigDraft) {
   const referenceAudioPath = draft.customVoiceReference
     ? buildCustomVoiceReferenceAbsolutePath(draft.customVoiceReference)
     : undefined;
+  const ttsRouteLabel = draft.customVoiceReference
+    ? "自定义声音克隆路线"
+    : draft.ttsProviderId === "f5-tts"
+      ? "高拟真 SaaS 生产路线"
+      : draft.ttsProviderId === "melotts"
+        ? "低成本批量兜底路线"
+        : "默认中文解说路线";
 
   if (draft.scriptMode === "markdown") {
-    return parseMarkdownToSceneGraph(draft.scriptText);
+    const manifest = parseMarkdownToSceneGraph(draft.scriptText);
+    return {
+      ...manifest,
+      metadata: {
+        ...manifest.metadata,
+        tts_provider_id: draft.ttsProviderId,
+        tts_route_label: ttsRouteLabel,
+      },
+    };
   }
 
   return parseTextToSceneGraph(draft.scriptText, {
@@ -53,6 +68,8 @@ function toManifest(draft: WizardConfigDraft) {
     renderProfile: draft.renderProfile,
     author: draft.author,
     ttsVoice: draft.ttsVoice,
+    ttsProviderId: draft.ttsProviderId,
+    ttsRouteLabel,
     referenceAudioPath,
   });
 }
@@ -83,6 +100,7 @@ function buildInitialRecord(input: {
   const now = new Date().toISOString();
   const outputPaths = buildJobAssetPaths(input.jobId);
   const compliance = runComplianceGuard(input.draft.scriptText);
+  const ttsRouteLabel = input.manifest.metadata.tts_route_label ?? "默认中文解说路线";
   const ttsDurationSecs = Math.round(
     input.manifest.scenes.reduce((total, scene) => total + scene.duration_ms, 0) / 1000,
   );
@@ -107,6 +125,8 @@ function buildInitialRecord(input: {
       voiceMode: input.draft.voiceMode,
       customVoiceReference: input.draft.customVoiceReference ?? null,
       ttsVoice: input.draft.ttsVoice,
+      ttsProviderId: input.draft.ttsProviderId,
+      ttsRouteLabel,
     },
     qualitySummary: {
       fileSizeBytes: null,

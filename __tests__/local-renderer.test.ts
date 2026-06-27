@@ -38,6 +38,8 @@ const manifest = {
     created_at: new Date("2026-06-27T00:00:00.000Z").toISOString(),
     author: "John",
     copyright_license: "commercial",
+    tts_provider_id: "cosyvoice-mlx",
+    tts_route_label: "默认中文解说路线",
   },
 };
 
@@ -55,6 +57,7 @@ test("mock renderer writes output package artifacts and preview url", async () =
   assert.equal(existsSync(result.outputPackage.cover.path), true);
   assert.equal(existsSync(result.outputPackage.metadataFile.path), true);
   assert.match(readFileSync(result.outputPackage.metadataFile.path, "utf8"), /mock-renderer/);
+  assert.match(readFileSync(result.outputPackage.metadataFile.path, "utf8"), /默认中文解说路线/);
 });
 
 test("auto mode falls back to mock metadata when ffmpeg rendering cannot be used", async () => {

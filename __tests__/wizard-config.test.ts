@@ -25,6 +25,36 @@ test("detects missing title, missing script, invalid platform, and invalid rende
   assert.match(result.errors.join("\n"), /scriptText is required/);
 });
 
+test("rejects invalid tts provider and cloning-incompatible provider selections", () => {
+  const invalidProvider = validateWizardConfig({
+    title: "TTS Provider Test",
+    platform: "douyin",
+    renderProfile: "standard",
+    author: "John",
+    ownerToken: "owner-tts-provider-001",
+    scriptText: "第一句。第二句。",
+    scriptMode: "plain_text",
+    ttsProviderId: "unknown-tts-provider",
+  });
+  assert.equal(invalidProvider.valid, false);
+  assert.match(invalidProvider.errors.join("\n"), /ttsProviderId must be one of/);
+
+  const cloningMismatch = validateWizardConfig({
+    title: "Custom Clone Provider Test",
+    platform: "douyin",
+    renderProfile: "standard",
+    author: "John",
+    ownerToken: "owner-tts-provider-002",
+    scriptText: "第一句。第二句。",
+    scriptMode: "plain_text",
+    voiceMode: "custom_reference",
+    customVoiceReference: "john-demo.wav",
+    ttsProviderId: "melotts",
+  });
+  assert.equal(cloningMismatch.valid, false);
+  assert.match(cloningMismatch.errors.join("\n"), /does not support custom voice cloning/);
+});
+
 test("normalizes valid wizard input into a draft payload", () => {
   const draft = normalizeWizardConfig({
     title: "  AI 提效日报  ",
@@ -45,6 +75,7 @@ test("normalizes valid wizard input into a draft payload", () => {
   assert.equal(draft.personaPreset, "john_persona_v1");
   assert.equal(draft.voiceMode, "male_coach_deep");
   assert.equal(draft.ttsVoice, "zh-CN-male-yunze");
+  assert.equal(draft.ttsProviderId, "cosyvoice-mlx");
   assert.equal(draft.estimatedScenes, 3);
 });
 
@@ -68,10 +99,60 @@ test("summary includes platform, profile, script mode, and estimated scene count
   assert.equal(summary.personaPreset, "john_persona_v1");
   assert.equal(summary.voiceMode, "male_coach_deep");
   assert.equal(summary.ttsVoice, "zh-CN-male-yunze");
+  assert.equal(summary.ttsProviderId, "cosyvoice-mlx");
+  assert.equal(summary.ttsProviderProfile.displayName, "CosyVoice MLX");
+  assert.equal(summary.ttsProviderProfile.supportsVoiceCloning, true);
   assert.equal(summary.estimatedScenes, 2);
   assert.equal(summary.checklist.includes("Platform: xiaohongshu"), true);
   assert.equal(summary.checklist.includes("Style preset: john_vertical_comic"), true);
   assert.equal(summary.checklist.includes("Voice mode: male_coach_deep"), true);
+  assert.equal(summary.checklist.includes("TTS provider: cosyvoice-mlx"), true);
+});
+
+test("voice presets map to provider strategy and custom voice defaults to cloning provider", () => {
+  const premiumDraft = normalizeWizardConfig({
+    title: "Creator Hook",
+    platform: "douyin",
+    renderProfile: "standard",
+    author: "John",
+    ownerToken: "owner-voice-provider-001",
+    scriptText: "第一句。第二句。",
+    scriptMode: "plain_text",
+    voiceMode: "female_energetic_creator",
+  });
+  assert.equal(premiumDraft.ttsProviderId, "f5-tts");
+  assert.equal(premiumDraft.ttsVoice, "zh-CN-female-yunxi");
+
+  const customDraft = normalizeWizardConfig({
+    title: "Custom Voice",
+    platform: "douyin",
+    renderProfile: "standard",
+    author: "John",
+    ownerToken: "owner-custom-voice-001",
+    scriptText: "第一句。第二句。",
+    scriptMode: "plain_text",
+    voiceMode: "custom_reference",
+    customVoiceReference: "john-demo.wav",
+  });
+  assert.equal(customDraft.ttsProviderId, "cosyvoice-mlx");
+  assert.equal(customDraft.ttsVoice, "custom-reference-voice");
+});
+
+test("explicit tts provider selection is preserved when compatible", () => {
+  const draft = normalizeWizardConfig({
+    title: "Explicit Provider",
+    platform: "douyin",
+    renderProfile: "standard",
+    author: "John",
+    ownerToken: "owner-explicit-provider-001",
+    scriptText: "第一句。第二句。",
+    scriptMode: "plain_text",
+    voiceMode: "male_coach_deep",
+    ttsProviderId: "f5-tts",
+  });
+
+  assert.equal(draft.ttsProviderId, "f5-tts");
+  assert.equal(draft.ttsVoice, "zh-CN-male-yunze");
 });
 
 test("plain text scene markers are counted as explicit scenes", () => {
