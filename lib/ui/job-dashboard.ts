@@ -13,7 +13,7 @@ export type JobDashboardRecord = {
   manifestId?: string | null;
   ownerTokenHash?: string | null;
   lastCheckpoint?: unknown;
-  outputs?: Array<{ path: string; kind: string }>;
+  outputs?: Array<{ path: string; kind: string; url?: string }>;
   errors?: Array<{ stepName: string; errorMessage: string; retryCount: number }>;
 };
 
@@ -148,7 +148,7 @@ export function buildJobDetailView(record: JobDashboardRecord): JobDetailView {
         : ["No errors recorded."],
     outputsSummary:
       record.outputs?.length
-        ? record.outputs.map((item) => `${item.kind}: ${item.path}`)
+        ? record.outputs.map((item) => `${item.kind}: ${item.url ?? item.path}`)
         : ["No output bundle available yet."],
   };
 }

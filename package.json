@@ -44,7 +44,8 @@
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:smoke": "node scripts/prisma-smoke-test.mjs",
-    "render-plan:smoke": "node --import tsx scripts/render-plan-smoke.mjs"
+    "render-plan:smoke": "node --import tsx scripts/render-plan-smoke.mjs",
+    "renderer:smoke": "node --import tsx scripts/renderer-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.0.1",

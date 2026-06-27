@@ -1,3 +1,5 @@
+import { createReadStream, existsSync } from "node:fs";
+import path from "node:path";
 import http from "node:http";
 import { URL } from "node:url";
 
@@ -17,10 +19,12 @@ import {
 import { normalizeWizardConfig, summarizeWizardConfig, validateWizardConfig } from "./lib/ui/wizard-config.ts";
 import { renderZenPageShell } from "./lib/ui/zen-shell.ts";
 import { createVideoJobFromDraft } from "./lib/jobs/job-creation.ts";
+import { renderJobArtifacts } from "./lib/video/local-renderer.ts";
 
 const port = Number(process.env.PORT ?? 3003);
 const channel = new JobProgressChannel();
 const createdJobs = new Map();
+const workspaceRoot = process.cwd();
 
 const sharedPageStyles = `
   .layout {
@@ -457,6 +461,7 @@ function renderWizardPage() {
               currentStep: payload.step,
               message: payload.message,
               outputs: detail.outputsSummary,
+              previewUrl: detail.previewUrl,
             });
           });
         });
@@ -536,8 +541,9 @@ function renderDemoPage() {
 }
 
 function renderJobDashboardPage() {
-  const list = buildJobListView(demoJobs);
-  const detail = buildJobDetailView(demoJobs[0]);
+  const jobRecords = [...createdJobs.values()].map((item) => item.record);
+  const list = buildJobListView(jobRecords.length ? jobRecords : demoJobs);
+  const detail = buildJobDetailView(jobRecords[0] ?? demoJobs[0]);
 
   return renderZenPageShell({
     title: "Job Management Panel",
@@ -1057,6 +1063,18 @@ function updateCreatedJob(jobId, updater) {
   return next;
 }
 
+function absoluteFromWorkspace(relativePath) {
+  return path.join(workspaceRoot, relativePath);
+}
+
+function pickMimeType(filePath) {
+  if (filePath.endsWith(".mp4")) return "video/mp4";
+  if (filePath.endsWith(".png")) return "image/png";
+  if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
+  if (filePath.endsWith(".wav")) return "audio/wav";
+  return "application/octet-stream";
+}
+
 function emitJobProgress(jobId, state, progress, step, message, meta = {}) {
   return channel.emit(
     createJobProgressPayload({
@@ -1071,38 +1089,114 @@ function emitJobProgress(jobId, state, progress, step, message, meta = {}) {
   );
 }
 
-function scheduleCreatedJobProgress(jobId) {
-  const sequence = [
+async function runCreatedJobLifecycle(jobId) {
+  const job = getCreatedJob(jobId);
+  if (!job) {
+    return;
+  }
+
+  const steps = [
     { state: "PARSING", progress: 12, step: "parse_manifest", message: "Parsing submitted script" },
-    { state: "AI_PROCESSING", progress: 42, step: "storyboard_ready", message: "Preparing storyboard package" },
-    { state: "ASSEMBLING", progress: 68, step: "package_outputs", message: "Assembling job output bundle" },
-    { state: "RENDERING", progress: 88, step: "waiting_for_renderer", message: "Waiting for renderer stage" },
-    { state: "COMPLETED", progress: 100, step: "done", message: "Job prepared for rendering handoff" },
+    { state: "AI_PROCESSING", progress: 34, step: "storyboard_ready", message: "Preparing storyboard package" },
+    { state: "ASSEMBLING", progress: 58, step: "build_timeline", message: "Building timeline and local assets" },
+    { state: "RENDERING", progress: 82, step: "ffmpeg_render", message: "Rendering MP4 with FFmpeg" },
   ];
 
-  sequence.forEach((item, index) => {
-    setTimeout(() => {
-      updateCreatedJob(jobId, (current) => ({
-        ...current,
-        record: {
-          ...current.record,
-          state: item.state,
+  for (const item of steps) {
+    updateCreatedJob(jobId, (current) => ({
+      ...current,
+      record: {
+        ...current.record,
+        state: item.state,
+        progress: item.progress,
+        currentStep: item.step,
+        updatedAt: new Date().toISOString(),
+        lastCheckpoint: {
+          step: item.step,
           progress: item.progress,
-          currentStep: item.step,
-          updatedAt: new Date().toISOString(),
-          lastCheckpoint: {
-            step: item.step,
-            progress: item.progress,
-            storyboardScenes: current.storyboard.summary.totalScenes,
-          },
+          storyboardScenes: current.storyboard.summary.totalScenes,
         },
-      }));
+      },
+    }));
 
-      emitJobProgress(jobId, item.state, item.progress, item.step, item.message, {
-        storyboardScenes: getCreatedJob(jobId)?.storyboard.summary.totalScenes ?? 0,
-      });
-    }, index * 250);
-  });
+    emitJobProgress(jobId, item.state, item.progress, item.step, item.message, {
+      storyboardScenes: getCreatedJob(jobId)?.storyboard.summary.totalScenes ?? 0,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+
+  try {
+    const rendered = await renderJobArtifacts({
+      jobId,
+      manifest: job.manifest,
+      mode: "auto",
+    });
+
+    updateCreatedJob(jobId, (current) => ({
+      ...current,
+      outputPaths: {
+        ...current.outputPaths,
+        ...{
+          videoPath: rendered.outputPackage.video.path,
+          coverPath: rendered.outputPackage.cover.path,
+          metadataPath: rendered.outputPackage.metadataFile.path,
+        },
+      },
+      record: {
+        ...current.record,
+        state: "COMPLETED",
+        progress: 100,
+        currentStep: "done",
+        updatedAt: new Date().toISOString(),
+        lastCheckpoint: {
+          step: "done",
+          progress: 100,
+          previewUrl: rendered.previewUrl,
+          provider: rendered.providerMetadata.provider,
+          probe: rendered.probe ?? null,
+        },
+        outputs: [
+          { kind: "video", path: rendered.outputPackage.video.path, url: rendered.outputPackage.video.url },
+          { kind: "cover", path: rendered.outputPackage.cover.path, url: rendered.outputPackage.cover.url },
+          {
+            kind: "metadata",
+            path: rendered.outputPackage.metadataFile.path,
+            url: rendered.outputPackage.metadataFile.url,
+          },
+        ],
+      },
+      renderResult: rendered,
+    }));
+
+    emitJobProgress(jobId, "COMPLETED", 100, "done", "Video render completed", {
+      previewUrl: rendered.previewUrl,
+      provider: rendered.providerMetadata.provider,
+      streamTypes: rendered.probe?.streamTypes ?? [],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Renderer failed";
+    updateCreatedJob(jobId, (current) => ({
+      ...current,
+      record: {
+        ...current.record,
+        state: "FAILED",
+        progress: current.record.progress ?? 0,
+        currentStep: "render_failed",
+        updatedAt: new Date().toISOString(),
+        lastCheckpoint: {
+          step: "render_failed",
+          error: message,
+        },
+        errors: [
+          ...(current.record.errors ?? []),
+          { stepName: "render", errorMessage: message, retryCount: 0 },
+        ],
+      },
+    }));
+
+    emitJobProgress(jobId, "FAILED", 100, "render_failed", message);
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -1123,6 +1217,24 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/jobs") {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(renderJobDashboardPage());
+    return;
+  }
+
+  if ((req.method === "GET" || req.method === "HEAD") && url.pathname.startsWith("/output/")) {
+    const relativePath = url.pathname.replace(/^\/+/, "");
+    const absolutePath = absoluteFromWorkspace(relativePath);
+
+    if (!existsSync(absolutePath)) {
+      sendJson(res, 404, { ok: false, error: "Output file not found" });
+      return;
+    }
+
+    res.writeHead(200, { "content-type": pickMimeType(absolutePath) });
+    if (req.method === "HEAD") {
+      res.end();
+      return;
+    }
+    createReadStream(absolutePath).pipe(res);
     return;
   }
 
@@ -1169,7 +1281,7 @@ const server = http.createServer(async (req, res) => {
 
       const draft = normalizeWizardConfig(payload);
       const created = storeCreatedJob(createVideoJobFromDraft(draft));
-      scheduleCreatedJobProgress(created.record.id);
+      void runCreatedJobLifecycle(created.record.id);
 
       sendJson(res, 201, {
         ok: true,
@@ -1195,11 +1307,15 @@ const server = http.createServer(async (req, res) => {
     const jobId = url.pathname.replace("/api/jobs/", "");
     const created = getCreatedJob(jobId);
     if (created) {
+      const previewUrl =
+        created.record.outputs?.find((item) => item.kind === "video")?.url ?? null;
       sendJson(res, 200, {
         ...buildJobDetailView(created.record),
         storyboard: created.storyboard,
         manifest: created.manifest,
         outputPaths: created.outputPaths,
+        previewUrl,
+        probe: created.renderResult?.probe ?? null,
       });
       return;
     }
