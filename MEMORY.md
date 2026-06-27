@@ -26,11 +26,11 @@
 
 ### 1.1 当前本地可运行入口（2026-06-27）
 
-- `http://localhost:3001/`：Wizard 配置页
-- `http://localhost:3001/jobs`：任务管理面板
-- `http://localhost:3001/storyboard`：Storyboard 预览页
-- `http://localhost:3001/compliance-report`：合规报告导出页
-- `http://localhost:3001/demo`：SSE 进度流演示页
+- `http://localhost:3003/`：Wizard 配置页
+- `http://localhost:3003/jobs`：任务管理面板
+- `http://localhost:3003/storyboard`：Storyboard 预览页
+- `http://localhost:3003/compliance-report`：合规报告导出页
+- `http://localhost:3003/demo`：SSE 进度流演示页
 
 ### 1.2 已补齐的重要模块（2026-06-27）
 

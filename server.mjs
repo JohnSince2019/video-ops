@@ -17,7 +17,7 @@ import {
 import { normalizeWizardConfig, summarizeWizardConfig, validateWizardConfig } from "./lib/ui/wizard-config.ts";
 import { renderZenPageShell } from "./lib/ui/zen-shell.ts";
 
-const port = Number(process.env.PORT ?? 3001);
+const port = Number(process.env.PORT ?? 3003);
 const channel = new JobProgressChannel();
 
 const sharedPageStyles = `

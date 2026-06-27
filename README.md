@@ -44,6 +44,8 @@ P0-P9 模块（文案解析 → 静帧生图 → TTS → 字幕 → 合成）
 - 合规报告导出页：`/compliance-report`
 - SSE 演示页：`/demo`
 
+默认本地端口：`3003`
+
 详细进度见 [docs/ROADMAP.md](docs/ROADMAP.md)
 
 ## 快速启动
@@ -52,6 +54,14 @@ P0-P9 模块（文案解析 → 静帧生图 → TTS → 字幕 → 合成）
 npm install
 npm run dev
 ```
+
+启动后访问：
+
+- `http://localhost:3003/`
+- `http://localhost:3003/jobs`
+- `http://localhost:3003/storyboard`
+- `http://localhost:3003/compliance-report`
+- `http://localhost:3003/demo`
 
 ## 贡献
 
