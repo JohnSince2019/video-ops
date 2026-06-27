@@ -406,6 +406,22 @@ export async function renderJobArtifacts(input: {
     ttsRouteSummary: {
       providerId: input.manifest.metadata.tts_provider_id,
       routeLabel: input.manifest.metadata.tts_route_label,
+      routeRoleLabel:
+        input.manifest.metadata.tts_route_label === "自定义声音克隆路线"
+          ? "自定义声音保真路线"
+          : input.manifest.metadata.tts_provider_id === "f5-tts"
+            ? "高拟真正式产线"
+            : input.manifest.metadata.tts_provider_id === "melotts"
+              ? "低成本兜底路线"
+              : "第一阶段默认主链路",
+      acceptanceHint:
+        input.manifest.metadata.tts_route_label === "自定义声音克隆路线"
+          ? "先确认参考音频是否足够稳定，再重点验收音色一致性和辨识度。"
+          : input.manifest.metadata.tts_provider_id === "f5-tts"
+            ? "更适合听最终产物效果，不以页面即时试听作为主要验收方式。"
+            : input.manifest.metadata.tts_provider_id === "melotts"
+              ? "重点验收节奏和可用性，不把它当作高拟真最终音色标准。"
+              : "可以先在工作台即时试听，再结合最终产物确认自然度和清晰度。",
       voiceLabel: input.manifest.scenes[0]?.audio.tts_voice,
     },
   });

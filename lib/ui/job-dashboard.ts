@@ -48,6 +48,9 @@ export type JobListItem = {
   statusTone: "queued" | "running" | "success" | "error" | "neutral";
   ttsProviderLabel: string;
   ttsRouteLabel: string;
+  routeRoleLabel: string;
+  renderSourceLabel: string;
+  rerunRecommendationLabel: string;
 };
 
 export type JobDetailView = {
@@ -68,6 +71,8 @@ export type JobDetailView = {
   ttsStrategySummary: {
     providerLabel: string;
     routeLabel: string;
+    routeRoleLabel: string;
+    acceptanceHint: string;
     voiceModeLabel: string;
     cloningLabel: string;
     deploymentLabel: string;
@@ -86,6 +91,16 @@ export type JobDetailView = {
     wanxUsd: string;
     ttsUsd: string;
     totalUsd: string;
+  };
+  routeOutcomeSummary: {
+    qualityFocusLabel: string;
+    costInterpretationLabel: string;
+    acceptancePriorityLabel: string;
+  };
+  resilienceSummary: {
+    renderSourceLabel: string;
+    fallbackInterpretationLabel: string;
+    rerunRecommendationLabel: string;
   };
 };
 
@@ -162,6 +177,12 @@ function buildCheckpointReadableSummary(checkpoint: unknown) {
   if (typeof data.ttsRouteLabel === "string") {
     lines.push(`TTS 路线：${data.ttsRouteLabel}`);
   }
+  if (typeof data.ttsRouteRoleLabel === "string") {
+    lines.push(`路线定位：${data.ttsRouteRoleLabel}`);
+  }
+  if (typeof data.ttsAcceptanceHint === "string") {
+    lines.push(`验收提示：${data.ttsAcceptanceHint}`);
+  }
   if (typeof data.customVoiceReference === "string" && data.customVoiceReference) {
     lines.push(`声音参考：${data.customVoiceReference}`);
   }
@@ -176,6 +197,9 @@ function buildCheckpointReadableSummary(checkpoint: unknown) {
   }
   if (typeof data.storyboardScenes === "number") {
     lines.push(`分镜数量：${data.storyboardScenes}`);
+  }
+  if (typeof data.stageNarration === "string") {
+    lines.push(`当前说明：${data.stageNarration}`);
   }
   if (typeof data.previewUrl === "string") {
     lines.push("预览视频已生成。");
@@ -263,6 +287,104 @@ function formatTtsDeploymentLabel(providerId?: string) {
     return "适合作为低成本 fallback";
   }
   return "未设置";
+}
+
+function formatTtsRouteRoleLabel(value?: string) {
+  return value?.trim() || "未设置";
+}
+
+function formatTtsAcceptanceHint(value?: string) {
+  return value?.trim() || "未设置";
+}
+
+function formatRouteQualityFocus(routeRole?: string) {
+  if (routeRole === "高拟真正式产线") {
+    return "优先关注最终成片自然度与整体观感，不用过度依赖即时试听。";
+  }
+  if (routeRole === "低成本兜底路线") {
+    return "优先关注结果可用性、节奏是否完整，以及是否满足兜底交付。";
+  }
+  if (routeRole === "自定义声音保真路线") {
+    return "优先关注音色一致性、辨识度和参考音频复现程度。";
+  }
+  return "优先关注自然度、清晰度和是否符合当前工作台预期。";
+}
+
+function formatRouteCostInterpretation(routeRole?: string) {
+  if (routeRole === "高拟真正式产线") {
+    return "这类路线通常接受更高语音成本，重点换取更稳定的正式发布质量。";
+  }
+  if (routeRole === "低成本兜底路线") {
+    return "这类路线更强调成本可控，适合批量出样或主链路失败时兜底。";
+  }
+  if (routeRole === "自定义声音保真路线") {
+    return "这类路线的成本解释要结合音色保真价值，而不只看单次语音价格。";
+  }
+  return "这类路线适合在试听效率和生产成本之间保持平衡。";
+}
+
+function formatRouteAcceptancePriority(routeRole?: string) {
+  if (routeRole === "高拟真正式产线") {
+    return "先看最终成片效果，再决定是否通过人工验收。";
+  }
+  if (routeRole === "低成本兜底路线") {
+    return "先看是否可交付、可继续生产，再决定是否升级到更高质量路线。";
+  }
+  if (routeRole === "自定义声音保真路线") {
+    return "先确认声音像不像本人，再看整体视频节奏和画面是否匹配。";
+  }
+  return "可以先听工作台试听，再结合成片做最终验收。";
+}
+
+function formatRenderSourceLabel(record: JobDashboardRecord) {
+  if (record.qualitySummary?.fallbackStatus === "fallback") {
+    return "当前产物来自 fallback 渲染链路";
+  }
+  if (record.qualitySummary?.fallbackStatus === "primary") {
+    return "当前产物来自正式主渲染链路";
+  }
+  return "当前还没有明确的渲染来源结论";
+}
+
+function formatFallbackInterpretation(record: JobDashboardRecord) {
+  const fallbackReason = record.qualitySummary?.fallbackReason?.trim();
+  const routeRole = readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel");
+
+  if (record.qualitySummary?.fallbackStatus === "fallback") {
+    if (routeRole === "高拟真正式产线") {
+      return `这条任务原本追求正式产线质量，但本次已退回 fallback${fallbackReason ? `：${fallbackReason}` : ""}，建议谨慎验收最终自然度。`;
+    }
+    if (routeRole === "低成本兜底路线") {
+      return `这条任务本来就允许兜底交付${fallbackReason ? `：${fallbackReason}` : ""}，重点确认结果是否仍可继续使用。`;
+    }
+    return `这条任务本次走了 fallback${fallbackReason ? `：${fallbackReason}` : ""}，需要结合路线目标判断是否接受。`;
+  }
+
+  if (record.qualitySummary?.fallbackStatus === "primary") {
+    return "这条任务仍然保持在正式主链路产出，当前不需要因为渲染来源而降级判断。";
+  }
+
+  return "当前还没有足够信息解释渲染来源是否发生了降级。";
+}
+
+function formatRerunRecommendation(record: JobDashboardRecord) {
+  const routeRole = readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel");
+  const isFallback = record.qualitySummary?.fallbackStatus === "fallback";
+  const isFailed = normalizeState(record.state) === "FAILED" || normalizeState(record.state) === "INTERRUPTED";
+
+  if (isFailed && routeRole === "高拟真正式产线") {
+    return "建议优先排查正式产线依赖并重跑，不要直接接受降级结果。";
+  }
+  if (isFallback && routeRole === "高拟真正式产线") {
+    return "如果这条内容要正式发布，建议修复主链路后重跑，避免长期接受 fallback 成片。";
+  }
+  if (isFallback && routeRole === "低成本兜底路线") {
+    return "如果当前成片可用，可以先交付；如果观感不够，再升级到更高质量路线重跑。";
+  }
+  if (routeRole === "自定义声音保真路线" && (isFallback || isFailed)) {
+    return "建议先确认参考音频和音色克隆链路是否稳定，再决定是否重跑。";
+  }
+  return "当前没有强制重跑信号，可以先按路线目标做人工验收。";
 }
 
 function formatWorkflowStepLabel(step?: string) {
@@ -383,6 +505,9 @@ export function buildJobListView(records: JobDashboardRecord[]): JobListItem[] {
       statusTone: getStatusTone(state),
       ttsProviderLabel: formatTtsProviderLabel(readCheckpointField(record.lastCheckpoint, "ttsProviderId")),
       ttsRouteLabel: readCheckpointField(record.lastCheckpoint, "ttsRouteLabel") || "未设置",
+      routeRoleLabel: formatTtsRouteRoleLabel(readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel")),
+      renderSourceLabel: formatRenderSourceLabel(record),
+      rerunRecommendationLabel: formatRerunRecommendation(record),
     };
   });
 }
@@ -422,6 +547,8 @@ export function buildJobDetailView(record: JobDashboardRecord): JobDetailView {
     ttsStrategySummary: {
       providerLabel: formatTtsProviderLabel(readCheckpointField(record.lastCheckpoint, "ttsProviderId")),
       routeLabel: readCheckpointField(record.lastCheckpoint, "ttsRouteLabel") || "未设置",
+      routeRoleLabel: formatTtsRouteRoleLabel(readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel")),
+      acceptanceHint: formatTtsAcceptanceHint(readCheckpointField(record.lastCheckpoint, "ttsAcceptanceHint")),
       voiceModeLabel: formatVoiceModeLabel(readCheckpointField(record.lastCheckpoint, "voiceMode")),
       cloningLabel: formatTtsCloningLabel(readCheckpointField(record.lastCheckpoint, "voiceMode")),
       deploymentLabel: formatTtsDeploymentLabel(readCheckpointField(record.lastCheckpoint, "ttsProviderId")),
@@ -465,6 +592,16 @@ export function buildJobDetailView(record: JobDashboardRecord): JobDetailView {
       wanxUsd: formatUsd(record.costSummary?.wanxUsd),
       ttsUsd: formatUsd(record.costSummary?.ttsUsd),
       totalUsd: formatUsd(record.costSummary?.totalUsd),
+    },
+    routeOutcomeSummary: {
+      qualityFocusLabel: formatRouteQualityFocus(readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel")),
+      costInterpretationLabel: formatRouteCostInterpretation(readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel")),
+      acceptancePriorityLabel: formatRouteAcceptancePriority(readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel")),
+    },
+    resilienceSummary: {
+      renderSourceLabel: formatRenderSourceLabel(record),
+      fallbackInterpretationLabel: formatFallbackInterpretation(record),
+      rerunRecommendationLabel: formatRerunRecommendation(record),
     },
   };
 }

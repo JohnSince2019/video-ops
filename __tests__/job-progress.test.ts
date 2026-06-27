@@ -77,12 +77,14 @@ test("formats server sent event payloads", () => {
     jobId: "job-1",
     state: "COMPLETED",
     progress: 100,
+    message: "任务已完成，当前成片来自正式主链路，可以进入人工验收。",
     timestamp: "2026-06-25T00:00:00.000Z",
   });
 
   assert.match(event, /^event: job-progress\n/);
   assert.match(event, /"jobId":"job-1"/);
   assert.match(event, /"state":"COMPLETED"/);
+  assert.match(event, /正式主链路/);
 });
 
 test("streams progress for a single job", async () => {

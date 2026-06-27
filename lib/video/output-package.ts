@@ -33,6 +33,8 @@ export type OutputPackage = {
     ttsRouteSummary?: {
       providerId?: string;
       routeLabel?: string;
+      routeRoleLabel?: string;
+      acceptanceHint?: string;
       voiceLabel?: string;
     };
   };

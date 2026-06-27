@@ -67,6 +67,7 @@ const voicePresetCardsHtml = listVoicePresets()
           <span>适合内容：${preset.chineseUseCase}</span>
           <span>声音引擎：${provider.displayName}</span>
           <span>自然度：${provider.naturalnessLabel}</span>
+          <span>产品定位：${provider.recommendedRoleLabel}</span>
           <span>音色克隆：${provider.supportsVoiceCloning ? "支持" : "暂不支持"}</span>
           <span>部署方式：${deploymentLabel}</span>
         </div>
@@ -96,6 +97,46 @@ const ttsProviderSelectOptionsHtml = listTtsProviderProfiles()
           : "轻量兜底";
 
     return `<option value="${provider.id}"${provider.id === defaultVoiceProvider.id ? " selected" : ""}>${provider.displayName} · ${qualityLabel} · ${deploymentLabel}</option>`;
+  })
+  .join("");
+const ttsProviderStrategyCardsHtml = listTtsProviderProfiles()
+  .map((provider, index) => {
+    const qualityLabel =
+      provider.qualityTier === "premium"
+        ? "高拟真生产"
+        : provider.qualityTier === "production"
+          ? "主力生产"
+          : "低成本兜底";
+    const deploymentLabel =
+      provider.deploymentMode === "hybrid"
+        ? "本地与云端都可落地"
+        : provider.deploymentMode === "cloud_ready"
+          ? "适合云端 SaaS"
+          : "更适合本地工作站";
+    const routeLabel =
+      provider.id === "cosyvoice-mlx"
+        ? "适合当前第一阶段主链路，支持中文解说与参考音频克隆。"
+        : provider.id === "f5-tts"
+          ? "适合更高拟真度和后续 SaaS 生产线路。"
+          : "适合快速预览、批量兜底和成本敏感场景。";
+
+    return `
+      <article class="provider-strategy-card${index === 0 ? " active" : ""}" data-provider-id="${provider.id}">
+        <div class="provider-strategy-top">
+          <strong>${provider.displayName}</strong>
+          <span class="voice-quality-chip">${qualityLabel}</span>
+        </div>
+        <small>${provider.naturalnessLabel}</small>
+        <div class="voice-meta-list">
+          <span>产品定位：${provider.recommendedRoleLabel}</span>
+          <span>部署方式：${deploymentLabel}</span>
+          <span>音色克隆：${provider.supportsVoiceCloning ? "支持" : "暂不支持"}</span>
+          <span>实时试听：${provider.supportsStreamingPreview ? "支持" : "不支持"}</span>
+          <span>试听体验：${provider.previewExperienceLabel}</span>
+          <span>${provider.saasFitLabel}</span>
+          <span>${routeLabel}</span>
+        </div>
+      </article>`;
   })
   .join("");
 
@@ -893,6 +934,32 @@ ${sharedPageStyles}
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
       }
+      .provider-strategy-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .provider-strategy-card {
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px;
+        background: rgba(247, 249, 252, 0.92);
+        display: grid;
+        gap: 8px;
+        cursor: pointer;
+      }
+      .provider-strategy-card.active {
+        border-color: #d9d2ff;
+        background: #f8f6ff;
+        box-shadow: inset 0 0 0 1px rgba(118, 103, 255, 0.08);
+      }
+      .provider-strategy-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
       .voice-card {
         border: 1px solid var(--border);
         border-radius: 14px;
@@ -933,6 +1000,46 @@ ${sharedPageStyles}
       .voice-meta-list {
         display: grid;
         gap: 4px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .mini-section-title {
+        margin: 14px 0 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+      }
+      .artifact-section[hidden] {
+        display: none;
+      }
+      .route-behavior-panel {
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: rgba(250, 251, 255, 0.92);
+        padding: 12px 14px;
+        display: grid;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .route-behavior-panel strong {
+        font-size: 13px;
+        color: var(--ink);
+      }
+      .route-behavior-note {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .route-behavior-list {
+        display: grid;
+        gap: 6px;
+      }
+      .route-behavior-item {
+        border-radius: 12px;
+        background: #fff;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        padding: 8px 10px;
         font-size: 12px;
         color: var(--muted);
       }
@@ -1590,11 +1697,15 @@ ${sharedPageStyles}
                       <strong id="activeVoiceModeLabel">男声教练沉稳</strong>
                     </div>
                     <div class="auto-card">
+                      <b>当前 TTS 路线</b>
+                      <strong id="assetVoiceRouteLabel">默认中文解说路线</strong>
+                    </div>
+                    <div class="auto-card">
                       <b>自定义声音参考</b>
                       <strong id="activeVoiceReferenceLabel">未使用自定义参考</strong>
                     </div>
                   </div>
-                  <div class="hint">现在先确认脚本结构是否正确。试听、录音、应用声音请在第 4 步完成。</div>
+                  <div class="hint">现在先确认脚本结构是否正确，并知道后面准备走哪条声音路线。试听、录音、应用声音都在第 4 步完成。</div>
                 </div>
                     `
                     : ""
@@ -1605,6 +1716,18 @@ ${sharedPageStyles}
                     ? `
                 <div class="field">
                   <label class="tip-label">声音方案 <span class="tip-icon" data-tip="先试听，再点应用该声音。也可以输入你自己的参考音频并应用为本次任务音色。">?</span></label>
+                  <div class="provider-strategy-grid">
+                    ${ttsProviderStrategyCardsHtml}
+                  </div>
+                  <div class="route-behavior-panel">
+                    <strong id="routeBehaviorTitle">当前路线：第一阶段默认主链路</strong>
+                    <div class="route-behavior-note" id="routeBehaviorNote">这条路线适合当前本地工作台：可以边试听边确认，确认自然度后再进入任务创建。</div>
+                    <div class="route-behavior-list" id="routeBehaviorList">
+                      <div class="route-behavior-item">试听策略：当前可以直接在页面里试听，适合快速判断声音风格。</div>
+                      <div class="route-behavior-item">产线定位：适合第一阶段默认生产主链路，也支持自定义参考音频克隆。</div>
+                      <div class="route-behavior-item">部署建议：既适合本地，也能作为云端异步 worker。</div>
+                    </div>
+                  </div>
                   <div class="field compact" style="margin-bottom:12px">
                     <label class="tip-label" for="ttsProviderIdVisible">TTS 引擎 <span class="tip-icon" data-tip="这里决定最终任务优先走哪套 TTS provider。你可以按自然度、是否支持克隆、以及是否要考虑云端 SaaS 部署来切换。">?</span></label>
                     <select id="ttsProviderIdVisible">${ttsProviderSelectOptionsHtml}</select>
@@ -1680,6 +1803,18 @@ ${sharedPageStyles}
 
                 <div class="field full">
                   <label class="tip-label">声音方案 <span class="tip-icon" data-tip="完整试听、应用、录音、自定义声音操作都集中在这一步完成。">?</span></label>
+                  <div class="provider-strategy-grid">
+                    ${ttsProviderStrategyCardsHtml}
+                  </div>
+                  <div class="route-behavior-panel">
+                    <strong id="routeBehaviorTitle">当前路线：第一阶段默认主链路</strong>
+                    <div class="route-behavior-note" id="routeBehaviorNote">这条路线适合当前本地工作台：可以边试听边确认，确认自然度后再进入任务创建。</div>
+                    <div class="route-behavior-list" id="routeBehaviorList">
+                      <div class="route-behavior-item">试听策略：当前可以直接在页面里试听，适合快速判断声音风格。</div>
+                      <div class="route-behavior-item">产线定位：适合第一阶段默认生产主链路，也支持自定义参考音频克隆。</div>
+                      <div class="route-behavior-item">部署建议：既适合本地，也能作为云端异步 worker。</div>
+                    </div>
+                  </div>
                   <div class="field compact" style="margin-bottom:12px">
                     <label class="tip-label" for="ttsProviderIdVisible">TTS 引擎 <span class="tip-icon" data-tip="这里决定最终任务优先走哪套 TTS provider。你可以按自然度、是否支持克隆、以及是否要考虑云端 SaaS 部署来切换。">?</span></label>
                     <select id="ttsProviderIdVisible">${ttsProviderSelectOptionsHtml}</select>
@@ -1818,7 +1953,9 @@ ${sharedPageStyles}
             <section class="gate-card">
               <div class="panel-title" id="focusPanelTitle">当前这一步重点</div>
               <div class="gate-note" id="focusPanelNote">素材收集阶段先关注：脚本是否完整、场景拆分是否顺、声音方案是否选对。任务创建后，右侧才重点显示进度、预览和产物质量。</div>
+              <div class="mini-section-title">当前门槛</div>
               <div class="gate-checklist" id="gateChecklist"></div>
+              <div class="mini-section-title">当前已完成</div>
               <div class="quality-list" id="summaryList"></div>
               <div class="error-list" id="errorList"></div>
             </section>
@@ -1835,8 +1972,20 @@ ${sharedPageStyles}
                   <p id="activeVoiceProviderLabel">${defaultVoiceProvider.displayName} · ${defaultVoiceProvider.deploymentMode === "hybrid" ? "本地与云端都可落地" : defaultVoiceProvider.deploymentMode === "cloud_ready" ? "适合云端 SaaS" : "更适合本地工作站"}</p>
                 </div>
                 <div class="asset-item">
+                  <strong>当前路线定位</strong>
+                  <p id="activeVoiceRoleLabel">${defaultVoiceProvider.recommendedRoleLabel}</p>
+                </div>
+                <div class="asset-item">
                   <strong>当前 TTS 路线</strong>
                   <p id="activeTtsRouteLabel">默认推荐路线</p>
+                </div>
+                <div class="asset-item">
+                  <strong>当前试听体验</strong>
+                  <p id="activeVoicePreviewCapabilityLabel">${defaultVoiceProvider.previewExperienceLabel}</p>
+                </div>
+                <div class="asset-item">
+                  <strong>当前 SaaS 适配</strong>
+                  <p id="activeVoiceSaasFitLabel">${defaultVoiceProvider.saasFitLabel}</p>
                 </div>
                 <div class="asset-item">
                   <strong>当前声音参考</strong>
@@ -1887,21 +2036,36 @@ ${sharedPageStyles}
                 </div>
                 <div class="preview-links" id="previewLinks"></div>
                 <div class="summary-item">
+                  <div class="mini-section-title" id="artifactSupportNote">当前还没进入产物验收阶段，等任务创建后再看质量、成本和预览结果。</div>
+                </div>
+                <div class="summary-item artifact-section" id="jobQualitySection">
                   <b style="display:block;margin-bottom:8px">产物质量摘要</b>
                   <div class="quality-list" id="jobQualitySummary">
                   <div class="summary-item empty">任务完成后，这里会显示文件大小、时长、分辨率、音频、字幕、备用渲染与合规状态。</div>
                   </div>
                 </div>
-                <div class="summary-item">
+                <div class="summary-item artifact-section" id="jobCostSection">
                   <b style="display:block;margin-bottom:8px">成本估算</b>
                   <div class="quality-list" id="jobCostSummary">
                     <div class="summary-item empty">创建任务后，这里会显示图像、TTS 和总成本估算。</div>
                   </div>
                 </div>
-                <div class="summary-item">
+                <div class="summary-item artifact-section" id="jobTtsStrategySection">
                   <b style="display:block;margin-bottom:8px">声音策略摘要</b>
                   <div class="quality-list" id="jobTtsStrategySummary">
                     <div class="summary-item empty">创建任务后，这里会显示当前任务使用的声音模式、TTS 引擎、克隆方式和部署策略。</div>
+                  </div>
+                </div>
+                <div class="summary-item artifact-section" id="jobRouteOutcomeSection">
+                  <b style="display:block;margin-bottom:8px">结果解读建议</b>
+                  <div class="quality-list" id="jobRouteOutcomeSummary">
+                    <div class="summary-item empty">任务完成后，这里会按当前 TTS 路线解释质量重点、成本理解方式和验收优先级。</div>
+                  </div>
+                </div>
+                <div class="summary-item artifact-section" id="jobResilienceSection">
+                  <b style="display:block;margin-bottom:8px">兜底与重跑建议</b>
+                  <div class="quality-list" id="jobResilienceSummary">
+                    <div class="summary-item empty">任务完成后，这里会解释当前产物是否来自 fallback、该如何判断是否需要重跑。</div>
                   </div>
                 </div>
                 <div class="summary-item">
@@ -1941,6 +2105,8 @@ ${sharedPageStyles}
         const jobQualitySummary = document.getElementById("jobQualitySummary");
         const jobCostSummary = document.getElementById("jobCostSummary");
         const jobTtsStrategySummary = document.getElementById("jobTtsStrategySummary");
+        const jobRouteOutcomeSummary = document.getElementById("jobRouteOutcomeSummary");
+        const jobResilienceSummary = document.getElementById("jobResilienceSummary");
         const progressValue = document.getElementById("progressValue");
         const jobStateChip = document.getElementById("jobStateChip");
         const jobStepChip = document.getElementById("jobStepChip");
@@ -1958,6 +2124,9 @@ ${sharedPageStyles}
         const previewCustomVoiceBtn = document.getElementById("previewCustomVoiceBtn");
         const presetVoiceStatus = document.getElementById("presetVoiceStatus");
         const customVoiceStatus = document.getElementById("customVoiceStatus");
+        const routeBehaviorTitle = document.getElementById("routeBehaviorTitle");
+        const routeBehaviorNote = document.getElementById("routeBehaviorNote");
+        const routeBehaviorList = document.getElementById("routeBehaviorList");
         const validateBtn = document.getElementById("validateBtn");
         const createJobBtn = document.getElementById("createJobBtn");
         const loadDemoBtn = document.getElementById("loadDemoBtn");
@@ -1966,7 +2135,11 @@ ${sharedPageStyles}
         const advancedConfig = document.querySelector(".advanced-config");
         const activeVoiceModeLabel = document.getElementById("activeVoiceModeLabel");
         const activeVoiceProviderLabel = document.getElementById("activeVoiceProviderLabel");
+        const activeVoiceRoleLabel = document.getElementById("activeVoiceRoleLabel");
+        const assetVoiceRouteLabel = document.getElementById("assetVoiceRouteLabel");
         const activeTtsRouteLabel = document.getElementById("activeTtsRouteLabel");
+        const activeVoicePreviewCapabilityLabel = document.getElementById("activeVoicePreviewCapabilityLabel");
+        const activeVoiceSaasFitLabel = document.getElementById("activeVoiceSaasFitLabel");
         const activeVoiceReferenceLabel = document.getElementById("activeVoiceReferenceLabel");
         const overviewPanelTitle = document.getElementById("overviewPanelTitle");
         const qualityScoreSuffix = document.getElementById("qualityScoreSuffix");
@@ -1976,6 +2149,12 @@ ${sharedPageStyles}
         const focusPanelTitle = document.getElementById("focusPanelTitle");
         const focusPanelNote = document.getElementById("focusPanelNote");
         const gateChecklist = document.getElementById("gateChecklist");
+        const artifactSupportNote = document.getElementById("artifactSupportNote");
+        const jobQualitySection = document.getElementById("jobQualitySection");
+        const jobCostSection = document.getElementById("jobCostSection");
+        const jobTtsStrategySection = document.getElementById("jobTtsStrategySection");
+        const jobRouteOutcomeSection = document.getElementById("jobRouteOutcomeSection");
+        const jobResilienceSection = document.getElementById("jobResilienceSection");
         const selectedPlanPanelTitle = document.getElementById("selectedPlanPanelTitle");
         const nextGatePanelTitle = document.getElementById("nextGatePanelTitle");
         const nextGateList = document.getElementById("nextGateList");
@@ -1986,6 +2165,7 @@ ${sharedPageStyles}
         let recorderStream = null;
         let recorderChunks = [];
         let activeEventSource = null;
+        let currentJobId = "";
 
         function syncAdvancedConfigLabel() {
           if (!advancedConfig) return;
@@ -1998,6 +2178,7 @@ ${sharedPageStyles}
         syncAdvancedConfigLabel();
         setCreateJobAvailability(false);
         syncGateAssistant("waiting_input");
+        syncArtifactPanels();
 
         function clientProfileLabel(value) {
           if (value === "draft") return "草稿";
@@ -2040,6 +2221,92 @@ ${sharedPageStyles}
           };
 
           return providerMap[value] || "未设置";
+        }
+
+        function clientTtsProviderRole(value) {
+          const roleMap = {
+            "cosyvoice-mlx": "第一阶段默认主链路",
+            "f5-tts": "高拟真正式产线",
+            melotts: "低成本兜底路线",
+          };
+
+          return roleMap[value] || "未设置";
+        }
+
+        function clientTtsPreviewCapability(value) {
+          const capabilityMap = {
+            "cosyvoice-mlx": "支持边调边试听，适合当前本地工作台快速确认声音",
+            "f5-tts": "更适合批量生成后再听结果，不以实时试听为强项",
+            melotts: "更适合快速出结果，不适合作为最终高拟真试听标准",
+          };
+
+          return capabilityMap[value] || "未设置";
+        }
+
+        function clientTtsSaasFit(value) {
+          const fitMap = {
+            "cosyvoice-mlx": "适合作为云端异步 TTS worker，也适合当前本地生产",
+            "f5-tts": "适合独立 GPU / 容器部署，优先面向云端 SaaS 重度生产",
+            melotts: "适合成本敏感型 SaaS 场景或 fallback 节点",
+          };
+
+          return fitMap[value] || "未设置";
+        }
+
+        function getRouteBehaviorConfig(providerId, voiceMode) {
+          if (voiceMode === "custom_reference") {
+            return {
+              title: "当前路线：自定义声音克隆路线",
+              note: "当前会优先保证参考音频可用和音色一致性。先上传并确认你的声音，再进入任务创建。",
+              items: [
+                "试听策略：优先试听你上传的参考声音，确认音色方向是否正确。",
+                "产线定位：适合需要保留本人辨识度的视频，不建议在参考音频不稳定时直接量产。",
+                "部署建议：当前默认走 CosyVoice MLX，自定义音色确认后再进入正式生产最稳。 ",
+              ],
+              previewAllowed: true,
+              previewButtonText: "试听我的声音",
+            };
+          }
+
+          if (providerId === "f5-tts") {
+            return {
+              title: "当前路线：高拟真正式产线",
+              note: "这条路线更适合正式生产和后续云端 SaaS，而不是当前页面里的高频即时试听。建议先应用方案，再通过任务结果做整体验收。",
+              items: [
+                "试听策略：不强调即时试听，重点是生成后听最终产物表现。",
+                "产线定位：适合高拟真正式发布视频，优先保证成品自然度。",
+                "部署建议：更适合独立 GPU / 容器生产环境，适合作为后续 SaaS 主引擎。",
+              ],
+              previewAllowed: false,
+              previewButtonText: "正式产线不建议直接试听",
+            };
+          }
+
+          if (providerId === "melotts") {
+            return {
+              title: "当前路线：低成本兜底路线",
+              note: "这条路线适合快速预览、fallback 或成本敏感场景，不建议作为最终高拟真验收标准。",
+              items: [
+                "试听策略：可以试听，但主要用于快速判断节奏，不代表最终自然度上限。",
+                "产线定位：适合低成本批量出样或主链路失败时兜底。",
+                "部署建议：适合作为成本敏感型 SaaS 节点，不建议承担高拟真主产线。",
+              ],
+              previewAllowed: true,
+              previewButtonText: "试听",
+            };
+          }
+
+          return {
+            title: "当前路线：第一阶段默认主链路",
+            note: "这条路线适合当前本地工作台：可以边试听边确认，确认自然度后再进入任务创建。",
+            items: [
+              "试听策略：当前可以直接在页面里试听，适合快速判断声音风格。",
+              "产线定位：适合第一阶段默认生产主链路，也支持自定义参考音频克隆。",
+              "部署建议：既适合本地，也能作为云端异步 worker。",
+            ],
+            previewAllowed: true,
+            previewButtonText: "试听",
+          };
         }
 
         function clientTtsRouteLabel(providerId, voiceMode) {
@@ -2230,14 +2497,27 @@ ${sharedPageStyles}
           const voiceModeValue = document.getElementById("voiceMode").value;
           const ttsProviderIdValue = document.getElementById("ttsProviderId").value;
           const customReferenceValue = customVoiceReferenceInput?.value?.trim() || "";
+          const routeBehavior = getRouteBehaviorConfig(ttsProviderIdValue, voiceModeValue);
           if (activeVoiceModeLabel) {
             activeVoiceModeLabel.textContent = clientVoiceModeLabel(voiceModeValue);
           }
           if (activeVoiceProviderLabel) {
             activeVoiceProviderLabel.textContent = clientTtsProviderDisplay(ttsProviderIdValue) || clientVoiceProviderLabel(voiceModeValue);
           }
+          if (activeVoiceRoleLabel) {
+            activeVoiceRoleLabel.textContent = clientTtsProviderRole(ttsProviderIdValue);
+          }
+          if (assetVoiceRouteLabel) {
+            assetVoiceRouteLabel.textContent = clientTtsRouteLabel(ttsProviderIdValue, voiceModeValue);
+          }
           if (activeTtsRouteLabel) {
             activeTtsRouteLabel.textContent = clientTtsRouteLabel(ttsProviderIdValue, voiceModeValue);
+          }
+          if (activeVoicePreviewCapabilityLabel) {
+            activeVoicePreviewCapabilityLabel.textContent = clientTtsPreviewCapability(ttsProviderIdValue);
+          }
+          if (activeVoiceSaasFitLabel) {
+            activeVoiceSaasFitLabel.textContent = clientTtsSaasFit(ttsProviderIdValue);
           }
           if (activeVoiceReferenceLabel) {
             activeVoiceReferenceLabel.textContent = customReferenceValue || "未使用自定义参考";
@@ -2245,6 +2525,30 @@ ${sharedPageStyles}
           if (ttsProviderSelect) {
             ttsProviderSelect.value = ttsProviderIdValue || "${defaultVoiceProvider.id}";
           }
+          document.querySelectorAll(".provider-strategy-card").forEach((item) => {
+            const providerId = item.getAttribute("data-provider-id");
+            item.classList.toggle("active", providerId === ttsProviderIdValue);
+          });
+          if (routeBehaviorTitle) {
+            routeBehaviorTitle.textContent = routeBehavior.title;
+          }
+          if (routeBehaviorNote) {
+            routeBehaviorNote.textContent = routeBehavior.note;
+          }
+          if (routeBehaviorList) {
+            routeBehaviorList.innerHTML = routeBehavior.items
+              .map((item) => '<div class="route-behavior-item">' + item + '</div>')
+              .join("");
+          }
+          document.querySelectorAll(".voice-preview-btn").forEach((button) => {
+            const card = button.closest(".voice-card");
+            const voiceMode = card?.getAttribute("data-voice-mode");
+            const providerId = inferProviderIdByVoiceMode(voiceMode || "");
+            const config = getRouteBehaviorConfig(providerId, voiceMode || "");
+            button.textContent = config.previewButtonText;
+            button.disabled = !config.previewAllowed;
+            button.classList.toggle("secondary", true);
+          });
         }
 
         function setInlineStatus(element, text, tone) {
@@ -2734,11 +3038,39 @@ ${sharedPageStyles}
             '<div class="quality-item pass">声音模式：' + (ttsStrategy.voiceModeLabel || "未设置") + '</div>',
             '<div class="quality-item pass">TTS 引擎：' + (ttsStrategy.providerLabel || "未设置") + '</div>',
             '<div class="quality-item pass">音色策略：' + (ttsStrategy.cloningLabel || "未设置") + '</div>',
+            '<div class="quality-item pass">路线定位：' + (ttsStrategy.routeRoleLabel || "未设置") + '</div>',
             '<div class="quality-item pass">部署策略：' + (ttsStrategy.deploymentLabel || "未设置") + '</div>',
+            '<div class="quality-item pass">验收提示：' + (ttsStrategy.acceptanceHint || "未设置") + '</div>',
+          ].join("");
+
+          if (!detail?.routeOutcomeSummary) {
+            jobRouteOutcomeSummary.innerHTML = '<div class="summary-item empty">任务完成后，这里会按当前 TTS 路线解释质量重点、成本理解方式和验收优先级。</div>';
+            return;
+          }
+
+          jobRouteOutcomeSummary.innerHTML = [
+            '<div class="quality-item pass">质量重点：' + (detail.routeOutcomeSummary.qualityFocusLabel || "未设置") + '</div>',
+            '<div class="quality-item pass">成本解读：' + (detail.routeOutcomeSummary.costInterpretationLabel || "未设置") + '</div>',
+            '<div class="quality-item pass">验收优先级：' + (detail.routeOutcomeSummary.acceptancePriorityLabel || "未设置") + '</div>',
+          ].join("");
+
+          if (!detail?.resilienceSummary) {
+            jobResilienceSummary.innerHTML = '<div class="summary-item empty">任务完成后，这里会解释当前产物是否来自 fallback、该如何判断是否需要重跑。</div>';
+            return;
+          }
+
+          jobResilienceSummary.innerHTML = [
+            '<div class="quality-item pass">渲染来源：' + (detail.resilienceSummary.renderSourceLabel || "未设置") + '</div>',
+            '<div class="quality-item pass">兜底解读：' + (detail.resilienceSummary.fallbackInterpretationLabel || "未设置") + '</div>',
+            '<div class="quality-item pass">重跑建议：' + (detail.resilienceSummary.rerunRecommendationLabel || "未设置") + '</div>',
           ].join("");
         }
 
         function renderJobSnapshot(snapshot) {
+          if (snapshot?.jobId) {
+            currentJobId = snapshot.jobId;
+          }
+          syncArtifactPanels();
           jobStatus.textContent = JSON.stringify(snapshot, null, 2);
           jobStatus.className = "";
           if (jobReadableSnapshot) {
@@ -2761,6 +3093,28 @@ ${sharedPageStyles}
           if (snapshot.currentStep) {
             jobStepChip.textContent = snapshot.currentStep;
           }
+        }
+
+        function formatEventStateLabel(state) {
+          const stateMap = {
+            PARSING: "解析脚本",
+            AI_PROCESSING: "整理分镜",
+            ASSEMBLING: "组装时间线",
+            RENDERING: "输出成片",
+            COMPLETED: "任务完成",
+            FAILED: "任务失败",
+            INTERRUPTED: "任务中断",
+          };
+          return stateMap[state] || state || "任务更新";
+        }
+
+        function formatEventNarration(payload) {
+          const label = formatEventStateLabel(payload.state);
+          const message = (payload.message || "").trim();
+          if (!message) {
+            return label;
+          }
+          return label + "： " + message;
         }
 
         function getWizardStepStatuses(jobState) {
@@ -2809,22 +3163,34 @@ ${sharedPageStyles}
 
         function renderSummary(summary) {
           summaryList.innerHTML = "";
-          const displayChecklist =
+          const completedItems =
             CURRENT_STEP_ID === "asset_intake"
               ? [
-                  "脚本结构已能提取标题、开场抓手、摘要和行动引导。",
-                  "自动识别分段已生成可读的口播、画面建议和时长。",
-                  "可以进入下一步分镜确认，不必再手填内部字段。",
+                  "脚本已能自动提取标题、开场抓手、摘要和行动引导。",
+                  "自动识别分段会直接生成“这一段说什么、建议画面、建议时长”的大白话预览。",
+                  "素材页只保留声音方向摘要，试听和应用动作已经集中到第 4 步。",
                 ]
               : CURRENT_STEP_ID === "voice_generation"
                 ? [
-                    "脚本内容已稳定，可直接选择或应用声音方案。",
-                    "声音方案会在本步集中试听和确认，不再分散到素材页。",
-                    "确认声音后即可进入合成预览。",
+                    "脚本内容已稳定，可以专注确认声音，而不是继续补脚本字段。",
+                    "试听、应用、上传参考音频和录音都集中在这一页完成。",
+                    "当前选中的引擎路线会同步到任务创建与后续渲染链路。",
                   ]
-                : summary.checklist;
+                : CURRENT_STEP_ID === "video_assembly"
+                  ? [
+                      "已经从脚本视角切换到任务视角，右侧重点开始变成进度、预览和产物状态。",
+                      "SSE 事件会持续写入最近关键进度，避免被无关交互刷屏。",
+                      "任务完成后会在当前页直接出现 MP4 预览和标准化产物摘要。",
+                    ]
+                  : CURRENT_STEP_ID === "preview_publish"
+                    ? [
+                        "当前页以最终交付为中心，不再强调脚本解释，而是强调成品是否可验收。",
+                        "质量、成本、声音策略和预览已经归并到同一块产物信息区。",
+                        "你可以直接用这里的信息做人工验收与发布前检查。",
+                      ]
+                    : summary.checklist;
 
-          displayChecklist.forEach((text, index) => {
+          completedItems.forEach((text, index) => {
             const item = document.createElement("div");
             item.className = "quality-item " + (index < 4 ? "pass" : "warn");
             item.textContent = text;
@@ -2842,6 +3208,20 @@ ${sharedPageStyles}
               ? (customVoiceReferenceInput?.value?.trim() ? 5 : 4)
               : Math.max(42, Math.min(96, 58 + summary.estimatedScenes * 6 + Math.min(14, Math.floor(summary.scriptCharacters / 80))));
           qualityScore.textContent = String(score);
+        }
+
+        function syncArtifactPanels() {
+          const showArtifactSections = CURRENT_STEP_ID === "video_assembly" || CURRENT_STEP_ID === "preview_publish" || Boolean(currentJobId);
+          if (artifactSupportNote) {
+            artifactSupportNote.textContent = showArtifactSections
+              ? "这里开始以真实任务与产物为主：看进度、预览、质量、成本和声音策略。"
+              : "当前还没进入产物验收阶段。先把脚本、分镜或声音方案确认好，等任务创建后再看质量、成本和预览结果。";
+          }
+          if (jobQualitySection) jobQualitySection.hidden = !showArtifactSections;
+          if (jobCostSection) jobCostSection.hidden = !showArtifactSections;
+          if (jobTtsStrategySection) jobTtsStrategySection.hidden = !showArtifactSections;
+          if (jobRouteOutcomeSection) jobRouteOutcomeSection.hidden = !showArtifactSections;
+          if (jobResilienceSection) jobResilienceSection.hidden = !showArtifactSections;
         }
 
         function splitScenes(text, mode) {
@@ -2899,6 +3279,7 @@ ${sharedPageStyles}
 
         async function sync() {
           const payload = collect();
+          syncArtifactPanels();
           currentModeChip.textContent = clientScriptModeLabel(payload.scriptMode || "plain_text");
           currentProfileChip.textContent = clientProfileLabel(payload.renderProfile || "standard");
           renderDerivedStructure(payload.scriptText || "");
@@ -2975,15 +3356,23 @@ ${sharedPageStyles}
             const selectedVoiceMode = card?.getAttribute("data-voice-mode");
             if (!selectedVoiceMode) return;
             const voiceName = card?.querySelector("strong")?.textContent?.trim() || "当前声音";
+            const inferredProviderId = inferProviderIdByVoiceMode(selectedVoiceMode);
             setButtonState(event.currentTarget, "应用中...", true);
             setInlineStatus(presetVoiceStatus, "正在应用：" + voiceName, "busy");
             document.getElementById("voiceMode").value = selectedVoiceMode;
-            document.getElementById("ttsProviderId").value = inferProviderIdByVoiceMode(selectedVoiceMode);
+            document.getElementById("ttsProviderId").value = inferredProviderId;
             markActiveVoiceCard(card);
             setHeroStatus("应用声音中", "busy");
             syncVoiceStatus();
             await sync();
-            setInlineStatus(presetVoiceStatus, "已应用：" + voiceName, "success");
+            const routeConfig = getRouteBehaviorConfig(inferredProviderId, selectedVoiceMode);
+            setInlineStatus(
+              presetVoiceStatus,
+              routeConfig.previewAllowed
+                ? "已应用：" + voiceName
+                : "已应用：" + voiceName + "。这条路线更适合创建任务后验收最终声音。",
+              "success",
+            );
             setHeroStatus("声音已应用", "ok");
             resetButtonState(event.currentTarget);
             event.currentTarget.textContent = "已应用";
@@ -3133,6 +3522,13 @@ ${sharedPageStyles}
             const name = card?.querySelector("strong")?.textContent?.trim() || "当前声音";
             const voiceMode = card?.getAttribute("data-voice-mode");
             if (!voiceMode) return;
+            const providerId = inferProviderIdByVoiceMode(voiceMode);
+            const routeConfig = getRouteBehaviorConfig(providerId, voiceMode);
+            if (!routeConfig.previewAllowed) {
+              appendEvent("当前路线不建议直接试听：" + name);
+              setInlineStatus(presetVoiceStatus, "这条路线更适合创建任务后听最终结果。", "warn");
+              return;
+            }
 
             setButtonState(event.currentTarget, "试听中...", true);
             setInlineStatus(presetVoiceStatus, "正在加载试听：" + name, "busy");
@@ -3153,6 +3549,20 @@ ${sharedPageStyles}
             appendEvent("正在试听：" + name);
             setInlineStatus(presetVoiceStatus, "正在试听：" + name, "success");
             resetButtonState(event.currentTarget);
+          });
+        });
+        document.querySelectorAll(".provider-strategy-card").forEach((card) => {
+          card.addEventListener("click", async () => {
+            const providerId = card.getAttribute("data-provider-id");
+            if (!providerId) return;
+            document.getElementById("ttsProviderId").value = providerId;
+            if (ttsProviderSelect) {
+              ttsProviderSelect.value = providerId;
+            }
+            syncVoiceStatus();
+            saveDraftToStorage();
+            appendEvent("已切换 TTS 路线：" + providerId);
+            await sync();
           });
         });
         createJobBtn?.addEventListener("click", async () => {
@@ -3180,6 +3590,8 @@ ${sharedPageStyles}
           }
 
           renderErrors([]);
+          currentJobId = result.job.id;
+          syncArtifactPanels();
           currentTaskChip.textContent = result.job.id;
           renderJobSnapshot({
             jobId: result.job.id,
@@ -3232,7 +3644,7 @@ ${sharedPageStyles}
               setWorkflowStatus("任务处理中", "系统正在持续推进当前任务，可在右侧查看阶段、预览和产物状态。");
               syncGateAssistant("processing_job");
             }
-            appendEvent(payload.state + " • " + payload.message);
+            appendEvent(formatEventNarration(payload));
             if (payload.state === "COMPLETED" || payload.state === "FAILED" || payload.state === "INTERRUPTED") {
               resetButtonState(createJobBtn);
               if (payload.state === "COMPLETED") {
@@ -3386,6 +3798,21 @@ ${sharedPageStyles}
         border-radius: 999px;
         background: linear-gradient(90deg, #ff7a59, #1f7a8c);
       }
+      .job-summary-grid {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .job-summary-chip {
+        display: block;
+        border-radius: 12px;
+        background: rgba(20,33,61,.05);
+        border: 1px solid rgba(20,33,61,.08);
+        padding: 8px 10px;
+        font-size: 12px;
+        color: var(--muted);
+        text-align: left;
+      }
       .detail-card { display: grid; gap: 14px; }
       .detail-grid { margin-top: 6px; }
       .detail-kv {
@@ -3447,6 +3874,14 @@ ${sharedPageStyles}
               <div class="detail-list" id="ttsStrategySummary"></div>
             </div>
             <div class="summary-item">
+              <b style="display:block;margin-bottom:8px">结果解读建议</b>
+              <div class="detail-list" id="routeOutcomeSummary"></div>
+            </div>
+            <div class="summary-item">
+              <b style="display:block;margin-bottom:8px">兜底与重跑建议</b>
+              <div class="detail-list" id="resilienceSummary"></div>
+            </div>
+            <div class="summary-item">
               <b style="display:block;margin-bottom:8px">原始检查点</b>
               <pre id="checkpointSummary"></pre>
             </div>
@@ -3498,6 +3933,11 @@ ${sharedPageStyles}
                 '<span>TTS：' + job.ttsProviderLabel + '</span>' +
                 '<span>•</span>' +
                 '<span>路线：' + job.ttsRouteLabel + '</span>' +
+              '</div>',
+              '<div class="job-summary-grid">' +
+                '<div class="job-summary-chip">路线定位：' + job.routeRoleLabel + '</div>' +
+                '<div class="job-summary-chip">渲染来源：' + job.renderSourceLabel + '</div>' +
+                '<div class="job-summary-chip">当前建议：' + job.rerunRecommendationLabel + '</div>' +
               '</div>',
               '<div class="progress-bar"><div class="progress-fill" style="width:' + job.progressLabel + ';"></div></div>',
               '<div class="hint" style="margin-top:8px">任务进度 ' + job.progressLabel + '</div>'
@@ -3553,8 +3993,20 @@ ${sharedPageStyles}
             '声音模式：' + detail.ttsStrategySummary.voiceModeLabel,
             'TTS 引擎：' + detail.ttsStrategySummary.providerLabel,
             '声音路线：' + detail.ttsStrategySummary.routeLabel,
+            '路线定位：' + detail.ttsStrategySummary.routeRoleLabel,
             '声音应用方式：' + detail.ttsStrategySummary.cloningLabel,
             '部署策略：' + detail.ttsStrategySummary.deploymentLabel,
+            '验收提示：' + detail.ttsStrategySummary.acceptanceHint,
+          ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
+          document.getElementById("routeOutcomeSummary").innerHTML = [
+            '质量重点：' + detail.routeOutcomeSummary.qualityFocusLabel,
+            '成本解读：' + detail.routeOutcomeSummary.costInterpretationLabel,
+            '验收优先级：' + detail.routeOutcomeSummary.acceptancePriorityLabel,
+          ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
+          document.getElementById("resilienceSummary").innerHTML = [
+            '渲染来源：' + detail.resilienceSummary.renderSourceLabel,
+            '兜底解读：' + detail.resilienceSummary.fallbackInterpretationLabel,
+            '重跑建议：' + detail.resilienceSummary.rerunRecommendationLabel,
           ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
           document.getElementById("checkpointSummary").textContent = detail.checkpointSummary;
           document.getElementById("errorSummary").innerHTML = detail.errorSummary
@@ -3967,18 +4419,64 @@ function mergeCheckpoint(base, patch) {
   };
 }
 
+function getLifecycleStepNarration(job) {
+  const routeRole = job?.record?.lastCheckpoint && typeof job.record.lastCheckpoint === "object"
+    ? job.record.lastCheckpoint.ttsRouteRoleLabel
+    : undefined;
+
+  return [
+    {
+      state: "PARSING",
+      progress: 12,
+      step: "parse_manifest",
+      message:
+        routeRole === "高拟真正式产线"
+          ? "正在校对正式产线输入，准备后续高拟真渲染链路。"
+          : routeRole === "自定义声音保真路线"
+            ? "正在解析脚本并检查自定义声音任务所需的基础输入。"
+            : "正在读取脚本和任务配置，准备进入视频生产流程。",
+    },
+    {
+      state: "AI_PROCESSING",
+      progress: 34,
+      step: "storyboard_ready",
+      message:
+        routeRole === "高拟真正式产线"
+          ? "正在整理分镜与正式产线素材包，优先保证最终成片质量。"
+          : routeRole === "低成本兜底路线"
+            ? "正在准备轻量化素材包，优先保证可交付和生成速度。"
+            : "正在整理分镜和素材计划，准备后续画面与声音生产。",
+    },
+    {
+      state: "ASSEMBLING",
+      progress: 58,
+      step: "build_timeline",
+      message:
+        routeRole === "自定义声音保真路线"
+          ? "正在组装时间线并对齐自定义声音参考，优先保证音色一致性。"
+          : "正在组装时间线、画面和本地资产，准备进入最终渲染。",
+    },
+    {
+      state: "RENDERING",
+      progress: 82,
+      step: "ffmpeg_render",
+      message:
+        routeRole === "高拟真正式产线"
+          ? "正在输出正式成片，请重点等待最终视频而不是中间试听结论。"
+          : routeRole === "低成本兜底路线"
+            ? "正在输出当前兜底成片，稍后请优先确认是否可继续交付。"
+            : "正在输出 MP4 成片，稍后可以直接预览并进入人工验收。",
+    },
+  ];
+}
+
 async function runCreatedJobLifecycle(jobId) {
   const job = getCreatedJob(jobId);
   if (!job) {
     return;
   }
 
-  const steps = [
-    { state: "PARSING", progress: 12, step: "parse_manifest", message: "Parsing submitted script" },
-    { state: "AI_PROCESSING", progress: 34, step: "storyboard_ready", message: "Preparing storyboard package" },
-    { state: "ASSEMBLING", progress: 58, step: "build_timeline", message: "Building timeline and local assets" },
-    { state: "RENDERING", progress: 82, step: "ffmpeg_render", message: "Rendering MP4 with FFmpeg" },
-  ];
+  const steps = getLifecycleStepNarration(job);
 
   for (const item of steps) {
     updateCreatedJob(jobId, (current) => ({
@@ -3993,6 +4491,7 @@ async function runCreatedJobLifecycle(jobId) {
           step: item.step,
           progress: item.progress,
           storyboardScenes: current.storyboard.summary.totalScenes,
+          stageNarration: item.message,
         }),
       },
     }));
@@ -4034,6 +4533,10 @@ async function runCreatedJobLifecycle(jobId) {
           progress: 100,
           previewUrl: rendered.previewUrl,
           provider: rendered.providerMetadata.provider,
+          stageNarration:
+            rendered.providerMetadata.mode === "fallback"
+              ? "任务已完成，但当前成片来自 fallback 渲染链路，请结合路线目标判断是否需要重跑。"
+              : "任务已完成，当前成片来自正式主链路，可以进入人工验收。",
           probe: rendered.probe ?? null,
         }),
         qualitySummary: {

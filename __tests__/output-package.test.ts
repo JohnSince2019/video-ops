@@ -63,6 +63,8 @@ test("metadata.json contains platform metadata, render profile, duration, and as
     ttsRouteSummary: {
       providerId: "cosyvoice-mlx",
       routeLabel: "默认中文解说路线",
+      routeRoleLabel: "第一阶段默认主链路",
+      acceptanceHint: "可以先在工作台即时试听，再结合最终产物确认自然度和清晰度。",
       voiceLabel: "zh-CN-male-yunze",
     },
   });
@@ -75,6 +77,8 @@ test("metadata.json contains platform metadata, render profile, duration, and as
   assert.equal(parsed.coverPath, "output/cover.png");
   assert.equal(parsed.ttsRouteSummary.providerId, "cosyvoice-mlx");
   assert.equal(parsed.ttsRouteSummary.routeLabel, "默认中文解说路线");
+  assert.equal(parsed.ttsRouteSummary.routeRoleLabel, "第一阶段默认主链路");
+  assert.match(parsed.ttsRouteSummary.acceptanceHint, /即时试听/);
 });
 
 test("returns explicit errors for missing video, cover, and metadata inputs", () => {

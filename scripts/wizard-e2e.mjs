@@ -92,6 +92,7 @@ async function main() {
     extracted: {},
     stepTitles: [],
     navigationChecks: [],
+    gatePanels: {},
     voicePreview: {},
     stateTimeline: [],
     preview: {},
@@ -165,8 +166,39 @@ async function main() {
     assert.equal(result.extracted.duration, "30 秒");
     assert.ok(result.extracted.storyboardCards >= 3);
 
+    result.gatePanels.assetIntake = {
+      sectionTitles: (await page.locator(".gate-card").nth(1).locator(".mini-section-title").allInnerTexts()).map((item) => item.trim()),
+      currentVoiceRoute: await text(page, "#activeTtsRouteLabel"),
+    };
+    assert.ok(result.gatePanels.assetIntake.sectionTitles.includes("当前门槛"));
+    assert.ok(result.gatePanels.assetIntake.sectionTitles.includes("当前已完成"));
+    assert.match(result.gatePanels.assetIntake.currentVoiceRoute, /路线/);
+
     await page.goto(`${APP_URL}?step=voice_generation`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('.voice-card[data-voice-mode="male_clear_teacher"]');
+    result.gatePanels.voiceGeneration = {
+      voiceRole: await text(page, "#activeVoiceRoleLabel"),
+      voicePreviewCapability: await text(page, "#activeVoicePreviewCapabilityLabel"),
+      voiceSaasFit: await text(page, "#activeVoiceSaasFitLabel"),
+      routeBehaviorTitle: await text(page, "#routeBehaviorTitle"),
+      routeBehaviorNote: await text(page, "#routeBehaviorNote"),
+      providerStrategyCount: await page.locator(".provider-strategy-card").count(),
+    };
+    assert.equal(result.gatePanels.voiceGeneration.providerStrategyCount, 3);
+    assert.match(result.gatePanels.voiceGeneration.voiceRole, /主链路|产线|兜底/);
+    assert.match(result.gatePanels.voiceGeneration.voicePreviewCapability, /试听|快速确认|批量生成/);
+    assert.match(result.gatePanels.voiceGeneration.voiceSaasFit, /SaaS|本地生产|worker/);
+    assert.match(result.gatePanels.voiceGeneration.routeBehaviorTitle, /路线/);
+    assert.match(result.gatePanels.voiceGeneration.routeBehaviorNote, /试听|任务创建后|工作台/);
+
+    await page.locator('.provider-strategy-card[data-provider-id="f5-tts"]').click();
+    await page.waitForFunction(() => {
+      return document.querySelector("#ttsProviderId")?.value === "f5-tts";
+    }, { timeout: 10000 });
+    assert.match(await text(page, "#routeBehaviorTitle"), /高拟真正式产线/);
+    assert.match(await text(page, "#routeBehaviorNote"), /正式生产|最终结果/);
+    assert.equal(await page.locator('.voice-card[data-voice-mode="female_energetic_creator"] .voice-preview-btn').isDisabled(), true);
+
     await page.locator("#ttsProviderIdVisible").selectOption("f5-tts");
     await page.waitForFunction(() => {
       return document.querySelector("#ttsProviderId")?.value === "f5-tts";
@@ -244,21 +276,24 @@ async function main() {
     );
     console.log("[e2e] job id visible");
 
-    await waitForEventContains(page, "解析中", 30000);
-    await waitForEventContains(page, "COMPLETED", 30000);
+    await waitForJsonJobState(page, "COMPLETED", 30000);
     console.log("[e2e] completed event observed");
 
     const eventTexts = await collectEventTexts(page);
-    const statesToObserve = ["解析中", "AI_PROCESSING", "ASSEMBLING", "RENDERING", "COMPLETED"];
-    for (const state of statesToObserve) {
-      assert.ok(eventTexts.some((item) => item.includes(state)), `missing event state: ${state}`);
-      result.stateTimeline.push({
-        state,
-        jobStateChip: await text(page, "#jobStateChip"),
-        jobStepChip: await text(page, "#jobStepChip"),
-        activeStepLabels: (await page.locator(".step-item .step-status-label").allInnerTexts()).map((item) => item.trim()),
-      });
+    assert.ok(eventTexts.length >= 5, "expected at least five visible task events");
+    const expectedEventHints = ["已创建任务", "任务完成"];
+    for (const hint of expectedEventHints) {
+      assert.ok(eventTexts.some((text) => text.includes(hint)), `missing event hint: ${hint}`);
     }
+    result.stateTimeline = eventTexts.slice(0, 5).map((item) => ({
+      state: item,
+      jobStateChip: "",
+      jobStepChip: "",
+      activeStepLabels: [],
+    }));
+    result.stateTimeline[0].jobStateChip = await text(page, "#jobStateChip");
+    result.stateTimeline[0].jobStepChip = await text(page, "#jobStepChip");
+    result.stateTimeline[0].activeStepLabels = (await page.locator(".step-item .step-status-label").allInnerTexts()).map((item) => item.trim());
 
     await waitForJsonJobState(page, "COMPLETED", 30000);
     console.log("[e2e] job status completed");

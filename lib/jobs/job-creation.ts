@@ -74,6 +74,45 @@ function toManifest(draft: WizardConfigDraft) {
   });
 }
 
+function resolveTtsRouteTier(draft: WizardConfigDraft) {
+  if (draft.customVoiceReference) {
+    return "identity_clone";
+  }
+  if (draft.ttsProviderId === "f5-tts") {
+    return "premium_production";
+  }
+  if (draft.ttsProviderId === "melotts") {
+    return "cost_fallback";
+  }
+  return "default_production";
+}
+
+function resolveTtsRouteRoleLabel(draft: WizardConfigDraft) {
+  if (draft.customVoiceReference) {
+    return "自定义声音保真路线";
+  }
+  if (draft.ttsProviderId === "f5-tts") {
+    return "高拟真正式产线";
+  }
+  if (draft.ttsProviderId === "melotts") {
+    return "低成本兜底路线";
+  }
+  return "第一阶段默认主链路";
+}
+
+function resolveTtsAcceptanceHint(draft: WizardConfigDraft) {
+  if (draft.customVoiceReference) {
+    return "先确认参考音频是否足够稳定，再重点验收音色一致性和辨识度。";
+  }
+  if (draft.ttsProviderId === "f5-tts") {
+    return "更适合听最终产物效果，不以页面即时试听作为主要验收方式。";
+  }
+  if (draft.ttsProviderId === "melotts") {
+    return "重点验收节奏和可用性，不把它当作高拟真最终音色标准。";
+  }
+  return "可以先在工作台即时试听，再结合最终产物确认自然度和清晰度。";
+}
+
 function buildStoryboard(manifest: SceneGraph) {
   return buildStoryboardPreview({
     scenes: manifest.scenes.map((scene) => ({
@@ -101,6 +140,9 @@ function buildInitialRecord(input: {
   const outputPaths = buildJobAssetPaths(input.jobId);
   const compliance = runComplianceGuard(input.draft.scriptText);
   const ttsRouteLabel = input.manifest.metadata.tts_route_label ?? "默认中文解说路线";
+  const ttsRouteTier = resolveTtsRouteTier(input.draft);
+  const ttsRouteRoleLabel = resolveTtsRouteRoleLabel(input.draft);
+  const ttsAcceptanceHint = resolveTtsAcceptanceHint(input.draft);
   const ttsDurationSecs = Math.round(
     input.manifest.scenes.reduce((total, scene) => total + scene.duration_ms, 0) / 1000,
   );
@@ -127,6 +169,9 @@ function buildInitialRecord(input: {
       ttsVoice: input.draft.ttsVoice,
       ttsProviderId: input.draft.ttsProviderId,
       ttsRouteLabel,
+      ttsRouteTier,
+      ttsRouteRoleLabel,
+      ttsAcceptanceHint,
     },
     qualitySummary: {
       fileSizeBytes: null,

@@ -31,6 +31,8 @@ test("creates a queued job, manifest, storyboard, and output paths from a plain 
   assert.equal(created.manifest.metadata.tts_provider_id, "cosyvoice-mlx");
   assert.equal(created.manifest.metadata.tts_route_label, "默认中文解说路线");
   assert.equal(checkpoint?.ttsProviderId, "cosyvoice-mlx");
+  assert.match(JSON.stringify(created.record.lastCheckpoint), /第一阶段默认主链路/);
+  assert.match(JSON.stringify(created.record.lastCheckpoint), /即时试听|自然度/);
   assert.equal(created.storyboard.summary.totalScenes, 2);
   assert.equal(created.outputPaths.videoPath.includes(`/jobs/${created.record.id}/video.mp4`), true);
 });
@@ -74,6 +76,28 @@ test("creates a manifest from markdown drafts and records style/voice checkpoint
   assert.equal(checkpoint?.ttsProviderId, "cosyvoice-mlx");
 });
 
+test("premium production route stores route role and acceptance hint in checkpoint metadata", () => {
+  const draft = normalizeWizardConfig({
+    title: "Premium Route Demo",
+    platform: "douyin",
+    renderProfile: "high_quality",
+    author: "John",
+    ownerToken: "owner-premium-route-001",
+    scriptText: "第一段：这是正式产线任务。",
+    scriptMode: "plain_text",
+    stylePreset: "john_vertical_comic",
+    personaPreset: "john_persona_v1",
+    voiceMode: "female_energetic_creator",
+  });
+
+  const created = createVideoJobFromDraft(draft);
+
+  assert.equal(created.manifest.metadata.tts_provider_id, "f5-tts");
+  assert.equal(created.manifest.metadata.tts_route_label, "高拟真 SaaS 生产路线");
+  assert.match(JSON.stringify(created.record.lastCheckpoint), /高拟真正式产线/);
+  assert.match(JSON.stringify(created.record.lastCheckpoint), /最终产物效果/);
+});
+
 test("custom voice reference is preserved in job checkpoint metadata", () => {
   const draft = normalizeWizardConfig({
     title: "Custom Voice Demo",
@@ -96,5 +120,7 @@ test("custom voice reference is preserved in job checkpoint metadata", () => {
   assert.match(JSON.stringify(created.record.lastCheckpoint), /custom-reference-voice/);
   assert.equal(checkpoint?.ttsProviderId, "cosyvoice-mlx");
   assert.equal(created.manifest.metadata.tts_route_label, "自定义声音克隆路线");
+  assert.match(JSON.stringify(created.record.lastCheckpoint), /自定义声音保真路线/);
+  assert.match(JSON.stringify(created.record.lastCheckpoint), /音色一致性和辨识度/);
   assert.equal(created.manifest.scenes[0]?.audio.reference_audio_path?.endsWith("john-custom-reference.wav"), true);
 });
