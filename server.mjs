@@ -16,9 +16,11 @@ import {
 } from "./lib/ui/storyboard-preview.ts";
 import { normalizeWizardConfig, summarizeWizardConfig, validateWizardConfig } from "./lib/ui/wizard-config.ts";
 import { renderZenPageShell } from "./lib/ui/zen-shell.ts";
+import { createVideoJobFromDraft } from "./lib/jobs/job-creation.ts";
 
 const port = Number(process.env.PORT ?? 3003);
 const channel = new JobProgressChannel();
+const createdJobs = new Map();
 
 const sharedPageStyles = `
   .layout {
@@ -316,6 +318,7 @@ function renderWizardPage() {
           </div>
           <div class="actions">
             <button class="primary" id="validateBtn">Validate Draft</button>
+            <button class="secondary" id="createJobBtn">Create Job</button>
             <button class="secondary" id="loadDemoBtn">Load Demo Content</button>
           </div>
         </section>
@@ -332,6 +335,10 @@ function renderWizardPage() {
             <b style="display:block;margin-bottom:8px">Normalized Draft JSON</b>
             <pre id="draftJson" class="empty">No valid draft yet.</pre>
           </div>
+          <div class="summary-item" style="margin-top:14px">
+            <b style="display:block;margin-bottom:8px">Current Job</b>
+            <pre id="jobStatus" class="empty">No job created yet.</pre>
+          </div>
         </aside>
       </section>
 
@@ -341,11 +348,18 @@ function renderWizardPage() {
         const summaryList = document.getElementById("summaryList");
         const errorList = document.getElementById("errorList");
         const draftJson = document.getElementById("draftJson");
+        const jobStatus = document.getElementById("jobStatus");
         const estimatedScenes = document.getElementById("estimatedScenes");
         const scriptCharacters = document.getElementById("scriptCharacters");
+        let activeEventSource = null;
 
         function collect() {
           return Object.fromEntries(ids.map((id) => [id, document.getElementById(id).value]));
+        }
+
+        function renderJobSnapshot(snapshot) {
+          jobStatus.textContent = JSON.stringify(snapshot, null, 2);
+          jobStatus.className = "";
         }
 
         function renderErrors(errors) {
@@ -404,6 +418,48 @@ function renderWizardPage() {
         });
 
         document.getElementById("validateBtn").addEventListener("click", sync);
+        document.getElementById("createJobBtn").addEventListener("click", async () => {
+          const payload = collect();
+          const response = await fetch("/api/jobs", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const result = await response.json();
+
+          if (!response.ok || !result.ok) {
+            renderErrors([result.error || "Job creation failed."]);
+            return;
+          }
+
+          renderErrors([]);
+          renderJobSnapshot({
+            jobId: result.job.id,
+            state: result.job.state,
+            progress: result.job.progress,
+            currentStep: result.job.currentStep,
+            storyboardScenes: result.storyboard.summary.totalScenes,
+          });
+
+          if (activeEventSource) {
+            activeEventSource.close();
+          }
+
+          activeEventSource = new EventSource("/events?jobId=" + result.job.id);
+          activeEventSource.addEventListener("job-progress", async (event) => {
+            const payload = JSON.parse(event.data);
+            const detailResponse = await fetch("/api/jobs/" + payload.jobId);
+            const detail = await detailResponse.json();
+            renderJobSnapshot({
+              jobId: payload.jobId,
+              state: payload.state,
+              progress: payload.progress,
+              currentStep: payload.step,
+              message: payload.message,
+              outputs: detail.outputsSummary,
+            });
+          });
+        });
         document.getElementById("loadDemoBtn").addEventListener("click", async () => {
           document.getElementById("title").value = "AI 工具如何让研发效率提升 3 倍";
           document.getElementById("author").value = "John";
@@ -981,6 +1037,74 @@ function pushDemoSequence(sequence) {
   }
 }
 
+function storeCreatedJob(job) {
+  createdJobs.set(job.record.id, job);
+  return job;
+}
+
+function getCreatedJob(jobId) {
+  return createdJobs.get(jobId);
+}
+
+function updateCreatedJob(jobId, updater) {
+  const existing = createdJobs.get(jobId);
+  if (!existing) {
+    return undefined;
+  }
+
+  const next = updater(existing);
+  createdJobs.set(jobId, next);
+  return next;
+}
+
+function emitJobProgress(jobId, state, progress, step, message, meta = {}) {
+  return channel.emit(
+    createJobProgressPayload({
+      jobId,
+      state,
+      progress,
+      step,
+      message,
+      meta,
+      timestamp: new Date().toISOString(),
+    }),
+  );
+}
+
+function scheduleCreatedJobProgress(jobId) {
+  const sequence = [
+    { state: "PARSING", progress: 12, step: "parse_manifest", message: "Parsing submitted script" },
+    { state: "AI_PROCESSING", progress: 42, step: "storyboard_ready", message: "Preparing storyboard package" },
+    { state: "ASSEMBLING", progress: 68, step: "package_outputs", message: "Assembling job output bundle" },
+    { state: "RENDERING", progress: 88, step: "waiting_for_renderer", message: "Waiting for renderer stage" },
+    { state: "COMPLETED", progress: 100, step: "done", message: "Job prepared for rendering handoff" },
+  ];
+
+  sequence.forEach((item, index) => {
+    setTimeout(() => {
+      updateCreatedJob(jobId, (current) => ({
+        ...current,
+        record: {
+          ...current.record,
+          state: item.state,
+          progress: item.progress,
+          currentStep: item.step,
+          updatedAt: new Date().toISOString(),
+          lastCheckpoint: {
+            step: item.step,
+            progress: item.progress,
+            storyboardScenes: current.storyboard.summary.totalScenes,
+          },
+        },
+      }));
+
+      emitJobProgress(jobId, item.state, item.progress, item.step, item.message, {
+        storyboardScenes: getCreatedJob(jobId)?.storyboard.summary.totalScenes ?? 0,
+      });
+    }, index * 250);
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
 
@@ -1034,8 +1158,51 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/jobs") {
+    try {
+      const payload = await readJsonBody(req);
+      const validation = validateWizardConfig(payload);
+      if (!validation.valid) {
+        sendJson(res, 400, { ok: false, error: validation.errors.join(" | ") });
+        return;
+      }
+
+      const draft = normalizeWizardConfig(payload);
+      const created = storeCreatedJob(createVideoJobFromDraft(draft));
+      scheduleCreatedJobProgress(created.record.id);
+
+      sendJson(res, 201, {
+        ok: true,
+        job: {
+          id: created.record.id,
+          state: created.record.state,
+          progress: created.record.progress,
+          currentStep: created.record.currentStep,
+        },
+        storyboard: created.storyboard,
+        manifest: created.manifest,
+      });
+    } catch (error) {
+      sendJson(res, 400, {
+        ok: false,
+        error: error instanceof Error ? error.message : "Invalid job payload",
+      });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname.startsWith("/api/jobs/")) {
     const jobId = url.pathname.replace("/api/jobs/", "");
+    const created = getCreatedJob(jobId);
+    if (created) {
+      sendJson(res, 200, {
+        ...buildJobDetailView(created.record),
+        storyboard: created.storyboard,
+        manifest: created.manifest,
+        outputPaths: created.outputPaths,
+      });
+      return;
+    }
     const record = demoJobs.find((job) => job.id === jobId);
     if (!record) {
       sendJson(res, 404, { ok: false, error: "Job not found" });
