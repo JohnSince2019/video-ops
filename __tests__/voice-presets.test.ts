@@ -22,7 +22,7 @@ test("voice preset registry exposes five stable voice presets", () => {
 test("custom voice mode and authorization notice are exposed explicitly", () => {
   assert.equal(isCustomVoiceMode(CUSTOM_VOICE_MODE), true);
   assert.equal(isCustomVoiceMode("male_coach_deep"), false);
-  assert.match(getCustomVoiceAuthorizationNotice(), /explicit permission/i);
+  assert.match(getCustomVoiceAuthorizationNotice(), /明确获得授权|未授权/);
 });
 
 test("wizard config defaults to the John coach male preset and validates custom reference mode", () => {

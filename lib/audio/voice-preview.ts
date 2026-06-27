@@ -144,6 +144,8 @@ export function getVoicePreviewMeta(voiceMode: VoiceMode) {
       label: "自定义声音参考",
       sampleText: PREVIEW_TEXT,
       isPreviewPlaceholder: false,
+      previewPurposeLabel: "直接回放你上传或录入的参考声音",
+      qualityNote: "这里播放的是你的原始参考声音，用来确认音色身份，不代表最终 TTS 成片已经生成。",
     };
   }
 
@@ -153,6 +155,8 @@ export function getVoicePreviewMeta(voiceMode: VoiceMode) {
     label: preset.label,
     sampleText: PREVIEW_TEXT,
     isPreviewPlaceholder: false,
+    previewPurposeLabel: "快速确认预设音色、语速和讲解气质",
+    qualityNote: "这是工作台试听样本，用来定声音方向；最终任务成片仍以任务创建后的正式 TTS 结果为准。",
   };
 }
 
@@ -167,6 +171,7 @@ export async function ensureVoicePreviewAsset(input: {
       outputPath: buildCustomVoiceReferenceAbsolutePath(customVoiceReference),
       relativeUrl: `/api/custom-voice-reference/file/${encodeURIComponent(customVoiceReference)}`,
       usedFallback: false,
+      previewSource: "custom_reference",
     };
   }
 
@@ -180,6 +185,7 @@ export async function ensureVoicePreviewAsset(input: {
       outputPath,
       relativeUrl: `/api/voice-preview/file/${outputFilename}`,
       usedFallback: false,
+      previewSource: "system_preview_cache",
     };
   }
 
@@ -195,6 +201,7 @@ export async function ensureVoicePreviewAsset(input: {
       outputPath,
       relativeUrl: `/api/voice-preview/file/${outputFilename}`,
       usedFallback: true,
+      previewSource: "generated_fallback_preview",
     };
   }
 
@@ -202,5 +209,6 @@ export async function ensureVoicePreviewAsset(input: {
     outputPath,
     relativeUrl: `/api/voice-preview/file/${outputFilename}`,
     usedFallback: false,
+    previewSource: "generated_system_preview",
   };
 }

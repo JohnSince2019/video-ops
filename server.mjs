@@ -584,15 +584,15 @@ const wizardStepContent = {
     title: "合成预览",
     subtitle: "组装画面、字幕、语音和 BGM，输出可预览的 MP4 成品。",
     goalTitle: "把分散资产合成成一条可以真正观看的视频",
-    goalText: "这个阶段会完成时间线装配、字幕叠加、音视频合流，并准备预览和下载产物。",
-    goalHint: "如果这一关通过，说明产品已经从“脚本工具”跨进了“视频生产工具”。",
+    goalText: "这个阶段会完成时间线装配、字幕叠加、音视频合流，并把你在第 4 步确认的声音方案真正带进成片。",
+    goalHint: "这一关不只是看“有没有出视频”，更要看第 4 步选定的声音路线、音色和验收重点有没有被正确继承到成片里。",
   },
   preview_publish: {
     title: "合规发布",
     subtitle: "核对多平台输出、合规状态、元数据和最终可交付的 MP4。",
     goalTitle: "确认这条视频可以被安全交付和后续发布",
-    goalText: "这里会查看最终预览、输出包、元数据与发布前检查项，确保不是只生成了一个临时文件。",
-    goalHint: "最终目标不是“渲染成功”四个字，而是你真的拿到一条能继续发布和复用的视频资产。",
+    goalText: "这里会查看最终预览、输出包、元数据与发布前检查项，也会回看这条成片最终落到了哪条声音路线和什么验收重点。",
+    goalHint: "最终目标不是“渲染成功”四个字，而是你真的拿到一条声音、画面、合规都能对得上前面决策的可交付资产。",
   },
 };
 
@@ -932,27 +932,51 @@ ${sharedPageStyles}
       .voice-preset-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
+        gap: 14px;
       }
       .provider-strategy-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-        margin-bottom: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 14px;
+        margin-bottom: 14px;
       }
       .provider-strategy-card {
         border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 14px;
-        background: rgba(247, 249, 252, 0.92);
+        border-radius: 18px;
+        padding: 16px;
+        background:
+          radial-gradient(circle at top right, rgba(118, 103, 255, 0.08), transparent 42%),
+          rgba(247, 249, 252, 0.96);
         display: grid;
-        gap: 8px;
+        gap: 10px;
         cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+      }
+      .provider-strategy-card::after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0 0;
+        height: 3px;
+        background: linear-gradient(90deg, rgba(118, 103, 255, 0), rgba(118, 103, 255, 0.55), rgba(118, 103, 255, 0));
+        opacity: 0;
+        transition: opacity .18s ease;
+      }
+      .provider-strategy-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(118, 103, 255, 0.22);
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
       }
       .provider-strategy-card.active {
-        border-color: #d9d2ff;
-        background: #f8f6ff;
-        box-shadow: inset 0 0 0 1px rgba(118, 103, 255, 0.08);
+        border-color: rgba(118, 103, 255, 0.3);
+        background:
+          radial-gradient(circle at top right, rgba(118, 103, 255, 0.16), transparent 44%),
+          linear-gradient(180deg, #faf8ff, #f6f8ff);
+        box-shadow: 0 18px 32px rgba(118, 103, 255, 0.12), inset 0 0 0 1px rgba(118, 103, 255, 0.08);
+      }
+      .provider-strategy-card.active::after {
+        opacity: 1;
       }
       .provider-strategy-top {
         display: flex;
@@ -962,11 +986,29 @@ ${sharedPageStyles}
       }
       .voice-card {
         border: 1px solid var(--border);
-        border-radius: 14px;
-        padding: 14px;
-        background: #fff;
+        border-radius: 18px;
+        padding: 16px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248, 250, 255, 0.98));
         display: grid;
-        gap: 8px;
+        gap: 10px;
+        position: relative;
+        overflow: hidden;
+        transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+      }
+      .voice-card::after {
+        content: "";
+        position: absolute;
+        inset: auto 0 0 0;
+        height: 3px;
+        background: linear-gradient(90deg, rgba(118, 103, 255, 0), rgba(118, 103, 255, 0.58), rgba(118, 103, 255, 0));
+        opacity: 0;
+        transition: opacity .18s ease;
+      }
+      .voice-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(118, 103, 255, 0.18);
+        box-shadow: 0 14px 26px rgba(15, 23, 42, 0.07);
       }
       .voice-card-top {
         display: flex;
@@ -984,22 +1026,32 @@ ${sharedPageStyles}
         white-space: nowrap;
       }
       .voice-card.active {
-        border-color: #d9d2ff;
-        background: #f8f6ff;
-        box-shadow: inset 0 0 0 1px rgba(118, 103, 255, 0.08);
+        border-color: rgba(118, 103, 255, 0.28);
+        background:
+          radial-gradient(circle at top right, rgba(118, 103, 255, 0.14), transparent 42%),
+          linear-gradient(180deg, #fbfaff, #f6f8ff);
+        box-shadow: 0 18px 30px rgba(118, 103, 255, 0.1), inset 0 0 0 1px rgba(118, 103, 255, 0.08);
+      }
+      .voice-card.active::after {
+        opacity: 1;
+      }
+      .voice-card.active strong {
+        color: #4f3cb8;
       }
       .voice-card small {
         color: var(--muted);
         font-size: 12px;
+        line-height: 1.6;
       }
       .voice-actions {
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
+        padding-top: 4px;
       }
       .voice-meta-list {
         display: grid;
-        gap: 4px;
+        gap: 6px;
         font-size: 12px;
         color: var(--muted);
       }
@@ -1014,16 +1066,19 @@ ${sharedPageStyles}
         display: none;
       }
       .route-behavior-panel {
-        border-radius: 14px;
-        border: 1px solid var(--border);
-        background: rgba(250, 251, 255, 0.92);
-        padding: 12px 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(118, 103, 255, 0.16);
+        background:
+          radial-gradient(circle at top right, rgba(118, 103, 255, 0.12), transparent 40%),
+          linear-gradient(180deg, rgba(250, 251, 255, 0.98), rgba(245, 248, 255, 0.98));
+        padding: 14px 16px;
         display: grid;
-        gap: 8px;
-        margin-bottom: 12px;
+        gap: 10px;
+        margin-bottom: 14px;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
       }
       .route-behavior-panel strong {
-        font-size: 13px;
+        font-size: 14px;
         color: var(--ink);
       }
       .route-behavior-note {
@@ -1036,12 +1091,13 @@ ${sharedPageStyles}
         gap: 6px;
       }
       .route-behavior-item {
-        border-radius: 12px;
+        border-radius: 14px;
         background: #fff;
         border: 1px solid rgba(15, 23, 42, 0.08);
-        padding: 8px 10px;
+        padding: 10px 11px;
         font-size: 12px;
-        color: var(--muted);
+        color: #44506a;
+        line-height: 1.6;
       }
       .micro-copy {
         font-size: 12px;
@@ -1118,7 +1174,8 @@ ${sharedPageStyles}
         font-size: 12px;
       }
       .editor-card {
-        padding: 18px;
+        padding: 20px;
+        box-shadow: 0 22px 50px rgba(15, 23, 42, 0.06);
       }
       .editor-card textarea#scriptText {
         min-height: 316px;
@@ -1235,6 +1292,7 @@ ${sharedPageStyles}
         color: var(--muted);
         font-size: 11px;
         font-weight: 700;
+        transition: background .18s ease, border-color .18s ease, color .18s ease;
       }
       .tiny-chip.ok {
         background: rgba(22, 163, 74, 0.08);
@@ -1436,11 +1494,11 @@ ${sharedPageStyles}
         gap: 12px;
       }
       .gate-card {
-        padding: 14px;
-        border-radius: 16px;
+        padding: 16px;
+        border-radius: 18px;
         background: #fff;
         border: 1px solid var(--border);
-        box-shadow: var(--shadow);
+        box-shadow: 0 18px 38px rgba(15, 23, 42, 0.06);
       }
       .gate-score {
         display: flex;
@@ -1461,11 +1519,12 @@ ${sharedPageStyles}
         color: var(--muted);
       }
       .gate-note {
-        padding: 12px;
+        padding: 13px 14px;
         border: 1px dashed #dde3f2;
-        border-radius: 12px;
-        color: var(--muted);
+        border-radius: 14px;
+        color: #50607a;
         font-size: 12px;
+        line-height: 1.65;
       }
       .gate-item strong,
       .asset-item strong {
@@ -1491,25 +1550,55 @@ ${sharedPageStyles}
         margin-top: 10px;
       }
       .inline-status {
-        min-height: 20px;
+        min-height: 22px;
         margin-top: 8px;
         font-size: 12px;
         font-weight: 700;
         color: var(--muted);
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: #f7f8fc;
+        border: 1px solid rgba(15, 23, 42, 0.06);
       }
       .inline-status.busy {
         color: #7c5cff;
+        background: rgba(118, 103, 255, 0.08);
+        border-color: rgba(118, 103, 255, 0.14);
       }
       .inline-status.success {
         color: #1d7f45;
+        background: rgba(22, 163, 74, 0.08);
+        border-color: rgba(22, 163, 74, 0.14);
       }
       .inline-status.warn {
         color: #c56a00;
+        background: rgba(245, 158, 11, 0.1);
+        border-color: rgba(245, 158, 11, 0.16);
+      }
+      button.busy-state {
+        position: relative;
+        box-shadow: none;
+      }
+      button.busy-state::after {
+        content: "";
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        display: inline-block;
+        margin-left: 8px;
+        vertical-align: -2px;
+        animation: videoOpsSpin .7s linear infinite;
       }
       button[disabled] {
         cursor: not-allowed;
         opacity: 0.68;
         box-shadow: none;
+      }
+      @keyframes videoOpsSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
       }
       @media (max-width: 1120px) {
         .wizard-shell {
@@ -1583,12 +1672,12 @@ ${sharedPageStyles}
           </section>
 
           <section class="card editor-card">
-              <div class="panel-title">${isAssetIntakeStep ? "脚本输入与自动抽取" : "脚本编辑器"}</div>
+              <div class="panel-title">${isAssetIntakeStep ? "脚本输入与自动抽取" : isVoiceGenerationStep ? "脚本与声音确认" : "当前步骤输入"}</div>
               <div class="editor-meta">
                 <span class="tiny-chip" id="currentTaskChip">暂无任务</span>
                 <span class="tiny-chip" id="currentModeChip">纯文本</span>
                 <span class="tiny-chip" id="currentProfileChip">标准</span>
-                <span class="tiny-chip" id="heroStatus">可提交</span>
+                <span class="tiny-chip" id="heroStatus">待处理</span>
               </div>
               ${
                 isAssetIntakeStep
@@ -1690,22 +1779,22 @@ ${sharedPageStyles}
                   isAssetIntakeStep
                     ? `
                 <div class="field full">
-                  <label class="tip-label">声音方案摘要 <span class="tip-icon" data-tip="素材收集阶段只需要确认你准备使用哪一类声音。完整试听、录音、应用操作放到第 4 步“声音应用”里完成。">?</span></label>
+                  <label class="tip-label">后续声音方向 <span class="tip-icon" data-tip="素材收集阶段不做声音选择，只确认你后面准备走预设声音还是你自己的声音。完整试听、录音、应用操作都放到第 4 步“声音应用”里完成。">?</span></label>
                   <div class="auto-grid">
                     <div class="auto-card">
-                      <b>当前声音方案</b>
-                      <strong id="activeVoiceModeLabel">男声教练沉稳</strong>
+                      <b>当前准备方式</b>
+                      <strong id="activeVoiceModeLabel">先用默认预设声音</strong>
                     </div>
                     <div class="auto-card">
-                      <b>当前 TTS 路线</b>
-                      <strong id="assetVoiceRouteLabel">默认中文解说路线</strong>
+                      <b>第 4 步要做的事</b>
+                      <strong>试听并确认最终声音</strong>
                     </div>
                     <div class="auto-card">
-                      <b>自定义声音参考</b>
+                      <b>是否已有本人声音参考</b>
                       <strong id="activeVoiceReferenceLabel">未使用自定义参考</strong>
                     </div>
                   </div>
-                  <div class="hint">现在先确认脚本结构是否正确，并知道后面准备走哪条声音路线。试听、录音、应用声音都在第 4 步完成。</div>
+                  <div class="hint">这一步只做输入整理，不做声音定稿。先确认脚本和场景拆分是对的，等到第 4 步再真正决定声音。</div>
                 </div>
                     `
                     : ""
@@ -1732,6 +1821,7 @@ ${sharedPageStyles}
                     <label class="tip-label" for="ttsProviderIdVisible">TTS 引擎 <span class="tip-icon" data-tip="这里决定最终任务优先走哪套 TTS provider。你可以按自然度、是否支持克隆、以及是否要考虑云端 SaaS 部署来切换。">?</span></label>
                     <select id="ttsProviderIdVisible">${ttsProviderSelectOptionsHtml}</select>
                   </div>
+                  <div class="hint" id="voiceQualityHint">当前工作台试听主要用于确认声音方向；正式验收请以创建任务后的最终 TTS 产物为准。</div>
                   <div class="voice-preset-grid">
                     ${voicePresetCardsHtml}
                   </div>
@@ -1765,15 +1855,15 @@ ${sharedPageStyles}
                 <input id="voiceMode" type="hidden" value="male_coach_deep" />
                 <input id="ttsProviderId" type="hidden" value="${defaultVoiceProvider.id}" />
                 <div class="field compact">
-                  <label for="title">标题</label>
+                  <label class="tip-label" for="title">标题 <span class="tip-icon" data-tip="这里会自动回填脚本识别出的标题。只有自动识别不准确时，你才需要手动修正。">?</span></label>
                   <input id="title" placeholder="例如：AI 如何让研发效率提升 3 倍" />
                 </div>
                 <div class="field compact">
-                  <label for="author">作者</label>
+                  <label class="tip-label" for="author">作者 <span class="tip-icon" data-tip="用于写入元数据和产物归属，不直接影响声音效果。">?</span></label>
                   <input id="author" value="John" />
                 </div>
                 <div class="field compact">
-                  <label for="renderProfile">渲染档位</label>
+                  <label class="tip-label" for="renderProfile">渲染档位 <span class="tip-icon" data-tip="声音应用阶段不用纠结画面细节，标准档位足够完成工作台验证。">?</span></label>
                   <select id="renderProfile">
                     <option value="draft">草稿</option>
                     <option value="standard" selected>标准</option>
@@ -1781,23 +1871,23 @@ ${sharedPageStyles}
                   </select>
                 </div>
                 <div class="field compact">
-                  <label for="stylePreset">画面风格</label>
+                  <label class="tip-label" for="stylePreset">画面风格 <span class="tip-icon" data-tip="这里保留是为了让你对照整条视频的统一风格，但当前重点仍然是声音。">?</span></label>
                   <select id="stylePreset">
                     <option value="john_vertical_comic" selected>John 竖屏讲解风格</option>
                   </select>
                 </div>
                 <div class="field compact">
-                  <label for="personaPreset">主角形象</label>
+                  <label class="tip-label" for="personaPreset">主角形象 <span class="tip-icon" data-tip="用于保证 John 的人物连续性，这里通常不需要频繁改动。">?</span></label>
                   <select id="personaPreset">
                     <option value="john_persona_v1" selected>John 专属人物形象</option>
                   </select>
                 </div>
                 <div class="field compact">
-                  <label for="ownerToken">任务归属标签</label>
+                  <label class="tip-label" for="ownerToken">任务归属标签 <span class="tip-icon" data-tip="用于标记任务归属，也用于系统去重。建议保持稳定，不要每次都改。">?</span></label>
                   <input id="ownerToken" placeholder="例如：john-content-studio" />
                 </div>
                 <div class="field full">
-                  <label for="scriptText">脚本文本</label>
+                  <label class="tip-label" for="scriptText">脚本文本 <span class="tip-icon" data-tip="这里保留整条脚本，是为了让你一边选声音，一边对照内容语气，而不是重新编写脚本。">?</span></label>
                   <textarea id="scriptText" placeholder="这里保留脚本全文，方便你在应用声音时仍能对照内容。"></textarea>
                 </div>
 
@@ -1823,6 +1913,7 @@ ${sharedPageStyles}
                     ${voicePresetCardsHtml}
                   </div>
                   <div class="inline-status" id="presetVoiceStatus">当前已应用：${defaultVoicePreset.chineseLabel}</div>
+                  <div class="hint">先做两件事：确认哪种声音最适合这条内容；同时判断这条路线更适合当前本地工作台，还是未来云端 SaaS 正式产线。</div>
                   <div class="hint">默认推荐使用 ${defaultVoiceProvider.displayName} 跑中文解说；如果后续做云端 SaaS 重度生产，可优先考虑 ${getTtsProviderProfile("f5-tts").displayName} 作为高拟真方案，${getTtsProviderProfile("melotts").displayName} 作为低成本备用方案。</div>
                 </div>
 
@@ -1938,10 +2029,10 @@ ${sharedPageStyles}
         <aside class="wizard-gate">
           <div class="gate-panel">
             <section class="gate-card">
-              <div class="panel-title" id="overviewPanelTitle">当前草稿概览</div>
+              <div class="panel-title" id="overviewPanelTitle">当前步骤概览</div>
               <div class="gate-score">
                 <strong><span id="qualityScore">--</span> <small id="qualityScoreSuffix" style="font-size:13px;color:var(--muted)">/100</small></strong>
-                <span class="gate-badge" id="gateBadge">待提交</span>
+                <span class="gate-badge" id="gateBadge">等待处理</span>
               </div>
               <div class="progress-track"><div class="progress-value" id="progressValue" style="width:0%"></div></div>
               <div class="status-pair" style="margin-top:12px">
@@ -1952,7 +2043,7 @@ ${sharedPageStyles}
 
             <section class="gate-card">
               <div class="panel-title" id="focusPanelTitle">当前这一步重点</div>
-              <div class="gate-note" id="focusPanelNote">素材收集阶段先关注：脚本是否完整、场景拆分是否顺、声音方案是否选对。任务创建后，右侧才重点显示进度、预览和产物质量。</div>
+              <div class="gate-note" id="focusPanelNote">素材收集阶段先关注：脚本是否完整、场景拆分是否顺。任务创建后，右侧才重点显示进度、预览和产物质量。</div>
               <div class="mini-section-title">当前门槛</div>
               <div class="gate-checklist" id="gateChecklist"></div>
               <div class="mini-section-title">当前已完成</div>
@@ -1961,11 +2052,11 @@ ${sharedPageStyles}
             </section>
 
             <section class="gate-card">
-              <div class="panel-title" id="selectedPlanPanelTitle">当前已选方案</div>
+              <div class="panel-title" id="selectedPlanPanelTitle">当前已定方案</div>
               <div class="asset-list">
                 <div class="asset-item">
-                  <strong>当前声音方案</strong>
-                  <p id="activeVoiceModeLabel">男声教练沉稳</p>
+                  <strong>当前声音方向</strong>
+                  <p id="activeVoiceModeLabel">先用默认预设声音</p>
                 </div>
                 <div class="asset-item">
                   <strong>当前声音引擎</strong>
@@ -1977,7 +2068,7 @@ ${sharedPageStyles}
                 </div>
                 <div class="asset-item">
                   <strong>当前 TTS 路线</strong>
-                  <p id="activeTtsRouteLabel">默认推荐路线</p>
+                  <p id="activeTtsRouteLabel">默认中文解说路线</p>
                 </div>
                 <div class="asset-item">
                   <strong>当前试听体验</strong>
@@ -2056,6 +2147,18 @@ ${sharedPageStyles}
                     <div class="summary-item empty">创建任务后，这里会显示当前任务使用的声音模式、TTS 引擎、克隆方式和部署策略。</div>
                   </div>
                 </div>
+                <div class="summary-item artifact-section" id="jobVoiceCarrySection">
+                  <b style="display:block;margin-bottom:8px">声音继承摘要</b>
+                  <div class="quality-list" id="jobVoiceCarrySummary">
+                    <div class="summary-item empty">进入合成阶段后，这里会解释第 4 步选定的声音路线、音色和验收重点是如何被带进当前成片的。</div>
+                  </div>
+                </div>
+                <div class="summary-item artifact-section" id="jobDiagnosisSection">
+                  <b style="display:block;margin-bottom:8px">成片诊断摘要</b>
+                  <div class="quality-list" id="jobDiagnosisSummary">
+                    <div class="summary-item empty">任务完成后，这里会帮助你判断问题更可能出在声音路线、画面资产，还是合成/渲染阶段。</div>
+                  </div>
+                </div>
                 <div class="summary-item artifact-section" id="jobRouteOutcomeSection">
                   <b style="display:block;margin-bottom:8px">结果解读建议</b>
                   <div class="quality-list" id="jobRouteOutcomeSummary">
@@ -2105,6 +2208,8 @@ ${sharedPageStyles}
         const jobQualitySummary = document.getElementById("jobQualitySummary");
         const jobCostSummary = document.getElementById("jobCostSummary");
         const jobTtsStrategySummary = document.getElementById("jobTtsStrategySummary");
+        const jobVoiceCarrySummary = document.getElementById("jobVoiceCarrySummary");
+        const jobDiagnosisSummary = document.getElementById("jobDiagnosisSummary");
         const jobRouteOutcomeSummary = document.getElementById("jobRouteOutcomeSummary");
         const jobResilienceSummary = document.getElementById("jobResilienceSummary");
         const progressValue = document.getElementById("progressValue");
@@ -2127,6 +2232,7 @@ ${sharedPageStyles}
         const routeBehaviorTitle = document.getElementById("routeBehaviorTitle");
         const routeBehaviorNote = document.getElementById("routeBehaviorNote");
         const routeBehaviorList = document.getElementById("routeBehaviorList");
+        const voiceQualityHint = document.getElementById("voiceQualityHint");
         const validateBtn = document.getElementById("validateBtn");
         const createJobBtn = document.getElementById("createJobBtn");
         const loadDemoBtn = document.getElementById("loadDemoBtn");
@@ -2153,6 +2259,8 @@ ${sharedPageStyles}
         const jobQualitySection = document.getElementById("jobQualitySection");
         const jobCostSection = document.getElementById("jobCostSection");
         const jobTtsStrategySection = document.getElementById("jobTtsStrategySection");
+        const jobVoiceCarrySection = document.getElementById("jobVoiceCarrySection");
+        const jobDiagnosisSection = document.getElementById("jobDiagnosisSection");
         const jobRouteOutcomeSection = document.getElementById("jobRouteOutcomeSection");
         const jobResilienceSection = document.getElementById("jobResilienceSection");
         const selectedPlanPanelTitle = document.getElementById("selectedPlanPanelTitle");
@@ -2347,17 +2455,17 @@ ${sharedPageStyles}
             asset_intake: {
               overviewTitle: "脚本就绪概览",
               focusTitle: "素材收集这一步看什么",
-              focusNote: "这里只看三件事：脚本是否完整、自动拆出的场景是否顺、是否已经知道要用哪类声音。先把输入搞清楚，比过早盯渲染结果更重要。",
+              focusNote: "这里只看两件事：脚本是否完整、自动拆出的场景是否顺。先把输入搞清楚，比过早盯渲染结果更重要。",
               selectedPlanTitle: "当前已选输入方案",
               nextGateTitle: "进入分镜确认前必须满足",
-              gateBadgeText: "待校验",
+              gateBadgeText: "整理输入中",
               scoreSuffix: "/100",
               estimatedLabel: "预估场景数",
               scriptLabel: "脚本字数",
               gates: [
                 { title: "脚本能读懂", text: "至少能提取出标题、核心观点和 CTA，不要让后续步骤猜你的意思。" },
                 { title: "场景拆分顺", text: "每一段都要能回答“这一段说什么、画面拍什么、预计几秒”。" },
-                { title: "声音方向已定", text: "现在只需要知道用预设声音还是你自己的声音，试听动作放到第 4 步。" },
+                { title: "先别急着定声音", text: "声音试听和应用是第 4 步的工作，这一步只要把脚本输入整理清楚。" },
               ],
             },
             storyboard_generation: {
@@ -2411,7 +2519,7 @@ ${sharedPageStyles}
             video_assembly: {
               overviewTitle: "合成任务概览",
               focusTitle: "合成预览这一步看什么",
-              focusNote: "这里开始真正看任务进度、SSE 事件和视频预览。脚本和声音都定下后，右侧应该更多反映生产状态，而不是草稿解释。",
+              focusNote: "这里开始真正看任务进度、SSE 事件和视频预览。更重要的是确认第 4 步选定的声音路线、音色和验收重点，是否已经被正确带进成片。",
               selectedPlanTitle: "当前产线方案",
               nextGateTitle: "进入合规发布前必须满足",
               gateBadgeText: "处理中",
@@ -2420,6 +2528,7 @@ ${sharedPageStyles}
               scriptLabel: "最新状态",
               gates: [
                 { title: "SSE 持续推进", text: "至少能看到 PARSING 到 RENDERING 的过程，不是卡在创建成功一行。" },
+                { title: "声音决策被正确继承", text: "这里要能解释当前成片用的是哪条声音路线、什么音色策略、为什么这样验收。" },
                 { title: "可打开预览", text: "产物出来后，用户必须能直接预览或下载，而不是只看 JSON。" },
                 { title: "时间线无明显错位", text: "字幕、语音、画面至少要基本对齐，不能完全错拍。" },
               ],
@@ -2427,7 +2536,7 @@ ${sharedPageStyles}
             preview_publish: {
               overviewTitle: "发布前概览",
               focusTitle: "合规发布这一步看什么",
-              focusNote: "最后一关看的是交付，而不是内部状态。你要拿到的是能继续发布、能复用、能回查的成品资产。",
+              focusNote: "最后一关看的是交付，而不是内部状态。你要拿到的是声音、画面、合规都能解释得通，并且能继续发布、复用、回查的成品资产。",
               selectedPlanTitle: "当前交付包",
               nextGateTitle: "标记完成前必须满足",
               gateBadgeText: "待交付",
@@ -2436,6 +2545,7 @@ ${sharedPageStyles}
               scriptLabel: "脚本字数",
               gates: [
                 { title: "MP4 可打开", text: "用户要能在页面里直接播放，不是只有一个路径字符串。" },
+                { title: "声音结果能被解释", text: "你要看得出这条成片最终走了哪条声音路线，以及为什么要按这个重点验收。" },
                 { title: "元数据齐全", text: "至少包含任务信息、输出信息和后续复盘需要的关键信息。" },
                 { title: "多平台可继续分发", text: "尺寸、字幕和合规状态不能阻塞下一步发布。" },
               ],
@@ -2540,6 +2650,17 @@ ${sharedPageStyles}
               .map((item) => '<div class="route-behavior-item">' + item + '</div>')
               .join("");
           }
+          if (voiceQualityHint) {
+            if (voiceModeValue === "custom_reference") {
+              voiceQualityHint.textContent = "你现在试听的是本人参考声音本身，用来确认身份音色；正式任务里是否保真，要以后续 TTS 成片为准。";
+            } else if (ttsProviderIdValue === "f5-tts") {
+              voiceQualityHint.textContent = "这条路线更适合云端 SaaS 或正式生产链路。当前页面主要帮助你定策略，不把它当作强实时试听工具。";
+            } else if (ttsProviderIdValue === "melotts") {
+              voiceQualityHint.textContent = "这条路线适合作为低成本兜底，不建议拿它的试听效果当最终自然度标准。";
+            } else {
+              voiceQualityHint.textContent = "当前工作台试听主要用于确认声音方向；正式验收请以创建任务后的最终 TTS 产物为准。";
+            }
+          }
           document.querySelectorAll(".voice-preview-btn").forEach((button) => {
             const card = button.closest(".voice-card");
             const voiceMode = card?.getAttribute("data-voice-mode");
@@ -2564,12 +2685,14 @@ ${sharedPageStyles}
           }
           button.textContent = text;
           button.disabled = Boolean(disabled);
+          button.classList.toggle("busy-state", Boolean(disabled) && /中|保存|上传|加载/.test(text));
         }
 
         function resetButtonState(button) {
           if (!button) return;
           button.textContent = button.dataset.defaultText || button.textContent;
           button.disabled = false;
+          button.classList.remove("busy-state");
         }
 
         function setStageChip(element, text, tone) {
@@ -2617,6 +2740,48 @@ ${sharedPageStyles}
                 { title: "先有完整脚本", text: "至少要有主题、核心观点和基本结构，系统才能开始拆分。" },
                 { title: "知道发到哪些平台", text: "勾选平台后，后面才能更准确地做比例和发布适配。" },
                 { title: "不用急着创建任务", text: "现在先别盯产物，先把输入和结构理顺。" },
+              ],
+            },
+            voice_waiting: {
+              badge: "等待声音确认",
+              note: "先把脚本放进来，右侧当前最重要的是帮你进入“选声音”的准备状态，而不是直接讨论产物质量。",
+              checklist: [
+                { title: "脚本已准备", text: "声音不是脱离内容单独选的，先让页面知道这条视频在讲什么。", done: false },
+                { title: "声音路线待确认", text: "下一步是判断你要走默认主链路、正式产线还是低成本兜底。", done: false },
+                { title: "还没到产物验收", text: "现在先别盯 MP4，先把声音方案定下来。", done: false },
+              ],
+              gates: [
+                { title: "先有可读脚本", text: "没有脚本内容，就无法判断哪种声音最合适。" },
+                { title: "明确声音目标", text: "先想清楚这条视频更重自然度、成本，还是未来 SaaS 正式生产。" },
+                { title: "再进入试听应用", text: "脚本有了之后，再试听并应用声音才有意义。" },
+              ],
+            },
+            voice_validating: {
+              badge: "正在确认声音输入",
+              note: "脚本已经进来了。现在这一步是在判断内容是否足够稳定，可以开始试听和应用声音方案。",
+              checklist: [
+                { title: "脚本内容已进入系统", text: "页面已经开始根据脚本准备声音应用的上下文。", done: true },
+                { title: "等待通过校验", text: "先确认这条内容结构清楚，再进入正式声音决策。", done: false },
+                { title: "准备试听与应用", text: "通过后就进入声音路线、音色和自定义参考的确认。", done: false },
+              ],
+              gates: [
+                { title: "先确认内容清楚", text: "如果脚本本身不稳定，声音再好也容易返工。" },
+                { title: "通过后再做声音定稿", text: "先过结构校验，再进入试听、应用和录音。" },
+                { title: "右侧先看步骤，不看成片", text: "当前重点是确认能不能进入声音选择，而不是看最终产物。" },
+              ],
+            },
+            voice_ready: {
+              badge: "可以定声音",
+              note: "脚本已经稳定了。现在右侧重点不再是字段修正，而是帮你判断哪条声音路线、哪种音色最适合这条内容。",
+              checklist: [
+                { title: "脚本已通过校验", text: "现在可以放心从内容视角来挑声音。", done: true },
+                { title: "可以试听并应用", text: "你现在可以在当前页确认预设声音或你自己的声音参考。", done: true },
+                { title: "下一步创建任务", text: "声音定稿后，再创建任务进入正式视频生产。", done: false },
+              ],
+              gates: [
+                { title: "选对声音路线", text: "先决定是默认主链路、正式产线，还是低成本兜底。" },
+                { title: "确认音色匹配内容", text: "这条视频到底更适合教练感、老师感、旁白感还是创作者感。" },
+                { title: "确认后再创建任务", text: "声音方案确定后，再进入任务创建和后续成片链路。" },
               ],
             },
             validating: {
@@ -3043,6 +3208,50 @@ ${sharedPageStyles}
             '<div class="quality-item pass">验收提示：' + (ttsStrategy.acceptanceHint || "未设置") + '</div>',
           ].join("");
 
+          if (jobVoiceCarrySummary) {
+            const carryNarratives = [
+              '这条成片沿用了“' + (ttsStrategy.routeRoleLabel || "未设置路线") + '”，当前声音引擎是“' + (ttsStrategy.providerLabel || "未设置引擎") + '”。',
+              '最终声音应用方式是“' + (ttsStrategy.cloningLabel || "未设置方式") + '”，你在第 4 步做的声音决策已经进入合成阶段。',
+              '人工验收时，先按“' + (ttsStrategy.acceptanceHint || "未设置验收提示") + '”去听最终成片，而不是只看有没有音频。',
+            ];
+            jobVoiceCarrySummary.innerHTML = carryNarratives
+              .map((item) => '<div class="quality-item pass">' + item + '</div>')
+              .join("");
+          }
+
+          if (jobDiagnosisSummary) {
+            const audioMissing = String(detail.qualitySummary.audioPresenceLabel || "").includes("无");
+            const subtitleMissing = String(detail.qualitySummary.subtitleStatusLabel || "").includes("缺失");
+            const fallbackUsed = String(detail.qualitySummary.fallbackStatusLabel || "").includes("fallback");
+            const customVoiceMode = String(ttsStrategy.voiceModeLabel || "").includes("自定义");
+            const providerLabel = ttsStrategy.providerLabel || "未设置引擎";
+
+            const diagnosisItems = [];
+            if (audioMissing) {
+              diagnosisItems.push('当前最该先查的是“声音链路”：成片缺少音频，优先回看第 4 步声音应用是否成功、TTS 是否真正产出了音轨。');
+            } else if (customVoiceMode) {
+              diagnosisItems.push('当前最该先查的是“自定义声音一致性”：这条成片走的是自定义声音路线，先重点听音色是否稳定、辨识度是否对。');
+            } else {
+              diagnosisItems.push('当前最该先查的是“声音路线是否匹配内容”：这条成片走的是“' + providerLabel + '”，先判断自然度、清晰度和内容气质是否匹配。');
+            }
+
+            if (fallbackUsed) {
+              diagnosisItems.push('当前还要重点查“产物链路”：这次渲染带有 fallback 痕迹，说明即便视频能打开，也要确认成片质量是否符合正式验收标准。');
+            } else {
+              diagnosisItems.push('当前画面与合成链路看起来更像正式产物，接下来优先检查画面节奏、字幕对齐和声音是否跟镜头节奏匹配。');
+            }
+
+            if (subtitleMissing) {
+              diagnosisItems.push('如果你感觉“内容不跟手”，还要查“字幕/合成阶段”：当前字幕缺失，问题不一定在声音路线本身，也可能在装配阶段。');
+            } else {
+              diagnosisItems.push('如果声音自然但整体观感仍不顺，更可能要查“画面资产或合成节奏”，而不是第一时间回退声音路线。');
+            }
+
+            jobDiagnosisSummary.innerHTML = diagnosisItems
+              .map((item) => '<div class="quality-item pass">' + item + '</div>')
+              .join("");
+          }
+
           if (!detail?.routeOutcomeSummary) {
             jobRouteOutcomeSummary.innerHTML = '<div class="summary-item empty">任务完成后，这里会按当前 TTS 路线解释质量重点、成本理解方式和验收优先级。</div>';
             return;
@@ -3153,10 +3362,17 @@ ${sharedPageStyles}
         function renderErrors(errors) {
           errorList.innerHTML = "";
           if (!errors.length) return;
+          const errorLabelMap = {
+            "title is required": "标题不能为空。",
+            "ownerToken is required": "任务归属标签不能为空。",
+            "scriptText is required": "脚本文本不能为空。",
+            "platform must be one of: douyin, xiaohongshu, videox": "发布平台配置无效，请重新选择。",
+            "renderProfile must be one of: draft, standard, high_quality": "渲染档位配置无效，请重新选择。",
+          };
           errors.forEach((text) => {
             const item = document.createElement("div");
             item.className = "error-item";
-            item.textContent = text;
+            item.textContent = errorLabelMap[text] || text;
             errorList.appendChild(item);
           });
         }
@@ -3168,7 +3384,7 @@ ${sharedPageStyles}
               ? [
                   "脚本已能自动提取标题、开场抓手、摘要和行动引导。",
                   "自动识别分段会直接生成“这一段说什么、建议画面、建议时长”的大白话预览。",
-                  "素材页只保留声音方向摘要，试听和应用动作已经集中到第 4 步。",
+                  "素材页已经不做声音定稿，试听和应用动作集中到第 4 步。",
                 ]
               : CURRENT_STEP_ID === "voice_generation"
                 ? [
@@ -3179,12 +3395,14 @@ ${sharedPageStyles}
                 : CURRENT_STEP_ID === "video_assembly"
                   ? [
                       "已经从脚本视角切换到任务视角，右侧重点开始变成进度、预览和产物状态。",
+                      "这里会把第 4 步选定的声音路线和当前成片结果对上，帮助你判断“这条声音为什么会这样”。",
                       "SSE 事件会持续写入最近关键进度，避免被无关交互刷屏。",
                       "任务完成后会在当前页直接出现 MP4 预览和标准化产物摘要。",
                     ]
                   : CURRENT_STEP_ID === "preview_publish"
                     ? [
                         "当前页以最终交付为中心，不再强调脚本解释，而是强调成品是否可验收。",
+                        "你可以直接回看这条成片最终用了什么声音路线、什么验收重点、是否需要重跑。",
                         "质量、成本、声音策略和预览已经归并到同一块产物信息区。",
                         "你可以直接用这里的信息做人工验收与发布前检查。",
                       ]
@@ -3206,20 +3424,28 @@ ${sharedPageStyles}
           const score =
             CURRENT_STEP_ID === "voice_generation"
               ? (customVoiceReferenceInput?.value?.trim() ? 5 : 4)
-              : Math.max(42, Math.min(96, 58 + summary.estimatedScenes * 6 + Math.min(14, Math.floor(summary.scriptCharacters / 80))));
+              : CURRENT_STEP_ID === "asset_intake"
+                ? Math.max(36, Math.min(92, 52 + summary.estimatedScenes * 7 + Math.min(12, Math.floor(summary.scriptCharacters / 90))))
+                : Math.max(42, Math.min(96, 58 + summary.estimatedScenes * 6 + Math.min(14, Math.floor(summary.scriptCharacters / 80))));
           qualityScore.textContent = String(score);
         }
 
         function syncArtifactPanels() {
           const showArtifactSections = CURRENT_STEP_ID === "video_assembly" || CURRENT_STEP_ID === "preview_publish" || Boolean(currentJobId);
           if (artifactSupportNote) {
-            artifactSupportNote.textContent = showArtifactSections
-              ? "这里开始以真实任务与产物为主：看进度、预览、质量、成本和声音策略。"
-              : "当前还没进入产物验收阶段。先把脚本、分镜或声音方案确认好，等任务创建后再看质量、成本和预览结果。";
+            if (showArtifactSections) {
+              artifactSupportNote.textContent = "这里开始以真实任务与产物为主：看进度、预览、质量、成本和声音策略。";
+            } else if (CURRENT_STEP_ID === "voice_generation") {
+              artifactSupportNote.textContent = "这一步先把声音方案定下来。当前右侧重点不是产物验收，而是帮助你判断路线、音色和后续任务适配性。";
+            } else {
+              artifactSupportNote.textContent = "当前还没进入产物验收阶段。先把脚本、分镜或声音方案确认好，等任务创建后再看质量、成本和预览结果。";
+            }
           }
           if (jobQualitySection) jobQualitySection.hidden = !showArtifactSections;
           if (jobCostSection) jobCostSection.hidden = !showArtifactSections;
           if (jobTtsStrategySection) jobTtsStrategySection.hidden = !showArtifactSections;
+          if (jobVoiceCarrySection) jobVoiceCarrySection.hidden = !showArtifactSections;
+          if (jobDiagnosisSection) jobDiagnosisSection.hidden = !showArtifactSections;
           if (jobRouteOutcomeSection) jobRouteOutcomeSection.hidden = !showArtifactSections;
           if (jobResilienceSection) jobResilienceSection.hidden = !showArtifactSections;
         }
@@ -3298,6 +3524,9 @@ ${sharedPageStyles}
             setStageChip(createStageChip, "可以创建任务", "ready");
             setCreateJobAvailability(true);
             syncGateAssistant("ready_to_create");
+            if (CURRENT_STEP_ID === "voice_generation") {
+              syncGateAssistant("voice_ready");
+            }
             renderSummary(result.summary);
             draftJson.textContent = JSON.stringify(result.draft, null, 2);
             draftJson.className = "";
@@ -3308,7 +3537,11 @@ ${sharedPageStyles}
             setStageChip(validateStageChip, "需要修正", "warn");
             setStageChip(createStageChip, "等待校验通过", "warn");
             setCreateJobAvailability(false);
-            syncGateAssistant((payload.scriptText || "").trim() ? "validating" : "waiting_input");
+            if (CURRENT_STEP_ID === "voice_generation") {
+              syncGateAssistant((payload.scriptText || "").trim() ? "voice_validating" : "voice_waiting");
+            } else {
+              syncGateAssistant((payload.scriptText || "").trim() ? "validating" : "waiting_input");
+            }
             summaryList.innerHTML = '<div class="summary-item empty">必填项通过后，这里会显示质量摘要。</div>';
             if (CURRENT_STEP_ID === "voice_generation") {
               estimatedScenes.textContent = "5";
@@ -3874,6 +4107,14 @@ ${sharedPageStyles}
               <div class="detail-list" id="ttsStrategySummary"></div>
             </div>
             <div class="summary-item">
+              <b style="display:block;margin-bottom:8px">声音继承摘要</b>
+              <div class="detail-list" id="voiceCarrySummary"></div>
+            </div>
+            <div class="summary-item">
+              <b style="display:block;margin-bottom:8px">成片诊断摘要</b>
+              <div class="detail-list" id="diagnosisSummary"></div>
+            </div>
+            <div class="summary-item">
               <b style="display:block;margin-bottom:8px">结果解读建议</b>
               <div class="detail-list" id="routeOutcomeSummary"></div>
             </div>
@@ -3997,6 +4238,28 @@ ${sharedPageStyles}
             '声音应用方式：' + detail.ttsStrategySummary.cloningLabel,
             '部署策略：' + detail.ttsStrategySummary.deploymentLabel,
             '验收提示：' + detail.ttsStrategySummary.acceptanceHint,
+          ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
+          document.getElementById("voiceCarrySummary").innerHTML = [
+            '这条任务沿用了“' + detail.ttsStrategySummary.routeRoleLabel + '”，当前声音引擎是“' + detail.ttsStrategySummary.providerLabel + '”。',
+            '最终声音应用方式是“' + detail.ttsStrategySummary.cloningLabel + '”，说明第 4 步的声音决策已经进入成片链路。',
+            '人工验收时，先按“' + detail.ttsStrategySummary.acceptanceHint + '”去听最终视频，而不是只看有没有音轨。',
+          ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
+          const detailAudioMissing = String(detail.qualitySummary.audioPresenceLabel || "").includes("无");
+          const detailSubtitleMissing = String(detail.qualitySummary.subtitleStatusLabel || "").includes("缺失");
+          const detailFallbackUsed = String(detail.qualitySummary.fallbackStatusLabel || "").includes("fallback");
+          const detailCustomVoice = String(detail.ttsStrategySummary.voiceModeLabel || "").includes("自定义");
+          document.getElementById("diagnosisSummary").innerHTML = [
+            detailAudioMissing
+              ? '当前最该先查声音链路：成片缺少音频，优先回看第 4 步声音应用是否成功、TTS 是否真正产出了音轨。'
+              : detailCustomVoice
+                ? '当前最该先查自定义声音一致性：这条成片走的是自定义声音路线，先重点听音色是否稳定、辨识度是否对。'
+                : '当前最该先查声音路线匹配度：先判断“' + detail.ttsStrategySummary.providerLabel + '”是否真的适合这条内容的语气和节奏。',
+            detailFallbackUsed
+              ? '当前还要重点查产物链路：这次渲染带有 fallback 痕迹，即使视频能打开，也要确认成片质量是否符合正式验收标准。'
+              : '当前画面与合成链路更像正式产物，接下来优先检查画面节奏、字幕对齐和声音是否跟镜头节奏匹配。',
+            detailSubtitleMissing
+              ? '如果你感觉整体观感不跟手，还要查字幕/合成阶段：当前字幕缺失，问题不一定只在声音路线。'
+              : '如果声音自然但整体观感仍不顺，更可能要查画面资产或合成节奏，而不是第一时间回退声音路线。',
           ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
           document.getElementById("routeOutcomeSummary").innerHTML = [
             '质量重点：' + detail.routeOutcomeSummary.qualityFocusLabel,
@@ -4769,8 +5032,11 @@ const server = http.createServer(async (req, res) => {
         label: meta.label,
         sampleText: meta.sampleText,
         isPreviewPlaceholder: meta.isPreviewPlaceholder,
+        previewPurposeLabel: meta.previewPurposeLabel,
+        qualityNote: meta.qualityNote,
         previewUrl: asset.relativeUrl,
         usedFallback: asset.usedFallback,
+        previewSource: asset.previewSource,
         customVoiceReference: customVoiceReference || undefined,
       });
     } catch (error) {

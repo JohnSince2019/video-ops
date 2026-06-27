@@ -104,5 +104,5 @@ export function isCustomVoiceMode(voiceMode: string) {
 }
 
 export function getCustomVoiceAuthorizationNotice() {
-  return "Only clone John's own voice or a voice with explicit permission. Do not clone unauthorized third-party voices.";
+  return "只能克隆 John 本人的声音，或你已经明确获得授权的声音。不要克隆未授权的第三方声音。";
 }
