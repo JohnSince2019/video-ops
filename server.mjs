@@ -265,6 +265,18 @@ function renderWizardPage() {
               </select>
             </div>
             <div class="field">
+              <label for="stylePreset">视觉风格 Style Preset</label>
+              <select id="stylePreset">
+                <option value="john_vertical_comic" selected>john_vertical_comic</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="personaPreset">人物预设 Persona Preset</label>
+              <select id="personaPreset">
+                <option value="john_persona_v1" selected>john_persona_v1</option>
+              </select>
+            </div>
+            <div class="field">
               <label for="ownerToken">Owner Token</label>
               <input id="ownerToken" placeholder="例如：john-mobile-studio" />
             </div>
@@ -272,6 +284,12 @@ function renderWizardPage() {
               <label for="scriptText">脚本文本 Script</label>
               <textarea id="scriptText" placeholder="在这里输入你的脚本、Markdown 场景或者段落文本。"></textarea>
               <div class="hint">支持普通文本和 Markdown 两种输入方式。摘要区会估算场景数量，帮助你快速判断脚本结构是否合理。</div>
+            </div>
+            <div class="field full">
+              <div class="summary-item">
+                <b style="display:block;margin-bottom:8px">John Style Notes</b>
+                <p>当前视觉方案会把画面约束为 John 的竖屏漫画讲解风格：暖色办公/训练场景、漫画人物、字幕安全区保留、禁止复制平台 UI、水印和账号元素。</p>
+              </div>
             </div>
           </div>
           <div class="actions">
@@ -296,7 +314,7 @@ function renderWizardPage() {
       </section>
 
       <script>
-        const ids = ["title", "author", "platform", "renderProfile", "scriptMode", "ownerToken", "scriptText"];
+        const ids = ["title", "author", "platform", "renderProfile", "scriptMode", "stylePreset", "personaPreset", "ownerToken", "scriptText"];
         const statusEl = document.getElementById("status");
         const summaryList = document.getElementById("summaryList");
         const errorList = document.getElementById("errorList");
@@ -370,6 +388,8 @@ function renderWizardPage() {
           document.getElementById("platform").value = "douyin";
           document.getElementById("renderProfile").value = "standard";
           document.getElementById("scriptMode").value = "plain_text";
+          document.getElementById("stylePreset").value = "john_vertical_comic";
+          document.getElementById("personaPreset").value = "john_persona_v1";
           document.getElementById("ownerToken").value = "john-ai-lab";
           document.getElementById("scriptText").value = "第一段：为什么高强度脑力工作者需要工作流级 AI。\\n\\n第二段：Atlas 如何帮你把内容生产拆成可执行步骤。\\n\\n第三段：为什么视频化表达能放大你的副业影响力。";
           await sync();

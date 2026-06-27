@@ -41,6 +41,8 @@ test("normalizes valid wizard input into a draft payload", () => {
   assert.equal(draft.renderProfile, "high_quality");
   assert.equal(draft.author, "John");
   assert.equal(draft.ownerToken, "owner-token-001");
+  assert.equal(draft.stylePreset, "john_vertical_comic");
+  assert.equal(draft.personaPreset, "john_persona_v1");
   assert.equal(draft.estimatedScenes, 3);
 });
 
@@ -60,8 +62,11 @@ test("summary includes platform, profile, script mode, and estimated scene count
   assert.equal(summary.platform, "xiaohongshu");
   assert.equal(summary.renderProfile, "standard");
   assert.equal(summary.scriptMode, "markdown");
+  assert.equal(summary.stylePreset, "john_vertical_comic");
+  assert.equal(summary.personaPreset, "john_persona_v1");
   assert.equal(summary.estimatedScenes, 2);
   assert.equal(summary.checklist.includes("Platform: xiaohongshu"), true);
+  assert.equal(summary.checklist.includes("Style preset: john_vertical_comic"), true);
 });
 
 test("plain text scene markers are counted as explicit scenes", () => {

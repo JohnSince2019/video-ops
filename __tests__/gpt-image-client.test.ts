@@ -30,6 +30,10 @@ test("maps scene input into a normalized GPT Image request", () => {
   assert.equal(body.response_format, "url");
   assert.match(body.prompt, /Scene hash: scene-hash-001/);
   assert.match(body.prompt, /Prompt hash: prompt-hash-001/);
+  assert.match(body.prompt, /Style preset: John Vertical Comic Explainer/);
+  assert.match(body.prompt, /Persona preset: John Persona v1/);
+  assert.match(body.prompt, /Do not imitate platform UI/);
+  assert.match(body.prompt, /reference-images\/john-persona-v1\.png/);
   assert.match(buildImagePrompt(scene), /Visual hint:/);
 });
 

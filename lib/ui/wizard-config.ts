@@ -4,6 +4,12 @@ import {
   type RenderProfile,
   type SupportedPlatform,
 } from "../types/manifest.js";
+import {
+  PERSONA_PRESET_IDS,
+  STYLE_PRESET_IDS,
+  type PersonaPresetId,
+  type StylePresetId,
+} from "../image/style-presets.js";
 
 export const SCRIPT_MODES = ["markdown", "plain_text"] as const;
 
@@ -17,6 +23,8 @@ export type WizardConfigInput = {
   ownerToken?: string;
   scriptText?: string;
   scriptMode?: string;
+  stylePreset?: string;
+  personaPreset?: string;
 };
 
 export type WizardConfigDraft = {
@@ -27,6 +35,8 @@ export type WizardConfigDraft = {
   ownerToken: string;
   scriptText: string;
   scriptMode: ScriptMode;
+  stylePreset: StylePresetId;
+  personaPreset: PersonaPresetId;
   estimatedScenes: number;
 };
 
@@ -36,6 +46,8 @@ export type WizardSummary = {
   renderProfile: RenderProfile;
   author: string;
   scriptMode: ScriptMode;
+  stylePreset: StylePresetId;
+  personaPreset: PersonaPresetId;
   estimatedScenes: number;
   scriptCharacters: number;
   checklist: string[];
@@ -44,6 +56,8 @@ export type WizardSummary = {
 const DEFAULT_PLATFORM: SupportedPlatform = "douyin";
 const DEFAULT_RENDER_PROFILE: RenderProfile = "standard";
 const DEFAULT_SCRIPT_MODE: ScriptMode = "plain_text";
+const DEFAULT_STYLE_PRESET: StylePresetId = "john_vertical_comic";
+const DEFAULT_PERSONA_PRESET: PersonaPresetId = "john_persona_v1";
 
 function estimateScenes(scriptText: string, scriptMode: ScriptMode) {
   const normalized = scriptText.trim();
@@ -97,6 +111,8 @@ export function validateWizardConfig(input: WizardConfigInput) {
   const ownerToken = input.ownerToken?.trim() ?? "";
   const scriptText = input.scriptText?.trim() ?? "";
   const scriptMode = input.scriptMode?.trim() ?? DEFAULT_SCRIPT_MODE;
+  const stylePreset = input.stylePreset?.trim() ?? DEFAULT_STYLE_PRESET;
+  const personaPreset = input.personaPreset?.trim() ?? DEFAULT_PERSONA_PRESET;
 
   if (!title) {
     errors.push("title is required");
@@ -112,6 +128,14 @@ export function validateWizardConfig(input: WizardConfigInput) {
 
   if (!SCRIPT_MODES.includes(scriptMode as ScriptMode)) {
     errors.push(`scriptMode must be one of: ${SCRIPT_MODES.join(", ")}`);
+  }
+
+  if (!STYLE_PRESET_IDS.includes(stylePreset as StylePresetId)) {
+    errors.push(`stylePreset must be one of: ${STYLE_PRESET_IDS.join(", ")}`);
+  }
+
+  if (!PERSONA_PRESET_IDS.includes(personaPreset as PersonaPresetId)) {
+    errors.push(`personaPreset must be one of: ${PERSONA_PRESET_IDS.join(", ")}`);
   }
 
   if (!author) {
@@ -149,6 +173,8 @@ export function normalizeWizardConfig(input: WizardConfigInput): WizardConfigDra
     ownerToken: input.ownerToken!.trim(),
     scriptText,
     scriptMode,
+    stylePreset: (input.stylePreset?.trim() ?? DEFAULT_STYLE_PRESET) as StylePresetId,
+    personaPreset: (input.personaPreset?.trim() ?? DEFAULT_PERSONA_PRESET) as PersonaPresetId,
     estimatedScenes: estimateScenes(scriptText, scriptMode),
   };
 }
@@ -160,12 +186,16 @@ export function summarizeWizardConfig(input: WizardConfigDraft): WizardSummary {
     renderProfile: input.renderProfile,
     author: input.author,
     scriptMode: input.scriptMode,
+    stylePreset: input.stylePreset,
+    personaPreset: input.personaPreset,
     estimatedScenes: input.estimatedScenes,
     scriptCharacters: input.scriptText.length,
     checklist: [
       `Platform: ${input.platform}`,
       `Render profile: ${input.renderProfile}`,
       `Script mode: ${input.scriptMode}`,
+      `Style preset: ${input.stylePreset}`,
+      `Persona preset: ${input.personaPreset}`,
       `Estimated scenes: ${input.estimatedScenes}`,
     ],
   };

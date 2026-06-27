@@ -1,4 +1,5 @@
 import type { ContentScene } from "../types/manifest.js";
+import { getPersonaPreset, getStylePreset } from "./style-presets.js";
 
 export type ImageGenerationSceneInput = Pick<
   ContentScene,
@@ -18,6 +19,8 @@ export type GenerateImageInput = {
   quality?: "standard" | "hd";
   n?: number;
   responseFormat?: "url" | "b64_json";
+  stylePreset?: string;
+  personaPreset?: string;
 };
 
 export type GatewayImageData = {
@@ -51,8 +54,13 @@ const DEFAULT_SIZE = "1024x1024";
 const DEFAULT_QUALITY = "standard";
 const DEFAULT_RESPONSE_FORMAT = "url";
 
-export function buildImagePrompt(scene: ImageGenerationSceneInput) {
+export function buildImagePrompt(
+  scene: ImageGenerationSceneInput,
+  options: Pick<GenerateImageInput, "stylePreset" | "personaPreset"> = {},
+) {
   const visualHint = scene.visual_hint?.trim() || "根据文案生成一张高信息密度、适合短视频分镜的画面";
+  const stylePreset = getStylePreset(options.stylePreset ?? "john_vertical_comic");
+  const personaPreset = getPersonaPreset(options.personaPreset ?? "john_persona_v1");
 
   return [
     "Create a single storyboard frame for a short-form video.",
@@ -63,6 +71,11 @@ export function buildImagePrompt(scene: ImageGenerationSceneInput) {
     `Mood: ${scene.mood}`,
     `Scene hash: ${scene.scene_hash}`,
     `Prompt hash: ${scene.prompt_hash}`,
+    `Style preset: ${stylePreset.label}`,
+    `Persona preset: ${personaPreset.label}`,
+    `Persona reference image path: ${personaPreset.referenceImagePath}`,
+    ...stylePreset.promptDirectives,
+    ...personaPreset.promptDirectives,
     "Requirements: cinematic composition, clear subject, no text overlay, production-ready visual.",
   ].join("\n");
 }
@@ -73,7 +86,10 @@ export function buildImageRequestBody(input: GenerateImageInput) {
   const quality = input.quality ?? DEFAULT_QUALITY;
   const n = input.n ?? 1;
   const responseFormat = input.responseFormat ?? DEFAULT_RESPONSE_FORMAT;
-  const prompt = buildImagePrompt(input.scene);
+  const prompt = buildImagePrompt(input.scene, {
+    stylePreset: input.stylePreset,
+    personaPreset: input.personaPreset,
+  });
 
   return {
     model,
