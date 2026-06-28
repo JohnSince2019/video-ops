@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 import { buildCustomVoiceReferenceAbsolutePath } from "../audio/custom-voice-reference.js";
 import { buildJobAssetPaths } from "../assets/job-assets.js";
+import type { JobMode } from "../domain/job-mode.js";
 import type { JobState } from "../domain/job-state.js";
 import { buildVisualConsistencySummary } from "../image/style-presets.js";
 import { parseMarkdownToSceneGraph } from "../parser/markdown-scene-graph.js";
@@ -23,6 +24,10 @@ export type CreatedVideoJob = {
   manifest: SceneGraph;
   storyboard: StoryboardPreview;
   outputPaths: ReturnType<typeof buildJobAssetPaths>;
+};
+
+export type CreateVideoJobOptions = {
+  jobMode?: JobMode;
 };
 
 function createJobId(draft: Pick<WizardConfigDraft, "title" | "ownerToken" | "scriptText">) {
@@ -165,6 +170,7 @@ function buildStoryboard(manifest: SceneGraph) {
 
 function buildInitialRecord(input: {
   jobId: string;
+  jobMode: JobMode;
   state: JobState;
   draft: WizardConfigDraft;
   manifest: SceneGraph;
@@ -183,6 +189,7 @@ function buildInitialRecord(input: {
   return {
     id: input.jobId,
     title: input.draft.title,
+    jobMode: input.jobMode,
     state: input.state,
     platform: input.draft.platform,
     renderProfile: input.draft.renderProfile,
@@ -236,11 +243,19 @@ function buildInitialRecord(input: {
 }
 
 export function createVideoJobFromDraft(draft: WizardConfigDraft): CreatedVideoJob {
+  return createVideoJobFromDraftWithOptions(draft, {});
+}
+
+export function createVideoJobFromDraftWithOptions(
+  draft: WizardConfigDraft,
+  options: CreateVideoJobOptions,
+): CreatedVideoJob {
   const jobId = createJobId(draft);
   const manifest = toManifest(draft);
   const storyboard = buildStoryboard(manifest);
   const record = buildInitialRecord({
     jobId,
+    jobMode: options.jobMode ?? "script_to_video",
     state: "QUEUED",
     draft,
     manifest,

@@ -1,7 +1,9 @@
 import { transitionJobState, type JobState } from "./job-state.js";
+import type { JobMode } from "./job-mode.js";
 
 export type RecoverableJob = {
   id: string;
+  jobMode: JobMode;
   state: JobState;
   manifestId: string;
   renderProfile: string;
@@ -62,6 +64,7 @@ export async function recoverInterruptedJobs(input: {
       message: "Recovered interrupted job and requeued for resume.",
       meta: {
         manifestId: job.manifestId,
+        jobMode: job.jobMode,
         renderProfile: job.renderProfile,
         ownerTokenHash: job.ownerTokenHash,
         recoveredFrom: "INTERRUPTED",

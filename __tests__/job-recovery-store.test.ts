@@ -29,6 +29,7 @@ test("queries interrupted jobs in updatedAt order for startup recovery", async (
       },
       select: {
         id: true,
+        jobMode: true,
         state: true,
         manifestId: true,
         renderProfile: true,

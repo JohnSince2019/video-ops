@@ -11,6 +11,7 @@ export function createJobRecoveryStore(prisma: PrismaClient): RecoverInterrupted
         },
         select: {
           id: true,
+          jobMode: true,
           state: true,
           manifestId: true,
           renderProfile: true,

@@ -20,6 +20,7 @@ test("scans interrupted jobs on startup, marks them queued, and re-enqueues them
         return [
           {
             id: "job-001",
+            jobMode: "script_to_video",
             state: "INTERRUPTED",
             manifestId: "manifest-001",
             renderProfile: "standard",
@@ -28,6 +29,7 @@ test("scans interrupted jobs on startup, marks them queued, and re-enqueues them
           },
           {
             id: "job-002",
+            jobMode: "raw_video_edit",
             state: "INTERRUPTED",
             manifestId: "manifest-002",
             renderProfile: "draft",
@@ -72,6 +74,7 @@ test("skips records that are not in INTERRUPTED state", async () => {
         return [
           {
             id: "job-003",
+            jobMode: "raw_video_edit",
             state: "FAILED",
             manifestId: "manifest-003",
             renderProfile: "standard",
@@ -108,6 +111,7 @@ test("result structure is consumable by startup bootstrap and ops diagnostics", 
         return [
           {
             id: "job-004",
+            jobMode: "script_to_video",
             state: "INTERRUPTED",
             manifestId: "manifest-004",
             renderProfile: "high_quality",

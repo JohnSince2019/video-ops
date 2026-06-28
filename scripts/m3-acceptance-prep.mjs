@@ -94,12 +94,25 @@ async function refreshAcceptanceScreenshots() {
     const selectedProviderBeforePreset = await page.locator("#ttsProviderIdVisible").inputValue();
     await page.locator('.voice-card[data-voice-mode="male_clear_teacher"] .voice-apply-btn').click();
     const selectedProviderAfterPreset = await page.locator("#ttsProviderId").inputValue();
+    const createJobResponsePromise = page.waitForResponse((response) =>
+      response.url().includes("/api/jobs") && response.request().method() === "POST",
+    );
     await page.locator("#createJobBtn").click();
-    await page.waitForFunction(() => {
-      return Array.from(document.querySelectorAll("#jobQualitySummary .quality-item")).some((item) =>
-        item.textContent?.includes("文件大小："),
-      );
-    }, { timeout: 60000 });
+    const createJobResponse = await createJobResponsePromise;
+    const createJobPayload = await createJobResponse.json();
+    assert.equal(createJobPayload.ok, true);
+    const completedJobDetail = await page.waitForFunction(
+      async (jobId) => {
+        const response = await fetch(`/api/jobs/${jobId}`);
+        if (!response.ok) return null;
+        const detail = await response.json();
+        return detail?.state === "COMPLETED" ? detail : null;
+      },
+      createJobPayload.job.id,
+      { timeout: 60000 },
+    ).then((handle) => handle.jsonValue());
+    await page.goto(`${appUrl}?step=video_assembly`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".main-title h2", { timeout: 10000 });
 
     const completedShot = await page.screenshot({ fullPage: true });
     await fs.writeFile(path.join(acceptanceDir, "workbench-completed.png"), completedShot);
@@ -107,6 +120,9 @@ async function refreshAcceptanceScreenshots() {
       hasProviderSelectOnInitial: Boolean(hasProviderSelectOnInitial),
       selectedProviderBeforePreset,
       selectedProviderAfterPreset,
+      createdJobId: createJobPayload.job.id,
+      completedJobState: completedJobDetail?.state ?? null,
+      completedPreviewUrl: completedJobDetail?.previewUrl ?? null,
     };
   } finally {
     await browser.close();

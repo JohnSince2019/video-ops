@@ -23,6 +23,7 @@ import { ensureVoicePreviewAsset, getVoicePreviewMeta } from "./lib/audio/voice-
 import { buildAcceptanceLead, buildJobDetailView, buildJobListView } from "./lib/ui/job-dashboard.ts";
 import { buildDeliveryPackageSummary } from "./lib/ui/delivery-package-summary.ts";
 import { evaluatePublishReadiness } from "./lib/ui/publish-readiness.ts";
+import { buildRawVideoPackageDetail } from "./lib/ui/raw-video-package-detail.ts";
 import { buildComplianceReport, exportComplianceReportJson } from "./lib/compliance/compliance-report.ts";
 import { exportComplianceReportPdf } from "./lib/compliance/compliance-report-pdf.ts";
 import { runComplianceGuard } from "./lib/domain/compliance-guard.ts";
@@ -35,7 +36,24 @@ import {
 import { normalizeWizardConfig, summarizeWizardConfig, validateWizardConfig } from "./lib/ui/wizard-config.ts";
 import { renderZenPageShell } from "./lib/ui/zen-shell.ts";
 import { createVideoJobFromDraft } from "./lib/jobs/job-creation.ts";
+import { createRawVideoJobFromInput } from "./lib/raw-video/create-raw-video-job.ts";
+import { createEmptyRawVideoEdl } from "./lib/raw-video/edl-schema.js";
+import { cutRawVideoEdlClips, attachClipManifestToSourceMetadata } from "./lib/raw-video/edl-clip-cutter.js";
+import { assembleCleanEditFromClipManifest, attachCleanEditToSourceMetadata } from "./lib/raw-video/clean-edit-assembler.js";
+import {
+  normalizeCleanEditAudio,
+  attachCleanEditAudioNormalizationToSourceMetadata,
+} from "./lib/raw-video/clean-edit-audio-normalizer.js";
+import {
+  inspectCleanEditQuality,
+  attachCleanEditQualityInspectionToSourceMetadata,
+} from "./lib/raw-video/clean-edit-quality-inspector.js";
+import { renderRawVideoWithRemotion } from "./lib/raw-video/raw-video-renderer.js";
+import { inspectRawVideoQualityGate } from "./lib/raw-video/raw-video-quality-gate.js";
+import { inspectRawVideoAiCritic } from "./lib/raw-video/raw-video-ai-critic.js";
 import { renderJobArtifacts } from "./lib/video/local-renderer.ts";
+import { buildPlatformMetadata } from "./lib/video/platform-metadata.js";
+import { buildOutputPackage } from "./lib/video/output-package.js";
 
 const port = Number(process.env.PORT ?? 3003);
 const channel = new JobProgressChannel();
@@ -5056,6 +5074,10 @@ ${sharedPageStyles}
               <b style="display:block;margin-bottom:8px">产物输出</b>
               <div class="detail-list" id="outputsSummary"></div>
             </div>
+            <div class="summary-item">
+              <b style="display:block;margin-bottom:8px">原始视频成片包</b>
+              <div class="detail-list" id="rawVideoPackageSummary"></div>
+            </div>
           </div>
         </aside>
       </section>
@@ -5428,6 +5450,46 @@ ${sharedPageStyles}
           document.getElementById("outputsSummary").innerHTML = detail.outputsSummary
             .map((item) => '<div class="summary-item">' + item + '</div>')
             .join("");
+          const rawVideoPackageSummary = document.getElementById("rawVideoPackageSummary");
+          if (rawVideoPackageSummary) {
+            const packageDetail = detail.rawVideoPackageDetail;
+            if (!packageDetail) {
+              rawVideoPackageSummary.innerHTML = '<div class="summary-item">当前任务不是原始视频剪辑任务，暂无专属成片包视图。</div>';
+            } else {
+              const finalOutputsHtml = packageDetail.finalOutputs.length
+                ? packageDetail.finalOutputs.map((item) =>
+                    '<div class="summary-item"><b>' + escapeHtml(item.label) + '</b>：' +
+                    (item.available
+                      ? '<a href="' + escapeHtml(item.url) + '" target="_blank" rel="noreferrer">' + escapeHtml(item.path) + '</a>'
+                      : '<span>' + escapeHtml(item.path) + '（当前未生成）</span>') +
+                    '</div>'
+                  ).join("")
+                : '<div class="summary-item">当前还没有最终交付文件。</div>';
+              const supportingHtml = packageDetail.supportingArtifacts.length
+                ? packageDetail.supportingArtifacts.map((item) =>
+                    '<div class="summary-item"><b>' + escapeHtml(item.label) + '</b>：' +
+                    (item.available
+                      ? '<a href="' + escapeHtml(item.url) + '" target="_blank" rel="noreferrer">' + escapeHtml(item.path) + '</a>'
+                      : '<span>' + escapeHtml(item.path) + '（当前未生成）</span>') +
+                    '</div>'
+                  ).join("")
+                : '<div class="summary-item">当前还没有可展示的辅助产物。</div>';
+              const reportHtml = packageDetail.reportCards.map((card) =>
+                '<div class="summary-item"><b>' + escapeHtml(card.title) + '</b>：' + escapeHtml(card.status) + '</div>' +
+                card.summary.map((line) => '<div class="summary-item">' + escapeHtml(line) + '</div>').join("") +
+                (card.url ? '<div class="summary-item"><a href="' + escapeHtml(card.url) + '" target="_blank" rel="noreferrer">打开报告</a></div>' : '')
+              ).join("");
+
+              rawVideoPackageSummary.innerHTML = [
+                '<div class="summary-item"><b>最终交付</b></div>',
+                finalOutputsHtml,
+                '<div class="summary-item"><b>辅助产物</b></div>',
+                supportingHtml,
+                '<div class="summary-item"><b>质量与批评报告</b></div>',
+                reportHtml,
+              ].join("");
+            }
+          }
         }
 
         renderList(initialDetail.id);
@@ -5744,6 +5806,41 @@ async function readJsonBody(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
+function validateRawVideoJobPayload(payload) {
+  const title = payload?.title?.trim();
+  const ownerToken = payload?.ownerToken?.trim();
+  const platform = payload?.platform?.trim() || "douyin";
+  const renderProfile = payload?.renderProfile?.trim() || "standard";
+
+  const errors = [];
+  if (!title) {
+    errors.push("title is required");
+  }
+  if (!ownerToken) {
+    errors.push("ownerToken is required");
+  }
+  if (!["douyin", "xiaohongshu", "videox"].includes(platform)) {
+    errors.push("platform must be one of: douyin, xiaohongshu, videox");
+  }
+  if (!["draft", "standard", "high_quality"].includes(renderProfile)) {
+    errors.push("renderProfile must be one of: draft, standard, high_quality");
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    normalized: {
+      title,
+      ownerToken,
+      platform,
+      renderProfile,
+      sourceFileName: payload?.sourceFileName?.trim() || "source-video.mp4",
+      sourceMimeType: payload?.sourceMimeType?.trim() || "video/mp4",
+      sourceVideoBase64: payload?.sourceVideoBase64?.trim() || undefined,
+    },
+  };
+}
+
 function pushDemoSequence(sequence) {
   for (const item of sequence) {
     channel.emit(
@@ -5786,6 +5883,10 @@ function absoluteFromWorkspace(relativePath) {
   return path.join(workspaceRoot, relativePath);
 }
 
+async function ensureWorkspaceAssetParent(relativePath) {
+  await ensureParentDirectory(absoluteFromWorkspace(relativePath));
+}
+
 function pickMimeType(filePath) {
   if (filePath.endsWith(".mp4")) return "video/mp4";
   if (filePath.endsWith(".png")) return "image/png";
@@ -5801,6 +5902,31 @@ async function readFileSizeSafe(filePath) {
   } catch {
     return null;
   }
+}
+
+async function readJsonFileSafe(filePath) {
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function collectExistingPaths(outputPaths) {
+  if (!outputPaths || typeof outputPaths !== "object") {
+    return [];
+  }
+
+  const entries = Object.values(outputPaths).filter((value) => typeof value === "string" && value.length > 0);
+  const existing = [];
+  for (const relativePath of entries) {
+    const absolutePath = absoluteFromWorkspace(relativePath);
+    if (existsSync(absolutePath)) {
+      existing.push(relativePath);
+    }
+  }
+  return existing;
 }
 
 function getComplianceSummaryFromManifest(manifest) {
@@ -5819,6 +5945,76 @@ function getRenderResolution(rendered) {
     return null;
   }
   return `${width}x${height}`;
+}
+
+function buildRawVideoEdlFromCreatedJob(job) {
+  const transcript = job.transcript;
+  const timeline = job.subtitleTimeline;
+  const sourceVideo = job.sourceVideo;
+  if (!transcript || !timeline || !sourceVideo) {
+    throw new Error("Raw-video job is missing transcript or subtitle timeline for EDL generation.");
+  }
+
+  const edl = createEmptyRawVideoEdl({
+    jobId: job.record.id,
+    sourceVideoId: sourceVideo.id,
+  });
+
+  const totalDurationMs = Math.max(
+    Math.round((job.sourceProbe?.durationSec ?? 0) * 1000),
+    timeline.cues[timeline.cues.length - 1]?.endMs ?? 0,
+  );
+  edl.totalDurationMs = totalDurationMs;
+  const fallbackTranscriptText =
+    transcript.text?.trim()
+    || job.transcriptAnalysis?.summary?.trim()
+    || "原始视频主线片段";
+  const effectiveCues =
+    timeline.cues.length > 0
+      ? timeline.cues
+      : [
+          {
+            index: 1,
+            startMs: 0,
+            endMs: totalDurationMs,
+            text: fallbackTranscriptText,
+            source: "segment",
+          },
+        ];
+  edl.clips = effectiveCues.map((cue, index) => {
+    const matchingSuggestion = job.transcriptAnalysis?.removalSuggestions?.find(
+      (item) => item.startMs <= cue.startMs && item.endMs >= cue.endMs,
+    );
+    return {
+      clipId: `clip-${index + 1}`,
+      sourceVideoId: sourceVideo.id,
+      startMs: cue.startMs,
+      endMs: cue.endMs,
+      durationMs: cue.endMs - cue.startMs,
+      transcriptText: cue.text,
+      removalCandidate: Boolean(matchingSuggestion),
+      // Removal suggestions are candidates for review, not auto-deletions.
+      reviewState: "kept",
+      reviewReason: matchingSuggestion
+        ? `候选删减待复核：${matchingSuggestion.reason}`
+        : "默认保留当前信息片段。",
+    };
+  });
+  edl.captions = effectiveCues.map((cue, index) => ({
+    captionId: `caption-${index + 1}`,
+    startMs: cue.startMs,
+    endMs: cue.endMs,
+    text: cue.text,
+  }));
+  edl.chapters = (job.transcriptAnalysis?.chapters ?? []).map((chapter, index) => ({
+    chapterId: `chapter-${index + 1}`,
+    title: chapter.title,
+    startMs: chapter.startMs,
+    endMs: chapter.endMs,
+    summary: chapter.summary,
+  }));
+
+  return edl;
 }
 
 function emitJobProgress(jobId, state, progress, step, message, meta = {}) {
@@ -5899,6 +6095,355 @@ async function runCreatedJobLifecycle(jobId) {
   const job = getCreatedJob(jobId);
   if (!job) {
     return;
+  }
+
+  if (job.record?.jobMode === "raw_video_edit") {
+    try {
+      const sourceVideo = job.sourceVideo;
+      const outputPaths = job.outputPaths;
+      const transcriptAnalysis = job.transcriptAnalysis;
+      const subtitleTimeline = job.subtitleTimeline;
+      if (!sourceVideo || !outputPaths || !transcriptAnalysis || !subtitleTimeline) {
+        throw new Error("Raw-video lifecycle is missing source artifacts required for end-to-end execution.");
+      }
+
+      const metadataAbsolutePath = absoluteFromWorkspace(sourceVideo.metadataPath);
+      const edl = buildRawVideoEdlFromCreatedJob(job);
+      await ensureWorkspaceAssetParent(sourceVideo.edlPath);
+      await fs.writeFile(absoluteFromWorkspace(sourceVideo.edlPath), JSON.stringify(edl, null, 2), "utf8");
+
+      await updateCreatedJob(jobId, (current) => ({
+        ...current,
+        record: {
+          ...current.record,
+          state: "AI_PROCESSING",
+          progress: 32,
+          currentStep: "build_timeline",
+          updatedAt: new Date().toISOString(),
+          lastCheckpoint: mergeCheckpoint(current.record.lastCheckpoint, {
+            step: "build_timeline",
+            stageNarration: "正在根据 transcript / subtitle timeline 生成原始视频 EDL。",
+            edlPath: current.sourceVideo?.edlPath ?? null,
+          }),
+          outputs: [
+            ...(current.record.outputs ?? []),
+            { kind: "edl", path: current.sourceVideo.edlPath, url: `/${current.sourceVideo.edlPath}` },
+          ],
+        },
+      }));
+      emitJobProgress(jobId, "AI_PROCESSING", 32, "build_timeline", "Raw-video EDL generated", {
+        edlPath: sourceVideo.edlPath,
+      });
+
+      const clipManifest = await cutRawVideoEdlClips({
+        workspaceRoot,
+        sourceVideoPath: sourceVideo.originalPath,
+        edl,
+        clipsDir: outputPaths.clipsDir,
+        clipManifestPath: outputPaths.clipManifestPath,
+      });
+      await attachClipManifestToSourceMetadata({
+        metadataPath: metadataAbsolutePath,
+        clipManifestPath: sourceVideo.clipManifestPath,
+        clipManifest,
+      });
+
+      await updateCreatedJob(jobId, (current) => ({
+        ...current,
+        record: {
+          ...current.record,
+          state: "ASSEMBLING",
+          progress: 54,
+          currentStep: "build_timeline",
+          updatedAt: new Date().toISOString(),
+          lastCheckpoint: mergeCheckpoint(current.record.lastCheckpoint, {
+            step: "build_timeline",
+            stageNarration: "正在裁切原始视频片段并拼接 clean edit。",
+            clipManifestPath: current.sourceVideo?.clipManifestPath ?? null,
+          }),
+          outputs: [
+            ...(current.record.outputs ?? []),
+            { kind: "clip_manifest", path: current.sourceVideo.clipManifestPath, url: `/${current.sourceVideo.clipManifestPath}` },
+          ],
+        },
+      }));
+      emitJobProgress(jobId, "ASSEMBLING", 54, "build_timeline", "Clip manifest generated", {
+        clipManifestPath: sourceVideo.clipManifestPath,
+      });
+
+      const cleanEdit = await assembleCleanEditFromClipManifest({
+        workspaceRoot,
+        clipManifest,
+        outputPath: outputPaths.cleanEditPath,
+      });
+      await attachCleanEditToSourceMetadata({
+        metadataPath: metadataAbsolutePath,
+        cleanEdit,
+      });
+
+      const normalizedAudio = await normalizeCleanEditAudio({
+        workspaceRoot,
+        inputPath: cleanEdit.outputPath,
+        outputPath: outputPaths.normalizedCleanEditPath,
+        reportPath: outputPaths.loudnessReportPath,
+      });
+      await attachCleanEditAudioNormalizationToSourceMetadata({
+        metadataPath: metadataAbsolutePath,
+        normalizedAudio,
+      });
+
+      const cleanEditQuality = await inspectCleanEditQuality({
+        workspaceRoot,
+        inspectedPath: normalizedAudio.outputPath,
+        clipManifest,
+        loudnessReportPath: normalizedAudio.reportPath,
+        reportPath: outputPaths.cleanEditQualityReportPath,
+      });
+      await attachCleanEditQualityInspectionToSourceMetadata({
+        metadataPath: metadataAbsolutePath,
+        inspection: cleanEditQuality,
+      });
+
+      await updateCreatedJob(jobId, (current) => ({
+        ...current,
+        record: {
+          ...current.record,
+          state: "RENDERING",
+          progress: 76,
+          currentStep: "ffmpeg_render",
+          updatedAt: new Date().toISOString(),
+          lastCheckpoint: mergeCheckpoint(current.record.lastCheckpoint, {
+            step: "ffmpeg_render",
+            stageNarration: "正在把 clean edit 包装成最终 Remotion 成片。",
+            cleanEditPath: current.sourceVideo?.cleanEditPath ?? null,
+          }),
+          outputs: [
+            ...(current.record.outputs ?? []),
+            { kind: "clean_edit", path: current.sourceVideo.cleanEditPath, url: `/${current.sourceVideo.cleanEditPath}` },
+            { kind: "clean_edit_normalized", path: current.sourceVideo.normalizedCleanEditPath, url: `/${current.sourceVideo.normalizedCleanEditPath}` },
+            { kind: "clean_edit_quality_report", path: current.sourceVideo.cleanEditQualityReportPath, url: `/${current.sourceVideo.cleanEditQualityReportPath}` },
+            { kind: "clean_edit_loudness_report", path: current.sourceVideo.loudnessReportPath, url: `/${current.sourceVideo.loudnessReportPath}` },
+          ],
+        },
+      }));
+      emitJobProgress(jobId, "RENDERING", 76, "ffmpeg_render", "Clean edit validated, rendering final raw-video output", {
+        cleanEditPath: sourceVideo.cleanEditPath,
+      });
+
+      const renderResult = await renderRawVideoWithRemotion({
+        workspaceRoot,
+        jobId,
+        title: job.record.title ?? "原始视频剪辑任务",
+        transcriptAnalysis,
+        outputPath: outputPaths.videoPath,
+        propsPath: outputPaths.remotionPropsPath,
+        metadataPath: outputPaths.remotionRenderMetadataPath,
+      });
+
+      const pseudoTimeline = {
+        totalDurationMs: Math.round(renderResult.probe.durationSec * 1000),
+        clips: [
+          {
+            sceneId: "raw-video-final",
+            durationMs: Math.round(renderResult.probe.durationSec * 1000),
+          },
+        ],
+      };
+      const platformMetadata = buildPlatformMetadata({
+        manifest: {
+          $schema: "https://video-ops.example.com/raw-video-package.schema.json",
+          id: `${jobId}-raw-video-package`,
+          title: job.record.title ?? "原始视频剪辑任务",
+          platform: job.record.platform ?? "douyin",
+          renderProfile: job.record.renderProfile ?? "standard",
+          scenes: [
+            {
+              id: "raw-video-final",
+              scene_hash: "raw-video-final",
+              prompt_hash: "raw-video-final",
+              duration_ms: Math.round(renderResult.probe.durationSec * 1000),
+              narration: transcriptAnalysis.summary,
+              script_type: "narration",
+              mood: "calm",
+              audio: { tts_voice: "raw-video-original-audio" },
+            },
+          ],
+          metadata: {
+            created_at: new Date().toISOString(),
+            author: "John",
+            copyright_license: "internal",
+          },
+        },
+        timeline: pseudoTimeline,
+        platform: job.record.platform ?? "douyin",
+        renderProfile: job.record.renderProfile ?? "standard",
+      });
+      const outputPackage = buildOutputPackage({
+        renderPlan: {
+          profile: job.record.renderProfile ?? "standard",
+          timelineDurationMs: pseudoTimeline.totalDurationMs,
+          outputPath: outputPaths.videoPath,
+          ffmpegArgs: ["remotion", "render", "CleanKnowledgeTalk"],
+          clips: [
+            {
+              sceneId: "raw-video-final",
+              imageInput: outputPaths.thumbnailPath,
+              audioInput: outputPaths.normalizedCleanEditPath,
+              durationMs: pseudoTimeline.totalDurationMs,
+              transition: { type: "cut", durationMs: 0 },
+            },
+          ],
+          spec: {
+            profile: job.record.renderProfile ?? "standard",
+            width: renderResult.probe.resolution === "1440x2560" ? 1440 : 1080,
+            height: renderResult.probe.resolution === "1440x2560" ? 2560 : 1920,
+            videoBitrateKbps: 3500,
+            audioBitrateKbps: 128,
+            crf: 24,
+            preset: "medium",
+          },
+        },
+        platformMetadata,
+        videoPath: outputPaths.videoPath,
+        coverPath: outputPaths.thumbnailPath,
+        metadataPath: outputPaths.metadataPath,
+        subtitles: [
+          { format: "srt", path: outputPaths.subtitleSrtPath },
+          { format: "vtt", path: outputPaths.subtitleVttPath },
+        ],
+        rawVideo: {
+          jobMode: "raw_video_edit",
+          sourceVideo: {
+            metadataPath: sourceVideo.metadataPath,
+            proxyPath: sourceVideo.proxyPath,
+            thumbnailPath: sourceVideo.thumbnailPath,
+          },
+          transcript: {
+            transcriptPath: sourceVideo.transcriptPath,
+            wordsPath: sourceVideo.transcriptWordsPath,
+            subtitleTimelinePath: sourceVideo.subtitleTimelinePath,
+            srtPath: sourceVideo.subtitleSrtPath,
+            vttPath: sourceVideo.subtitleVttPath,
+          },
+          editDecisionList: {
+            path: sourceVideo.edlPath,
+          },
+          cleanEdit: {
+            path: sourceVideo.cleanEditPath,
+            normalizedPath: sourceVideo.normalizedCleanEditPath,
+            loudnessReportPath: sourceVideo.loudnessReportPath,
+            qualityReportPath: sourceVideo.cleanEditQualityReportPath,
+          },
+          remotion: {
+            propsPath: sourceVideo.remotionPropsPath,
+            renderMetadataPath: sourceVideo.remotionRenderMetadataPath,
+          },
+        },
+      });
+      await ensureWorkspaceAssetParent(outputPaths.metadataPath);
+      await fs.writeFile(absoluteFromWorkspace(outputPaths.metadataPath), outputPackage.metadataFile.content, "utf8");
+
+      const qualityGateReport = await inspectRawVideoQualityGate({
+        workspaceRoot,
+        outputPackage,
+        reportPath: outputPaths.rawVideoQualityGateReportPath,
+      });
+      const criticReport = await inspectRawVideoAiCritic({
+        workspaceRoot,
+        analysis: transcriptAnalysis,
+        subtitleTimeline,
+        qualityGate: qualityGateReport,
+        edl,
+        editIntentOptions: job.editIntentOptions,
+        reportPath: outputPaths.rawVideoCriticReportPath,
+      });
+
+      const complianceSummary = {
+        complianceStatus: qualityGateReport.qualityPassed ? "allowed" : "blocked",
+        complianceViolations: qualityGateReport.checks.filter((item) => !item.passed).length,
+      };
+
+      await updateCreatedJob(jobId, (current) => ({
+        ...current,
+        outputPaths: {
+          ...current.outputPaths,
+          videoPath: outputPackage.video.path,
+          coverPath: outputPackage.cover.path,
+          metadataPath: outputPackage.metadataFile.path,
+        },
+        record: {
+          ...current.record,
+          state: "COMPLETED",
+          progress: 100,
+          currentStep: "done",
+          updatedAt: new Date().toISOString(),
+          lastCheckpoint: mergeCheckpoint(current.record.lastCheckpoint, {
+            step: "done",
+            progress: 100,
+            previewUrl: outputPackage.video.url,
+            stageNarration: qualityGateReport.qualityPassed
+              ? "原始视频链路已完成，成片、质量门与 AI Critic 报告都已生成。"
+              : "原始视频链路已完成，但质量门或 AI Critic 仍提示需要复核。",
+            rawVideoQualityGateScore: qualityGateReport.qualityPassed,
+            rawVideoCriticScore: criticReport.overallScore,
+          }),
+          qualitySummary: {
+            ...(current.record.qualitySummary ?? {}),
+            durationSec: renderResult.probe.durationSec,
+            resolution: renderResult.probe.resolution,
+            audioPresence: renderResult.probe.hasAudio,
+            subtitleStatus: outputPackage.subtitles.length ? "generated" : "missing",
+            fallbackStatus: "primary",
+            fallbackReason: null,
+            ...complianceSummary,
+          },
+          outputs: outputPackage.artifacts.map((item) => ({
+            kind: item.kind,
+            path: item.path,
+            url: item.url,
+          })),
+        },
+        renderResult: {
+          outputPackage,
+          previewUrl: outputPackage.video.url,
+          providerMetadata: { stage: "render", provider: "remotion-raw-video", mode: "primary" },
+          probe: renderResult.probe,
+        },
+        rawVideoReports: {
+          qualityGateReport,
+          criticReport,
+        },
+      }));
+
+      emitJobProgress(jobId, "COMPLETED", 100, "done", "Raw-video pipeline completed", {
+        previewUrl: outputPackage.video.url,
+        qualityGatePassed: qualityGateReport.qualityPassed,
+        criticScore: criticReport.overallScore,
+      });
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Raw-video pipeline failed";
+      await updateCreatedJob(jobId, (current) => ({
+        ...current,
+        record: {
+          ...current.record,
+          state: "FAILED",
+          currentStep: "render_failed",
+          updatedAt: new Date().toISOString(),
+          lastCheckpoint: mergeCheckpoint(current.record.lastCheckpoint, {
+            step: "render_failed",
+            error: message,
+            stageNarration: "原始视频链路执行失败，请先处理错误后再重试。",
+          }),
+          errors: [
+            ...(current.record.errors ?? []),
+            { stepName: "render", errorMessage: message, retryCount: 0 },
+          ],
+        },
+      }));
+      emitJobProgress(jobId, "FAILED", job.record.progress ?? 0, "render_failed", message, {});
+      return;
+    }
   }
 
   const steps = getLifecycleStepNarration(job);
@@ -6164,6 +6709,40 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/raw-video/jobs") {
+    try {
+      const payload = await readJsonBody(req);
+      const validation = validateRawVideoJobPayload(payload);
+      if (!validation.valid) {
+        sendJson(res, 400, { ok: false, error: validation.errors.join(" | ") });
+        return;
+      }
+
+      const created = await storeCreatedJob(await createRawVideoJobFromInput(validation.normalized));
+      sendJson(res, 201, {
+        ok: true,
+        job: {
+          id: created.record.id,
+          jobMode: created.record.jobMode,
+          state: created.record.state,
+          progress: created.record.progress,
+          currentStep: created.record.currentStep,
+        },
+        sourceVideo: created.sourceVideo,
+        outputPaths: created.outputPaths,
+      });
+      setTimeout(() => {
+        void runCreatedJobLifecycle(created.record.id);
+      }, 0);
+    } catch (error) {
+      sendJson(res, 400, {
+        ok: false,
+        error: error instanceof Error ? error.message : "Invalid raw video job payload",
+      });
+    }
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/custom-voice-reference") {
     try {
       const payload = await readJsonBody(req);
@@ -6226,6 +6805,13 @@ const server = http.createServer(async (req, res) => {
       const fileSizeBytes = videoPath ? await readFileSizeSafe(videoPath) : null;
       const previewUrl =
         created.record.outputs?.find((item) => item.kind === "video")?.url ?? null;
+      const availablePaths = await collectExistingPaths(created.outputPaths);
+      const qualityGateReport = created.outputPaths?.rawVideoQualityGateReportPath
+        ? await readJsonFileSafe(absoluteFromWorkspace(created.outputPaths.rawVideoQualityGateReportPath))
+        : null;
+      const criticReport = created.outputPaths?.rawVideoCriticReportPath
+        ? await readJsonFileSafe(absoluteFromWorkspace(created.outputPaths.rawVideoCriticReportPath))
+        : null;
       const hydratedRecord = {
         ...created.record,
         qualitySummary: {
@@ -6237,6 +6823,14 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, {
         ...buildJobDetailView(hydratedRecord, {
           reviewRank: listItem?.reviewRank ?? null,
+          rawVideoPackageDetail: buildRawVideoPackageDetail({
+            jobMode: hydratedRecord.jobMode,
+            outputs: hydratedRecord.outputs ?? [],
+            outputPaths: created.outputPaths,
+            qualityGateReport,
+            criticReport,
+            availablePaths,
+          }),
         }),
         storyboard: created.storyboard,
         manifest: created.manifest,
@@ -6259,6 +6853,14 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, {
       ...buildJobDetailView(record, {
         reviewRank: listItem?.reviewRank ?? null,
+        rawVideoPackageDetail: buildRawVideoPackageDetail({
+          jobMode: record.jobMode,
+          outputs: record.outputs ?? [],
+          outputPaths: null,
+          qualityGateReport: null,
+          criticReport: null,
+          availablePaths: [],
+        }),
       }),
       storyboard: null,
       manifest: null,

@@ -1,4 +1,5 @@
 import { JOB_STATES, type JobState } from "../domain/job-state.js";
+import { formatJobModeLabel, type JobMode } from "../domain/job-mode.js";
 import {
   buildVisualConsistencySummary,
   formatPersonaPresetLabel,
@@ -8,6 +9,7 @@ import {
 export type JobDashboardRecord = {
   id: string;
   title?: string | null;
+  jobMode?: JobMode | null;
   state?: string | null;
   platform?: string | null;
   renderProfile?: string | null;
@@ -42,6 +44,8 @@ export type JobDashboardRecord = {
 export type JobListItem = {
   id: string;
   title: string;
+  jobMode: JobMode | "UNKNOWN";
+  jobModeLabel: string;
   state: JobState | "UNKNOWN";
   stateLabel: string;
   platform: string;
@@ -72,6 +76,8 @@ export type JobListItem = {
 export type JobDetailView = {
   id: string;
   title: string;
+  jobMode: JobMode | "UNKNOWN";
+  jobModeLabel: string;
   state: JobState | "UNKNOWN";
   stateLabel: string;
   progress: number;
@@ -84,6 +90,27 @@ export type JobDetailView = {
   checkpointReadableSummary: string[];
   errorSummary: string[];
   outputsSummary: string[];
+  rawVideoPackageDetail: {
+    finalOutputs: Array<{
+      label: string;
+      path: string;
+      url: string;
+      available: boolean;
+    }>;
+    supportingArtifacts: Array<{
+      label: string;
+      path: string;
+      url: string;
+      available: boolean;
+    }>;
+    reportCards: Array<{
+      title: string;
+      status: string;
+      summary: string[];
+      url: string | null;
+      available: boolean;
+    }>;
+  } | null;
   ttsStrategySummary: {
     providerLabel: string;
     routeLabel: string;
@@ -147,7 +174,16 @@ export type JobDetailView = {
 
 type JobDetailContext = {
   reviewRank?: number | null;
+  rawVideoPackageDetail?: JobDetailView["rawVideoPackageDetail"];
 };
+
+function normalizeJobMode(mode?: string | null): JobMode | "UNKNOWN" {
+  if (mode === "script_to_video" || mode === "raw_video_edit") {
+    return mode;
+  }
+
+  return "UNKNOWN";
+}
 
 export type JobAcceptanceLead = {
   jobId: string;
@@ -936,6 +972,7 @@ export function buildJobListView(records: JobDashboardRecord[]): JobListItem[] {
   const sorted = records
     .map((record, index) => {
     const state = normalizeState(record.state);
+    const jobMode = normalizeJobMode(record.jobMode);
     const priorityBucket = resolvePriorityBucket(record);
     const readyLane = resolveReadyLane(record, priorityBucket);
     const progressValue =
@@ -948,6 +985,8 @@ export function buildJobListView(records: JobDashboardRecord[]): JobListItem[] {
     return {
       id: record.id,
       title: record.title?.trim() || `未命名任务 ${index + 1}`,
+      jobMode,
+      jobModeLabel: formatJobModeLabel(jobMode === "UNKNOWN" ? null : jobMode),
       state,
       stateLabel: formatStateLabel(state),
       platform: record.platform?.trim() || "unknown-platform",
@@ -1027,6 +1066,7 @@ export function buildAcceptanceLead(list: JobListItem[]): JobAcceptanceLead | nu
 
 export function buildJobDetailView(record: JobDashboardRecord, context?: JobDetailContext): JobDetailView {
   const state = normalizeState(record.state);
+  const jobMode = normalizeJobMode(record.jobMode);
   const priorityBucket = resolvePriorityBucket(record);
   const readyLane = resolveReadyLane(record, priorityBucket);
   const stylePresetId = readCheckpointField(record.lastCheckpoint, "stylePreset");
@@ -1044,6 +1084,8 @@ export function buildJobDetailView(record: JobDashboardRecord, context?: JobDeta
   return {
     id: record.id,
     title: record.title?.trim() || "未命名任务",
+    jobMode,
+    jobModeLabel: formatJobModeLabel(jobMode === "UNKNOWN" ? null : jobMode),
     state,
     stateLabel: formatStateLabel(state),
     progress,
@@ -1064,6 +1106,7 @@ export function buildJobDetailView(record: JobDashboardRecord, context?: JobDeta
       record.outputs?.length
         ? record.outputs.map((item) => `${formatOutputKindLabel(item.kind)}：${item.url ?? item.path}`)
         : ["当前还没有可用产物。"],
+    rawVideoPackageDetail: context?.rawVideoPackageDetail ?? null,
     ttsStrategySummary: {
       providerLabel: formatTtsProviderLabel(readCheckpointField(record.lastCheckpoint, "ttsProviderId")),
       routeLabel: readCheckpointField(record.lastCheckpoint, "ttsRouteLabel") || "未设置",

@@ -12,6 +12,7 @@ import {
 import { createUnavailableMlxRunner, detectMlxAudioAvailability } from "../audio/local-tts-runner.js";
 import { buildJobAssetPaths } from "../assets/job-assets.js";
 import type { ProviderExecutionMetadata } from "../providers/provider-types.js";
+import { probeSourceVideo } from "../raw-video/source-video-probe.js";
 import type { ContentManifest } from "../types/manifest.js";
 import { buildPlatformMetadata } from "./platform-metadata.js";
 import { buildOutputPackage } from "./output-package.js";
@@ -309,26 +310,6 @@ async function renderSegmentsWithFfmpeg(plan: RenderPlan, tempDir: string) {
   ], EXEC_OPTIONS);
 }
 
-async function probeVideo(videoPath: string) {
-  const { stdout } = await execFileAsync("ffprobe", [
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration:stream=codec_type",
-    "-of",
-    "json",
-    videoPath,
-  ], EXEC_OPTIONS);
-
-  const parsed = JSON.parse(stdout);
-  return {
-    durationSec: Number(parsed.format?.duration ?? 0),
-    streamTypes: Array.isArray(parsed.streams)
-      ? parsed.streams.map((item: { codec_type?: string }) => item.codec_type).filter(Boolean)
-      : [],
-  };
-}
-
 async function buildMockArtifacts(plan: RenderPlan, outputPaths: ReturnType<typeof buildJobAssetPaths>) {
   await fs.writeFile(plan.outputPath, "mock-mp4-placeholder");
   await fs.copyFile(plan.clips[0]?.imageInput ?? outputPaths.coverPath, outputPaths.coverPath).catch(async () => {
@@ -394,7 +375,7 @@ export async function renderJobArtifacts(input: {
     } else {
       await renderSegmentsWithFfmpeg(renderPlan, outputPaths.tempDir);
       await fs.copyFile(renderPlan.clips[0]!.imageInput, outputPaths.coverPath);
-      probe = await probeVideo(renderPlan.outputPath);
+      probe = await probeSourceVideo(renderPlan.outputPath);
     }
   } catch (error) {
     if (requestedMode !== "auto" && requestedMode !== undefined) {

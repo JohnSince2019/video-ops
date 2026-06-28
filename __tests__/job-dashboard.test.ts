@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildAcceptanceLead, buildJobDetailView, buildJobListView } from "../lib/ui/job-dashboard.js";
+import { buildRawVideoPackageDetail } from "../lib/ui/raw-video-package-detail.js";
 import { evaluatePublishReadiness } from "../lib/ui/publish-readiness.js";
 
 test("task list normalization exposes state, platform, profile, progress, and updated time", () => {
@@ -9,6 +10,7 @@ test("task list normalization exposes state, platform, profile, progress, and up
     {
       id: "job-001",
       title: "AI 效率视频",
+      jobMode: "script_to_video",
       state: "AI_PROCESSING",
       platform: "douyin",
       renderProfile: "standard",
@@ -27,6 +29,8 @@ test("task list normalization exposes state, platform, profile, progress, and up
   ]);
 
   assert.equal(list[0]?.title, "AI 效率视频");
+  assert.equal(list[0]?.jobMode, "script_to_video");
+  assert.equal(list[0]?.jobModeLabel, "文案生成视频");
   assert.equal(list[0]?.state, "AI_PROCESSING");
   assert.equal(list[0]?.platform, "douyin");
   assert.equal(list[0]?.platformLabel, "抖音");
@@ -50,6 +54,7 @@ test("task detail output includes step, progress, errors, checkpoint, and output
   const detail = buildJobDetailView({
     id: "job-002",
     title: "副业视频任务",
+    jobMode: "raw_video_edit",
     state: "FAILED",
     platform: "xiaohongshu",
     renderProfile: "high_quality",
@@ -80,6 +85,8 @@ test("task detail output includes step, progress, errors, checkpoint, and output
   });
 
   assert.equal(detail.state, "FAILED");
+  assert.equal(detail.jobMode, "raw_video_edit");
+  assert.equal(detail.jobModeLabel, "原始视频剪辑");
   assert.equal(detail.stateLabel, "失败");
   assert.equal(detail.progress, 73);
   assert.equal(detail.currentStep, "生成配音音频");
@@ -726,4 +733,40 @@ test("completed standard task gets ready-for-acceptance assistant guidance", () 
   assert.equal(detail.reviewContext.firstCheckLabel, "先验声音和节奏");
   assert.equal(detail.reviewContext.reviewPriorityLabel, "可以常规验收");
   assert.equal(detail.reviewContext.reviewModeLabel, "常规验收模式");
+});
+
+test("job detail can carry raw-video package detail for jobs page rendering", () => {
+  const rawVideoPackageDetail = buildRawVideoPackageDetail({
+    jobMode: "raw_video_edit",
+    outputs: [{ kind: "video", path: "output/jobs/job-raw/video.mp4", url: "/output/jobs/job-raw/video.mp4" }],
+    outputPaths: {
+      videoPath: "output/jobs/job-raw/video.mp4",
+      coverPath: "output/jobs/job-raw/cover.png",
+      metadataPath: "output/jobs/job-raw/metadata.json",
+      rawVideoQualityGateReportPath: "output/jobs/job-raw/analysis/raw-video-quality-gate.json",
+      rawVideoCriticReportPath: "output/jobs/job-raw/analysis/raw-video-critic-report.json",
+    },
+    availablePaths: ["output/jobs/job-raw/video.mp4"],
+  });
+
+  const detail = buildJobDetailView(
+    {
+      id: "job-raw-detail",
+      title: "原始视频详情",
+      jobMode: "raw_video_edit",
+      state: "COMPLETED",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "generated",
+        fallbackStatus: "primary",
+      },
+      outputs: [{ kind: "video", path: "output/jobs/job-raw/video.mp4" }],
+    },
+    {
+      rawVideoPackageDetail,
+    },
+  );
+
+  assert.equal(detail.rawVideoPackageDetail?.finalOutputs[0]?.label, "成片 MP4");
+  assert.equal(detail.rawVideoPackageDetail?.reportCards[0]?.title, "自动质量门");
 });

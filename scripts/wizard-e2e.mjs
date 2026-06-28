@@ -69,6 +69,19 @@ async function waitForApiJobState(page, jobId, expectedState, timeout = 30000) {
   );
 }
 
+async function waitForApiJobDetail(page, jobId, expectedState, timeout = 30000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeout) {
+    const payload = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/jobs/${id}`);
+      return response.ok ? response.json() : null;
+    }, jobId);
+    if (payload?.state === expectedState) return payload;
+    await page.waitForTimeout(250);
+  }
+  throw new Error(`Timed out waiting for job ${jobId} to reach ${expectedState}`);
+}
+
 async function waitForEventContains(page, text, timeout = 30000) {
   await page.waitForFunction(
     (expected) => {
@@ -355,15 +368,13 @@ async function main() {
     result.stateTimeline[0].activeStepLabels = (await page.locator(".step-item .step-status-label").allInnerTexts()).map((item) => item.trim());
     assert.ok(eventTexts.some((item) => item.includes("已创建任务")), "missing event hint: 已创建任务");
 
-    await waitForJsonJobState(page, "COMPLETED", 30000);
+    const completedJobDetail = await waitForApiJobDetail(page, createJobPayload.job.id, "COMPLETED", 30000);
+    assert.equal(completedJobDetail?.state, "COMPLETED");
     console.log("[e2e] job status completed");
 
     await page.waitForSelector("#previewStage video", { timeout: 30000 });
     console.log("[e2e] preview video rendered");
-    const finalJobDetail = await page.evaluate(async (jobId) => {
-      const response = await fetch(`/api/jobs/${jobId}`);
-      return response.json();
-    }, createJobPayload.job.id);
+    const finalJobDetail = completedJobDetail;
     assert.ok(finalJobDetail?.qualitySummary?.fileSizeLabel, "missing quality summary from job detail api");
     assert.ok(finalJobDetail?.costSummary?.totalUsd, "missing cost summary from job detail api");
     assert.ok(finalJobDetail?.ttsStrategySummary?.providerLabel, "missing tts strategy from job detail api");
@@ -597,16 +608,21 @@ async function main() {
     }
 
     console.log(JSON.stringify({ ok: true, result }, null, 2));
+    process.exit(0);
   } finally {
     await browser.close();
   }
 }
 
-main().catch((error) => {
-  console.error(JSON.stringify({
-    ok: false,
-    error: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : null,
-  }, null, 2));
-  process.exitCode = 1;
-});
+main()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error(JSON.stringify({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : null,
+    }, null, 2));
+    process.exit(1);
+  });

@@ -4,7 +4,7 @@
 > **不读本文件开始对话 = 必然失智。**
 > **同时请先读 WORKSPACE_MEMORY.md 了解跨项目上下文。**
 
-最后更新：2026-06-27 10:20（Sprint 0 / 1 / 2 核心能力完成；Sprint 3 UI 原型与合规导出落地）
+最后更新：2026-06-28 13:40（VIDEO-RAW-M0 ~ M6 完成，并补齐 raw_video_edit 真实 HTTP 闭环验证）
 
 ---
 
@@ -22,7 +22,18 @@
 - 两者共享 LLM Gateway 作为 AI 图片生成调用层
 - LLM Gateway 无 TTS 能力，video-ops 独立使用 CosyVoice 3.0 MLX
 
-**当前阶段**：原始 39 张 video-ops backlog 已基本完成实现；当前已进入更高层产品化迭代。
+**当前阶段**：原始 39 张 video-ops backlog 与后续 M3-M5 产品化闭环已完成；当前启动新 Linear Project `video-ops · 原始视频生产流水线`，目标是新增第二条 `raw_video_edit` 流水线。
+
+**2026-06-28 新增执行边界**：
+- 旧 `Video-Ops` Linear Project：`M0-M5` 已完成，当前无 active issue。
+- 新 Linear Project：`video-ops · 原始视频生产流水线`，ID `c55541f4-c540-4ee0-8c22-3c5fb3819401`。
+- 新 P0 范围：`VIDEO-RAW-M0` 到 `VIDEO-RAW-M6`，共 29 张 issues，Linear 编号 `JOH-141` 到 `JOH-169`。
+- 新主线不是优化现有 `script_to_video`，而是新增 `raw_video_edit`：原始视频 -> 转写 -> 剪辑计划 -> 包装动效 -> 平台成片。
+- 本地执行镜像：`video-ops/docs/linear/raw-video-pipeline.md`。
+- 当前已完成：`JOH-141` 到 `JOH-169`。其中 `JOH-158` 已将 EDL 片段真实裁切为可复用的 clip mp4，`JOH-159` 已将 approved clips 拼接为 `clean-edit.mp4`，`JOH-160` 已产出 `clean-edit-normalized.mp4` 与响度报告，`JOH-161` 已产出 clean edit 质量探测报告，`JOH-162` 已落地 `remotion/` 子工程并完成本地 composition smoke render，`JOH-163` 已将 `CleanKnowledgeTalk` 升级为结构化知识口播模板，`JOH-164` 已定义 Remotion props schema 与 raw-video 转换入口，`JOH-165` 已把主系统接入 raw-video renderer bridge，`JOH-166` 已将 OutputPackage 扩展为统一的 raw-video 交付包契约，`JOH-167` 已落地自动质量门报告，`JOH-168` 已落地 explainable AI Critic 报告，`JOH-169` 已将 raw-video 成片包在 Jobs 详情中可视化展示。
+- 2026-06-28 新增关键收口：`raw_video_edit` 不再只是“模块都写完了”，而是已经补齐创建任务后的真实生命周期闭环验证。通过本地 `POST /api/raw-video/jobs -> GET /api/jobs/:id` 真实回归，确认任务可从 source video 自动推进到 final MP4 / metadata / supporting artifacts / Jobs detail package display。
+- 这次真实回归额外抓到一个重要 bug：服务端在创建态运行 raw-video lifecycle 时，写入 `output/jobs/<jobId>/edl/edit-decision-list.json` 前没有确保 `edl/` 目录存在，导致任务会在 `render_failed` 失败。现已在 `server.mjs` 修复为写 EDL / metadata 前先自动创建父目录。
+- 当前结论：`VIDEO-RAW-M0` 到 `VIDEO-RAW-M6` 已全部完成，而且 `raw_video_edit` 已具备真实 API 闭环可运行性；下一步不应凭空新增 backlog，而应基于新的产品目标或新 Linear milestone 再启动后续阶段。
 
 ### 1.1 当前本地可运行入口（2026-06-27）
 

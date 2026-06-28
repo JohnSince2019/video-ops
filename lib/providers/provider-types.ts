@@ -1,4 +1,4 @@
-export type ProviderStage = "image" | "tts" | "render";
+export type ProviderStage = "image" | "tts" | "render" | "analysis";
 
 export type ProviderExecutionMode = "primary" | "fallback";
 

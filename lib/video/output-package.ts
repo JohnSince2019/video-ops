@@ -1,6 +1,12 @@
 import type { PlatformMetadata } from "./platform-metadata.js";
 import type { RenderPlan } from "./render-plan.js";
 
+export type OutputArtifact = {
+  kind: string;
+  path: string;
+  url: string;
+};
+
 export type OutputPackage = {
   video: {
     path: string;
@@ -22,6 +28,7 @@ export type OutputPackage = {
     path: string;
     url: string;
   }>;
+  artifacts: OutputArtifact[];
   metadata: {
     platform: PlatformMetadata;
     renderProfile: string;
@@ -46,6 +53,35 @@ export type OutputPackage = {
       acceptanceHint?: string;
       voiceLabel?: string;
     };
+    rawVideo?: {
+      jobMode: "raw_video_edit";
+      sourceVideo?: {
+        metadataPath?: string;
+        proxyPath?: string;
+        thumbnailPath?: string;
+      };
+      transcript?: {
+        transcriptPath: string;
+        wordsPath?: string;
+        subtitleTimelinePath?: string;
+        srtPath?: string;
+        vttPath?: string;
+      };
+      editDecisionList?: {
+        path: string;
+      };
+      cleanEdit?: {
+        path?: string;
+        normalizedPath?: string;
+        loudnessReportPath?: string;
+        qualityReportPath?: string;
+      };
+      remotion?: {
+        propsPath?: string;
+        renderMetadataPath?: string;
+      };
+      complianceReportPath?: string;
+    };
   };
 };
 
@@ -57,6 +93,22 @@ function deriveMetadataPath(videoPath: string) {
   }
 
   return videoPath.replace(/\/[^/]+$/, "/metadata.json");
+}
+
+function pushArtifact(target: OutputArtifact[], artifact?: { kind: string; path?: string | null }) {
+  if (!artifact?.path?.trim()) {
+    return;
+  }
+
+  if (target.some((item) => item.kind === artifact.kind && item.path === artifact.path)) {
+    return;
+  }
+
+  target.push({
+    kind: artifact.kind,
+    path: artifact.path,
+    url: buildJobOutputUrl(artifact.path),
+  });
 }
 
 export function buildOutputPackage(input: {
@@ -71,6 +123,7 @@ export function buildOutputPackage(input: {
   }>;
   providerMetadata?: OutputPackage["metadata"]["providerMetadata"];
   ttsRouteSummary?: OutputPackage["metadata"]["ttsRouteSummary"];
+  rawVideo?: OutputPackage["metadata"]["rawVideo"];
 }) {
   if (!input.renderPlan) {
     throw new Error("Render plan is required for output packaging.");
@@ -103,7 +156,33 @@ export function buildOutputPackage(input: {
     clipCount: input.renderPlan.clips.length,
     providerMetadata: input.providerMetadata,
     ttsRouteSummary: input.ttsRouteSummary,
+    rawVideo: input.rawVideo,
   };
+
+  const artifacts: OutputArtifact[] = [];
+  pushArtifact(artifacts, { kind: "video", path: videoPath });
+  pushArtifact(artifacts, { kind: "cover", path: input.coverPath });
+  pushArtifact(artifacts, { kind: "metadata", path: metadataPath });
+  for (const subtitle of input.subtitles ?? []) {
+    pushArtifact(artifacts, {
+      kind: subtitle.format === "srt" ? "subtitle_srt" : "subtitle_vtt",
+      path: subtitle.path,
+    });
+  }
+  pushArtifact(artifacts, { kind: "source_metadata", path: input.rawVideo?.sourceVideo?.metadataPath });
+  pushArtifact(artifacts, { kind: "proxy_video", path: input.rawVideo?.sourceVideo?.proxyPath });
+  pushArtifact(artifacts, { kind: "thumbnail", path: input.rawVideo?.sourceVideo?.thumbnailPath });
+  pushArtifact(artifacts, { kind: "transcript_json", path: input.rawVideo?.transcript?.transcriptPath });
+  pushArtifact(artifacts, { kind: "transcript_words", path: input.rawVideo?.transcript?.wordsPath });
+  pushArtifact(artifacts, { kind: "subtitle_timeline", path: input.rawVideo?.transcript?.subtitleTimelinePath });
+  pushArtifact(artifacts, { kind: "edl", path: input.rawVideo?.editDecisionList?.path });
+  pushArtifact(artifacts, { kind: "clean_edit", path: input.rawVideo?.cleanEdit?.path });
+  pushArtifact(artifacts, { kind: "clean_edit_normalized", path: input.rawVideo?.cleanEdit?.normalizedPath });
+  pushArtifact(artifacts, { kind: "clean_edit_loudness_report", path: input.rawVideo?.cleanEdit?.loudnessReportPath });
+  pushArtifact(artifacts, { kind: "clean_edit_quality_report", path: input.rawVideo?.cleanEdit?.qualityReportPath });
+  pushArtifact(artifacts, { kind: "remotion_props", path: input.rawVideo?.remotion?.propsPath });
+  pushArtifact(artifacts, { kind: "remotion_render_metadata", path: input.rawVideo?.remotion?.renderMetadataPath });
+  pushArtifact(artifacts, { kind: "compliance_report", path: input.rawVideo?.complianceReportPath });
 
   return {
     video: {
@@ -126,6 +205,7 @@ export function buildOutputPackage(input: {
       path: item.path,
       url: buildJobOutputUrl(item.path),
     })),
+    artifacts,
     metadata,
   } satisfies OutputPackage;
 }

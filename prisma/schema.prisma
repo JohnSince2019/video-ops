@@ -24,6 +24,11 @@ enum RenderProfile {
   high_quality
 }
 
+enum JobMode {
+  script_to_video
+  raw_video_edit
+}
+
 model ContentManifest {
   id            String   @id @default(cuid())
   title         String
@@ -73,6 +78,7 @@ model RenderJob {
   id              String        @id @default(cuid())
   manifestId      String
   ownerTokenHash  String
+  jobMode         JobMode       @default(script_to_video)
   state           JobState      @default(QUEUED)
   renderProfile   RenderProfile @default(standard)
   lastCheckpoint  Json?
@@ -89,6 +95,7 @@ model RenderJob {
   errors          JobErrorLog[]
 
   @@index([manifestId, ownerTokenHash])
+  @@index([jobMode, state])
   @@index([state])
 }
 

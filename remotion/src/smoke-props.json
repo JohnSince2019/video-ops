@@ -1,0 +1,67 @@
+{
+  "title": "你不是缺 AI 工具，你是缺一套高输出操作系统",
+  "speaker": "John × Atlas",
+  "hook": "很多高强度脑力工作者不是不会用 AI，而是只有零散工具，没有一套能接住工作素材并持续产出的系统。",
+  "topicLabel": "知识口播成片模板",
+  "accentColor": "#ff7a59",
+  "runtimeLabel": "45s · 9:16 · CleanKnowledgeTalk",
+  "chapters": [
+    {
+      "title": "问题识别",
+      "summary": "不是不会用 AI，而是没有把工具组织成系统。",
+      "startFrame": 12,
+      "endFrame": 72
+    },
+    {
+      "title": "方法拆解",
+      "summary": "接住工作素材、整理经验、拆成文章和短视频反复复用。",
+      "startFrame": 72,
+      "endFrame": 132
+    },
+    {
+      "title": "行动收束",
+      "summary": "让内容成为长期资产，而不是每天从空白开始。",
+      "startFrame": 132,
+      "endFrame": 180
+    }
+  ],
+  "standoutQuotes": [
+    {
+      "text": "你不是缺 AI 工具，你是缺一套高输出操作系统。",
+      "reason": "标题级核心观点，适合强化记忆点。",
+      "startFrame": 20,
+      "endFrame": 92
+    },
+    {
+      "text": "不是额外抽时间创作，而是把你本来就在做的工作沉淀成资产。",
+      "reason": "强化副业与内容复用的价值。",
+      "startFrame": 96,
+      "endFrame": 164
+    }
+  ],
+  "captionCues": [
+    {
+      "text": "你不是缺 AI 工具",
+      "startFrame": 18,
+      "endFrame": 48
+    },
+    {
+      "text": "你是缺一套高输出操作系统",
+      "startFrame": 48,
+      "endFrame": 84
+    },
+    {
+      "text": "先接住工作素材，再整理，再复用",
+      "startFrame": 92,
+      "endFrame": 132
+    },
+    {
+      "text": "把内容沉淀成长期资产",
+      "startFrame": 136,
+      "endFrame": 176
+    }
+  ],
+  "cta": "下一步接入真实 transcript、章节卡、字幕和 renderer 调用。",
+  "speakerFootnote": "面向知识口播 / talking-head / 课程切片的第一版成片模板",
+  "waveformStyle": "focused"
+}

@@ -136,3 +136,81 @@ test("output package is consumable by downstream export and publishing flows", (
   assert.equal(output.metadataFile.path, "output/publish-metadata.json");
   assert.equal(output.metadata.subtitles.length, 1);
 });
+
+test("raw-video output package carries transcript, EDL, clean edit, and remotion artifacts in one delivery contract", () => {
+  const output = buildOutputPackage({
+    renderPlan,
+    platformMetadata,
+    videoPath: "output/jobs/job-raw-001/video.mp4",
+    coverPath: "output/jobs/job-raw-001/cover.png",
+    metadataPath: "output/jobs/job-raw-001/metadata.json",
+    subtitles: [
+      { format: "srt", path: "output/jobs/job-raw-001/subtitles/captions.srt" },
+      { format: "vtt", path: "output/jobs/job-raw-001/subtitles/captions.vtt" },
+    ],
+    rawVideo: {
+      jobMode: "raw_video_edit",
+      sourceVideo: {
+        metadataPath: "output/jobs/job-raw-001/source/source-video.json",
+        proxyPath: "output/jobs/job-raw-001/proxy/proxy.mp4",
+        thumbnailPath: "output/jobs/job-raw-001/proxy/thumbnail.jpg",
+      },
+      transcript: {
+        transcriptPath: "output/jobs/job-raw-001/transcripts/transcript.json",
+        wordsPath: "output/jobs/job-raw-001/transcripts/words.json",
+        subtitleTimelinePath: "output/jobs/job-raw-001/transcripts/subtitle-timeline.json",
+        srtPath: "output/jobs/job-raw-001/subtitles/captions.srt",
+        vttPath: "output/jobs/job-raw-001/subtitles/captions.vtt",
+      },
+      editDecisionList: {
+        path: "output/jobs/job-raw-001/edl/edit-decision-list.json",
+      },
+      cleanEdit: {
+        path: "output/jobs/job-raw-001/clean-edit.mp4",
+        normalizedPath: "output/jobs/job-raw-001/clean-edit-normalized.mp4",
+        loudnessReportPath: "output/jobs/job-raw-001/analysis/clean-edit-loudness.json",
+        qualityReportPath: "output/jobs/job-raw-001/analysis/clean-edit-quality-report.json",
+      },
+      remotion: {
+        propsPath: "output/jobs/job-raw-001/remotion/clean-knowledge-talk-props.json",
+        renderMetadataPath: "output/jobs/job-raw-001/remotion/render-metadata.json",
+      },
+      complianceReportPath: "output/jobs/job-raw-001/analysis/compliance-report.json",
+    },
+  });
+
+  const parsed = JSON.parse(output.metadataFile.content);
+  assert.equal(parsed.rawVideo.jobMode, "raw_video_edit");
+  assert.equal(parsed.rawVideo.transcript.transcriptPath, "output/jobs/job-raw-001/transcripts/transcript.json");
+  assert.equal(parsed.rawVideo.editDecisionList.path, "output/jobs/job-raw-001/edl/edit-decision-list.json");
+  assert.equal(parsed.rawVideo.cleanEdit.normalizedPath, "output/jobs/job-raw-001/clean-edit-normalized.mp4");
+  assert.equal(parsed.rawVideo.remotion.renderMetadataPath, "output/jobs/job-raw-001/remotion/render-metadata.json");
+  assert.equal(parsed.rawVideo.complianceReportPath, "output/jobs/job-raw-001/analysis/compliance-report.json");
+
+  const artifactKinds = output.artifacts.map((item) => item.kind);
+  assert.deepEqual(
+    artifactKinds,
+    [
+      "video",
+      "cover",
+      "metadata",
+      "subtitle_srt",
+      "subtitle_vtt",
+      "source_metadata",
+      "proxy_video",
+      "thumbnail",
+      "transcript_json",
+      "transcript_words",
+      "subtitle_timeline",
+      "edl",
+      "clean_edit",
+      "clean_edit_normalized",
+      "clean_edit_loudness_report",
+      "clean_edit_quality_report",
+      "remotion_props",
+      "remotion_render_metadata",
+      "compliance_report",
+    ],
+  );
+  assert.equal(output.artifacts.find((item) => item.kind === "remotion_render_metadata")?.url, "/output/jobs/job-raw-001/remotion/render-metadata.json");
+});

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createVideoJobFromDraft } from "../lib/jobs/job-creation.js";
+import { createVideoJobFromDraft, createVideoJobFromDraftWithOptions } from "../lib/jobs/job-creation.js";
 import { normalizeWizardConfig } from "../lib/ui/wizard-config.js";
 
 test("creates a queued job, manifest, storyboard, and output paths from a plain text draft", () => {
@@ -22,6 +22,7 @@ test("creates a queued job, manifest, storyboard, and output paths from a plain 
   const checkpoint = created.record.lastCheckpoint as { ttsProviderId?: string } | null;
 
   assert.match(created.record.id, /^job-/);
+  assert.equal(created.record.jobMode, "script_to_video");
   assert.equal(created.record.state, "QUEUED");
   assert.equal(created.record.platform, "douyin");
   assert.equal(created.record.renderProfile, "standard");
@@ -35,6 +36,28 @@ test("creates a queued job, manifest, storyboard, and output paths from a plain 
   assert.match(JSON.stringify(created.record.lastCheckpoint), /即时试听|自然度/);
   assert.equal(created.storyboard.summary.totalScenes, 2);
   assert.equal(created.outputPaths.videoPath.includes(`/jobs/${created.record.id}/video.mp4`), true);
+});
+
+test("job creation can explicitly mark the raw-video pipeline mode", () => {
+  const draft = normalizeWizardConfig({
+    title: "Raw Video Entry",
+    platform: "douyin",
+    renderProfile: "standard",
+    author: "John",
+    ownerToken: "owner-raw-001",
+    scriptText: "第一段：这是原始视频剪辑任务的占位文案。",
+    scriptMode: "plain_text",
+    stylePreset: "john_vertical_comic",
+    personaPreset: "john_persona_v1",
+    voiceMode: "male_coach_deep",
+  });
+
+  const created = createVideoJobFromDraftWithOptions(draft, {
+    jobMode: "raw_video_edit",
+  });
+
+  assert.equal(created.record.jobMode, "raw_video_edit");
+  assert.equal(created.record.state, "QUEUED");
 });
 
 test("creates a manifest from markdown drafts and records style/voice checkpoint metadata", () => {

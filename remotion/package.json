@@ -1,0 +1,21 @@
+{
+  "name": "video-ops-remotion",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render:smoke": "remotion render src/index.ts CleanKnowledgeTalk ../tmp/remotion-smoke/clean-knowledge-talk.mp4 --props=src/smoke-props.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.484",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.484"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "typescript": "6.0.3"
+  }
+}

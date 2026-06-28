@@ -7,6 +7,7 @@
 ## [Unreleased]
 
 ### In Progress
+
 - 阶段 1.1：Git 基座（首次提交 + dev 分支推送）— ✅ 已完成（含 main 推送）
 - ~~阶段 1.2：LLM Gateway Wanx2.1-t2i-plus 接入~~ → ✅ **2026-06-22 15:20 完成**
 - ~~阶段 1.3：图模矩阵文档同步~~ → ✅ **2026-06-22 15:40 完成**
@@ -18,6 +19,11 @@
 - 素材层路径统一迁移（2026-06-24）：`video-ops/content/` → `/Users/john/Desktop/AI/Solutions/content/`
 
 ### Completed (Pre-Release)
+- 2026-06-28：完成 Linear Project `video-ops · 原始视频生产流水线` 的 `VIDEO-RAW-M0` 到 `VIDEO-RAW-M6` 共 7 个 milestones、29 张 issues（`JOH-141` 到 `JOH-169`），正式落地 `raw_video_edit` 第二生产流水线。
+- 2026-06-28：补齐 `RawVideoStyleGuide`、`jobMode`、`SourceVideo`、Whisper transcript、subtitle timeline、transcript analyzer、EditIntent options、EDL、clip review、FFmpeg clean edit、loudness normalization、quality gate、AI Critic、Remotion packaging、Jobs detail package display 等 raw-video P0 全链路能力。
+- 2026-06-28：完成 `raw_video_edit` 真实本地 HTTP 闭环验证：`POST /api/raw-video/jobs -> GET /api/jobs/:id` 可从 source video 自动推进到 final MP4、metadata、supporting artifacts、quality reports 与 Jobs 详情预览。
+- 2026-06-28：修复 raw-video created-job lifecycle 写 EDL / metadata 时未自动创建父目录导致的 `ENOENT` 问题，确保真实 API 创建任务不再在 `render_failed` 失败。
+- 2026-06-28：完成交付级验证：`npm test` 228/228 通过，`npm run remotion:smoke` 通过，`npm run renderer:smoke` 通过，`DATABASE_URL=... npm run prisma:validate` 通过。
 - 2026-06-22：环境基线验证（FFmpeg 8.1 / Python 3.11.15 / Docker / PostgreSQL / LLM Gateway / gpt-image-2）
 - 2026-06-22 13:00：阶段 1.1 Git 基座（仓库创建 + .gitignore / README / CHANGELOG + dev 推送 + main 推送）
 - 2026-06-22 13:45：公众号 Day 0 素材 v0 落盘（`/Users/john/Desktop/AI/Solutions/content/2026-06-22-Day0.md`，待用户跑 ContentOps wizard s1-s10 重生成）
