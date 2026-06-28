@@ -23,7 +23,7 @@ export type JobDashboardRecord = {
     durationSec?: number | null;
     resolution?: string | null;
     audioPresence?: boolean | null;
-    subtitleStatus?: "embedded" | "planned" | "missing" | null;
+    subtitleStatus?: "embedded" | "generated" | "planned" | "missing" | null;
     fallbackStatus?: "primary" | "fallback" | null;
     fallbackReason?: string | null;
     complianceStatus?: "allowed" | "blocked" | null;
@@ -876,6 +876,8 @@ function formatOutputKindLabel(kind?: string) {
     video: "视频文件",
     cover: "封面图",
     metadata: "元数据文件",
+    subtitle_srt: "字幕 SRT",
+    subtitle_vtt: "字幕 VTT",
   };
 
   return labels[kind || ""] || kind || "未知产物";
@@ -1094,6 +1096,8 @@ export function buildJobDetailView(record: JobDashboardRecord, context?: JobDeta
       subtitleStatusLabel:
         record.qualitySummary?.subtitleStatus === "embedded"
           ? "已内嵌"
+          : record.qualitySummary?.subtitleStatus === "generated"
+            ? "已生成字幕文件"
           : record.qualitySummary?.subtitleStatus === "planned"
             ? "规划中"
             : record.qualitySummary?.subtitleStatus === "missing"

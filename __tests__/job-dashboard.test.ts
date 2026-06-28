@@ -355,6 +355,27 @@ test("task list acceptance focus highlights custom voice and completed prioritie
   assert.equal(list[1]?.reviewRankLabel, "普通验收第 1 位");
 });
 
+test("generated subtitle artifacts surface as generated instead of planned", () => {
+  const detail = buildJobDetailView({
+    id: "job-subtitle-generated",
+    title: "字幕已生成任务",
+    state: "COMPLETED",
+    qualitySummary: {
+      audioPresence: true,
+      subtitleStatus: "generated",
+      fallbackStatus: "primary",
+    },
+    outputs: [
+      { kind: "subtitle_srt", path: "output/jobs/job-subtitle-generated/subtitles/captions.srt" },
+      { kind: "subtitle_vtt", path: "output/jobs/job-subtitle-generated/subtitles/captions.vtt" },
+    ],
+  });
+
+  assert.equal(detail.qualitySummary.subtitleStatusLabel, "已生成字幕文件");
+  assert.match(detail.outputsSummary[0] || "", /字幕 SRT/);
+  assert.match(detail.outputsSummary[1] || "", /字幕 VTT/);
+});
+
 test("task list priority bucket distinguishes attention, queued, and ready states", () => {
   const list = buildJobListView([
     {

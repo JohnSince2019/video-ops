@@ -16,6 +16,7 @@ import type { ContentManifest } from "../types/manifest.js";
 import { buildPlatformMetadata } from "./platform-metadata.js";
 import { buildOutputPackage } from "./output-package.js";
 import { buildRenderPlan, type RenderPlan } from "./render-plan.js";
+import { buildSubtitleArtifacts } from "./subtitle-artifacts.js";
 import { assembleVideoTimeline, type VideoTimeline } from "./video-assembler.js";
 
 const execFileAsync = promisify(execFile);
@@ -170,6 +171,7 @@ async function buildSceneAssets(manifest: ContentManifest, outputPaths: ReturnTy
     ensureDir(outputPaths.rootDir),
     ensureDir(outputPaths.imagesDir),
     ensureDir(outputPaths.audioDir),
+    ensureDir(outputPaths.subtitlesDir),
     ensureDir(outputPaths.tempDir),
   ]);
 
@@ -218,6 +220,20 @@ async function buildSceneAssets(manifest: ContentManifest, outputPaths: ReturnTy
   }
 
   return { mainImages, audios };
+}
+
+async function buildSubtitleFiles(manifest: ContentManifest, outputPaths: ReturnType<typeof buildJobAssetPaths>) {
+  const artifacts = buildSubtitleArtifacts(manifest);
+  const srtPath = path.join(outputPaths.subtitlesDir, "captions.srt");
+  const vttPath = path.join(outputPaths.subtitlesDir, "captions.vtt");
+
+  await fs.writeFile(srtPath, artifacts.srt, "utf8");
+  await fs.writeFile(vttPath, artifacts.vtt, "utf8");
+
+  return [
+    { format: "srt" as const, path: srtPath },
+    { format: "vtt" as const, path: vttPath },
+  ];
 }
 
 async function renderSegmentsWithFfmpeg(plan: RenderPlan, tempDir: string) {
@@ -339,6 +355,7 @@ export async function renderJobArtifacts(input: {
 }) {
   const outputPaths = buildJobAssetPaths(input.jobId);
   const { mainImages, audios } = await buildSceneAssets(input.manifest, outputPaths);
+  const subtitleFiles = await buildSubtitleFiles(input.manifest, outputPaths);
   const timeline = assembleVideoTimeline({
     scenes: input.manifest.scenes.map((scene) => ({ id: scene.id, scene_hash: scene.scene_hash })),
     mainImages,
@@ -400,6 +417,7 @@ export async function renderJobArtifacts(input: {
     videoPath: renderPlan.outputPath,
     coverPath: outputPaths.coverPath,
     metadataPath: outputPaths.metadataPath,
+    subtitles: subtitleFiles,
     providerMetadata: {
       render: providerMetadata,
     },

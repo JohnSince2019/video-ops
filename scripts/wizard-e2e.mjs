@@ -401,6 +401,8 @@ async function main() {
     assert.ok(result.preview.previewLinks.includes("打开 MP4"));
     assert.ok(result.preview.previewLinks.includes("下载 MP4"));
     assert.ok(result.preview.previewLinks.includes("元数据 JSON"));
+    assert.ok(result.preview.previewLinks.includes("字幕 SRT"));
+    assert.ok(result.preview.previewLinks.includes("字幕 VTT"));
     assert.deepEqual(result.preview.finalStatusLabels, ["已通过", "已通过", "已通过", "已通过", "已通过", "当前步骤"]);
     assert.ok(result.qualitySummary.some((item) => item.includes("文件大小：")), "missing file size summary");
     assert.ok(result.qualitySummary.some((item) => item.includes("时长：")), "missing duration summary");
@@ -423,6 +425,7 @@ async function main() {
     assert.ok(result.publishReadinessSummary.some((item) => item.includes("具备发布条件") || item.includes("可以发") || item.includes("不能发")), "missing publish readiness status");
     assert.ok(result.publishReadinessSummary.some((item) => item.includes("下一步：")), "missing publish next action");
     assert.ok(result.deliveryPackageSummary.some((item) => item.includes("主交付物：可直接播放的 MP4 成片")), "missing delivery package mp4 summary");
+    assert.ok(result.deliveryPackageSummary.some((item) => item.includes("字幕交付：")), "missing delivery subtitle summary");
     assert.ok(result.deliveryPackageSummary.some((item) => item.includes("元数据：")), "missing delivery metadata summary");
 
     await page.goto(`${APP_URL}?step=voice_generation`, { waitUntil: "domcontentloaded" });

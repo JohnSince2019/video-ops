@@ -17,12 +17,21 @@ export type OutputPackage = {
     url: string;
     content: string;
   };
+  subtitles: Array<{
+    format: "srt" | "vtt";
+    path: string;
+    url: string;
+  }>;
   metadata: {
     platform: PlatformMetadata;
     renderProfile: string;
     timelineDurationMs: number;
     videoPath: string;
     coverPath: string;
+    subtitles: Array<{
+      format: "srt" | "vtt";
+      path: string;
+    }>;
     ffmpegArgs: string[];
     clipCount: number;
     providerMetadata?: {
@@ -56,6 +65,10 @@ export function buildOutputPackage(input: {
   videoPath?: string;
   coverPath: string;
   metadataPath?: string;
+  subtitles?: Array<{
+    format: "srt" | "vtt";
+    path: string;
+  }>;
   providerMetadata?: OutputPackage["metadata"]["providerMetadata"];
   ttsRouteSummary?: OutputPackage["metadata"]["ttsRouteSummary"];
 }) {
@@ -82,6 +95,10 @@ export function buildOutputPackage(input: {
     timelineDurationMs: input.renderPlan.timelineDurationMs,
     videoPath,
     coverPath: input.coverPath,
+    subtitles: (input.subtitles ?? []).map((item) => ({
+      format: item.format,
+      path: item.path,
+    })),
     ffmpegArgs: input.renderPlan.ffmpegArgs,
     clipCount: input.renderPlan.clips.length,
     providerMetadata: input.providerMetadata,
@@ -104,6 +121,11 @@ export function buildOutputPackage(input: {
       url: buildJobOutputUrl(metadataPath),
       content: JSON.stringify(metadata, null, 2),
     },
+    subtitles: (input.subtitles ?? []).map((item) => ({
+      format: item.format,
+      path: item.path,
+      url: buildJobOutputUrl(item.path),
+    })),
     metadata,
   } satisfies OutputPackage;
 }

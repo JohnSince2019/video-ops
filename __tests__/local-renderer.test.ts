@@ -56,8 +56,11 @@ test("mock renderer writes output package artifacts and preview url", async () =
   assert.equal(existsSync(result.outputPackage.video.path), true);
   assert.equal(existsSync(result.outputPackage.cover.path), true);
   assert.equal(existsSync(result.outputPackage.metadataFile.path), true);
+  assert.equal(existsSync(result.outputPackage.subtitles[0]?.path || ""), true);
+  assert.equal(existsSync(result.outputPackage.subtitles[1]?.path || ""), true);
   assert.match(readFileSync(result.outputPackage.metadataFile.path, "utf8"), /mock-renderer/);
   assert.match(readFileSync(result.outputPackage.metadataFile.path, "utf8"), /默认中文解说路线/);
+  assert.match(readFileSync(result.outputPackage.subtitles[0]!.path, "utf8"), /第一幕/);
 });
 
 test("auto mode falls back to mock metadata when ffmpeg rendering cannot be used", async () => {

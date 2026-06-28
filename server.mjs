@@ -3076,6 +3076,7 @@ ${sharedPageStyles}
 
           const audioOk = !String(detail.qualitySummary.audioPresenceLabel || "").includes("无");
           const subtitleMissing = String(detail.qualitySummary.subtitleStatusLabel || "").includes("缺失");
+          const subtitlePlanned = String(detail.qualitySummary.subtitleStatusLabel || "").includes("规划中");
           const complianceBlocked = String(detail.qualitySummary.complianceStatusLabel || "").includes("拦截");
           const fallbackUsed = String(detail.qualitySummary.fallbackStatusLabel || "").includes("fallback");
           const hasPreview = Boolean(detail.previewUrl);
@@ -3112,6 +3113,15 @@ ${sharedPageStyles}
               status: "勉强可交付，但不建议直接发",
               reason: "因为视频主体已经可看，但字幕缺失会明显降低最终发布质量。",
               nextAction: "先补字幕或确认字幕策略，再决定是否直接发布。",
+              ready: false,
+            };
+          }
+
+          if (subtitlePlanned) {
+            return {
+              status: "接近可交付，但还差最后一环",
+              reason: "因为视频和音频已经齐了，但字幕还停留在规划状态，交付完整性还不够稳。",
+              nextAction: "先把字幕真正产出出来，再进入最终发布判断。",
               ready: false,
             };
           }
@@ -3621,10 +3631,16 @@ ${sharedPageStyles}
           }
 
           previewStage.innerHTML = '<video controls preload="metadata" src="' + previewUrl + '"></video>';
+          const subtitleLinks = Array.isArray(detail.outputs)
+            ? detail.outputs
+                .filter((item) => item.kind === "subtitle_srt" || item.kind === "subtitle_vtt")
+                .map((item) => '<a href="' + item.url + '" target="_blank" rel="noreferrer">字幕 ' + (item.kind === "subtitle_srt" ? 'SRT' : 'VTT') + '</a>')
+            : [];
           previewLinks.innerHTML = [
             '<a href="' + previewUrl + '" target="_blank" rel="noreferrer">打开 MP4</a>',
             '<a href="' + previewUrl + '" download>下载 MP4</a>',
-            detail.outputPaths?.metadataPath ? '<a href="/' + detail.outputPaths.metadataPath + '" target="_blank" rel="noreferrer">元数据 JSON</a>' : ''
+            detail.outputPaths?.metadataPath ? '<a href="/' + detail.outputPaths.metadataPath + '" target="_blank" rel="noreferrer">元数据 JSON</a>' : '',
+            ...subtitleLinks,
           ].filter(Boolean).join("");
           if (publishReadinessSummary) {
             publishReadinessSummary.innerHTML = [
@@ -3637,6 +3653,7 @@ ${sharedPageStyles}
             const packageItems = [
               '主交付物：可直接播放的 MP4 成片',
               '下载能力：支持直接下载当前 MP4',
+              subtitleLinks.length ? '字幕交付：已附带字幕文件，可继续发布或二次加工' : '字幕交付：当前还没有字幕文件',
               detail.outputPaths?.metadataPath ? '元数据：已附带 JSON 产物说明，便于复盘和继续发布' : '元数据：当前还没有附带元数据文件',
               '发布判断：' + publishReadiness.status,
             ];
@@ -5948,6 +5965,7 @@ async function runCreatedJobLifecycle(jobId) {
           videoPath: rendered.outputPackage.video.path,
           coverPath: rendered.outputPackage.cover.path,
           metadataPath: rendered.outputPackage.metadataFile.path,
+          subtitlesPath: rendered.outputPackage.subtitles[0]?.path ?? null,
         },
       },
       record: {
@@ -5972,7 +5990,7 @@ async function runCreatedJobLifecycle(jobId) {
           durationSec: rendered.probe?.durationSec ?? null,
           resolution: getRenderResolution(rendered),
           audioPresence: rendered.probe?.streamTypes?.includes("audio") ?? true,
-          subtitleStatus: "planned",
+          subtitleStatus: rendered.outputPackage.subtitles.length ? "generated" : "missing",
           fallbackStatus: rendered.providerMetadata.mode,
           fallbackReason: rendered.providerMetadata.fallbackReason ?? null,
           ...complianceSummary,
@@ -5985,6 +6003,11 @@ async function runCreatedJobLifecycle(jobId) {
             path: rendered.outputPackage.metadataFile.path,
             url: rendered.outputPackage.metadataFile.url,
           },
+          ...rendered.outputPackage.subtitles.map((item) => ({
+            kind: item.format === "srt" ? "subtitle_srt" : "subtitle_vtt",
+            path: item.path,
+            url: item.url,
+          })),
         ],
       },
       renderResult: rendered,
@@ -6237,6 +6260,7 @@ const server = http.createServer(async (req, res) => {
         }),
         storyboard: created.storyboard,
         manifest: created.manifest,
+        outputs: hydratedRecord.outputs ?? [],
         outputPaths: created.outputPaths,
         previewUrl,
         probe: created.renderResult?.probe ?? null,
@@ -6257,6 +6281,7 @@ const server = http.createServer(async (req, res) => {
       }),
       storyboard: null,
       manifest: null,
+      outputs: record.outputs ?? [],
       outputPaths: null,
       previewUrl: record.outputs?.find((item) => item.kind === "video")?.url ?? null,
       probe: null,
