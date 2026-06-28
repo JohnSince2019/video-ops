@@ -20,6 +20,14 @@ export type StoryboardControls = {
   transitionStyle: TransitionStyle;
 };
 
+export type StoryboardVisualConsistency = {
+  styleLabel: string;
+  personaLabel: string;
+  styleDescription?: string;
+  personaDescription?: string;
+  consistencyRule?: string;
+};
+
 export type StoryboardCard = {
   id: string;
   title: string;
@@ -29,6 +37,8 @@ export type StoryboardCard = {
   transition: TransitionStyle;
   subtitleStyle: SubtitleStyle;
   previewCaption: string;
+  visualConsistencyLabel: string;
+  visualConsistencyRule: string;
 };
 
 export type StoryboardPreview = {
@@ -38,6 +48,7 @@ export type StoryboardPreview = {
     subtitleStyle: SubtitleStyle;
     transitionStyle: TransitionStyle;
     totalScenes: number;
+    visualConsistency?: StoryboardVisualConsistency;
   };
 };
 
@@ -62,6 +73,7 @@ function summarizeText(narration: string, mode: StoryboardControls["textMode"]) 
 export function buildStoryboardPreview(input: {
   scenes: StoryboardSceneInput[];
   controls: StoryboardControls;
+  visualConsistency?: StoryboardVisualConsistency;
 }): StoryboardPreview {
   const cards = input.scenes.map((scene, index) => ({
     id: scene.id,
@@ -72,6 +84,10 @@ export function buildStoryboardPreview(input: {
     transition: input.controls.transitionStyle,
     subtitleStyle: input.controls.subtitleStyle,
     previewCaption: summarizeText(scene.narration, input.controls.textMode),
+    visualConsistencyLabel: input.visualConsistency
+      ? `${input.visualConsistency.styleLabel} / ${input.visualConsistency.personaLabel}`
+      : "未指定统一视觉方案",
+    visualConsistencyRule: input.visualConsistency?.consistencyRule?.trim() || "当前没有额外的统一风格规则说明。",
   }));
 
   return {
@@ -81,6 +97,7 @@ export function buildStoryboardPreview(input: {
       subtitleStyle: input.controls.subtitleStyle,
       transitionStyle: input.controls.transitionStyle,
       totalScenes: cards.length,
+      visualConsistency: input.visualConsistency,
     },
   };
 }

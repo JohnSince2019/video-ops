@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { buildCustomVoiceReferenceAbsolutePath } from "../audio/custom-voice-reference.js";
 import { buildJobAssetPaths } from "../assets/job-assets.js";
 import type { JobState } from "../domain/job-state.js";
+import { buildVisualConsistencySummary } from "../image/style-presets.js";
 import { parseMarkdownToSceneGraph } from "../parser/markdown-scene-graph.js";
 import { parseTextToSceneGraph } from "../parser/text-fallback.js";
 import { estimateJobCost } from "../domain/cost-estimator.js";
@@ -114,6 +115,11 @@ function resolveTtsAcceptanceHint(draft: WizardConfigDraft) {
 }
 
 function buildStoryboard(manifest: SceneGraph) {
+  const visualConsistency = buildVisualConsistencySummary({
+    stylePresetId: manifest.metadata.style_preset ?? "john_vertical_comic",
+    personaPresetId: manifest.metadata.persona_preset ?? "john_persona_v1",
+  });
+
   return buildStoryboardPreview({
     scenes: manifest.scenes.map((scene) => ({
       id: scene.id,
@@ -126,6 +132,13 @@ function buildStoryboard(manifest: SceneGraph) {
       textMode: "original",
       subtitleStyle: SUBTITLE_STYLES[0],
       transitionStyle: TRANSITION_STYLES[1],
+    },
+    visualConsistency: {
+      styleLabel: visualConsistency.styleLabel,
+      personaLabel: visualConsistency.personaLabel,
+      styleDescription: visualConsistency.styleDescription,
+      personaDescription: visualConsistency.personaDescription,
+      consistencyRule: visualConsistency.combinedNarrative,
     },
   });
 }
@@ -172,6 +185,10 @@ function buildInitialRecord(input: {
       ttsRouteTier,
       ttsRouteRoleLabel,
       ttsAcceptanceHint,
+      styleConsistencySummary: buildVisualConsistencySummary({
+        stylePresetId: input.draft.stylePreset,
+        personaPresetId: input.draft.personaPreset,
+      }).combinedNarrative,
     },
     qualitySummary: {
       fileSizeBytes: null,

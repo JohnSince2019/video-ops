@@ -94,6 +94,7 @@ test("task detail output includes step, progress, errors, checkpoint, and output
   assert.equal(detail.ttsStrategySummary.cloningLabel, "使用预设音色");
   assert.equal(detail.ttsStrategySummary.deploymentLabel, "本地与云端都可落地");
   assert.equal(detail.ttsStrategySummary.acceptanceHint, "未设置");
+  assert.equal(detail.visualConsistencySummary.styleLabel, "未设置");
   assert.equal(detail.routeOutcomeSummary.qualityFocusLabel, "优先关注自然度、清晰度和是否符合当前工作台预期。");
   assert.equal(detail.routeOutcomeSummary.costInterpretationLabel, "这类路线适合在试听效率和生产成本之间保持平衡。");
   assert.equal(detail.routeOutcomeSummary.acceptancePriorityLabel, "可以先听工作台试听，再结合成片做最终验收。");
@@ -176,6 +177,42 @@ test("task detail checkpoint summary includes custom voice reference when presen
   assert.match(detail.acceptanceAssistant.readinessLabel, /还在处理中|先看阶段进展/);
   assert.equal(detail.acceptanceAssistant.reviewModeLabel, "进度观察模式");
   assert.equal(detail.acceptanceAssistant.primaryActionLabel, "先看进度");
+});
+
+test("task detail surfaces visual consistency summary in plain Chinese when style and persona exist", () => {
+  const detail = buildJobDetailView({
+    id: "job-visual",
+    title: "统一风格任务",
+    state: "COMPLETED",
+    platform: "douyin",
+    renderProfile: "standard",
+    updatedAt: "2026-06-28T02:00:00.000Z",
+    createdAt: "2026-06-28T01:00:00.000Z",
+    progress: 100,
+    currentStep: "done",
+    lastCheckpoint: {
+      step: "done",
+      stylePreset: "john_vertical_comic",
+      personaPreset: "john_persona_v1",
+      ttsProviderId: "cosyvoice-mlx",
+      ttsRouteLabel: "默认中文解说路线",
+    },
+    qualitySummary: {
+      audioPresence: true,
+      subtitleStatus: "planned",
+      fallbackStatus: "primary",
+      complianceStatus: "allowed",
+      complianceViolations: 0,
+    },
+    outputs: [],
+    errors: [],
+  });
+
+  assert.equal(detail.visualConsistencySummary.styleLabel, "John 竖屏讲解风格");
+  assert.equal(detail.visualConsistencySummary.personaLabel, "John 专属人物形象");
+  assert.match(detail.visualConsistencySummary.styleDescription, /暖色竖屏插画讲解风格/);
+  assert.match(detail.visualConsistencySummary.personaDescription, /John 专属插画人物形象/);
+  assert.match(detail.visualConsistencySummary.consistencyRule, /同一个 John|竖屏讲解构图/);
 });
 
 test("premium production route with fallback surfaces stronger rerun guidance", () => {
@@ -359,6 +396,65 @@ test("task list priority bucket distinguishes attention, queued, and ready state
   assert.equal(byId["job-ready"]?.readyLane, "standard_review");
   assert.equal(byId["job-ready"]?.readyLaneLabel, "普通验收");
   assert.deepEqual(byId["job-ready"]?.prioritySignals, []);
+});
+
+test("older standard completed jobs remain distinguishable from recommended review targets", () => {
+  const list = buildJobListView([
+    {
+      id: "job-priority",
+      title: "自定义声音优先任务",
+      state: "COMPLETED",
+      renderProfile: "standard",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "custom_reference",
+        ttsRouteRoleLabel: "自定义声音保真路线",
+      },
+    },
+    {
+      id: "job-history-a",
+      title: "历史标准任务 A",
+      state: "COMPLETED",
+      renderProfile: "standard",
+      updatedAt: "2026-06-28T01:00:00.000Z",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "male_clear_teacher",
+        ttsRouteRoleLabel: "第一阶段默认主链路",
+      },
+    },
+    {
+      id: "job-history-b",
+      title: "历史标准任务 B",
+      state: "COMPLETED",
+      renderProfile: "standard",
+      updatedAt: "2026-06-27T01:00:00.000Z",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "male_clear_teacher",
+        ttsRouteRoleLabel: "第一阶段默认主链路",
+      },
+    },
+  ]);
+
+  assert.equal(list[0]?.id, "job-priority");
+  assert.equal(list[0]?.readyLane, "priority_review");
+  assert.equal(list[1]?.readyLane, "standard_review");
+  assert.equal(list[2]?.readyLane, "standard_review");
+  assert.equal(list[1]?.reviewRankLabel, "普通验收第 1 位");
+  assert.equal(list[2]?.reviewRankLabel, "普通验收第 2 位");
 });
 
 test("high quality completed tasks are promoted into priority review lane", () => {

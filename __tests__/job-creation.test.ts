@@ -72,6 +72,9 @@ test("creates a manifest from markdown drafts and records style/voice checkpoint
   assert.equal(created.manifest.scenes.length, 1);
   assert.equal(created.manifest.metadata.tts_provider_id, "cosyvoice-mlx");
   assert.equal(created.storyboard.cards[0]?.title, "Scene 1");
+  assert.equal(created.storyboard.summary.visualConsistency?.styleLabel, "John 竖屏讲解风格");
+  assert.equal(created.storyboard.summary.visualConsistency?.personaLabel, "John 专属人物形象");
+  assert.match(created.storyboard.cards[0]?.visualConsistencyRule ?? "", /同一个 John|统一/);
   assert.match(JSON.stringify(created.record.lastCheckpoint), /john_vertical_comic/i);
   assert.equal(checkpoint?.ttsProviderId, "cosyvoice-mlx");
 });

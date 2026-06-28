@@ -28,12 +28,19 @@ test("builds storyboard preview cards from scene inputs", () => {
       subtitleStyle: "minimal",
       transitionStyle: "crossfade",
     },
+    visualConsistency: {
+      styleLabel: "John 竖屏讲解风格",
+      personaLabel: "John 专属人物形象",
+      consistencyRule: "所有场景都必须保持同一个 John 与统一竖屏讲解构图。",
+    },
   });
 
   assert.equal(preview.cards.length, 2);
   assert.equal(preview.cards[0]?.title, "Scene 1");
   assert.equal(preview.cards[0]?.visualHint, "工程师站在白板前");
   assert.equal(preview.cards[0]?.durationLabel, "4s");
+  assert.equal(preview.cards[0]?.visualConsistencyLabel, "John 竖屏讲解风格 / John 专属人物形象");
+  assert.match(preview.cards[0]?.visualConsistencyRule ?? "", /同一个 John/);
 });
 
 test("text, subtitle style, and transition changes produce updated preview summaries", () => {

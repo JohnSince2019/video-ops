@@ -1,4 +1,9 @@
 import { JOB_STATES, type JobState } from "../domain/job-state.js";
+import {
+  buildVisualConsistencySummary,
+  formatPersonaPresetLabel,
+  formatStylePresetLabel,
+} from "../image/style-presets.js";
 
 export type JobDashboardRecord = {
   id: string;
@@ -87,6 +92,13 @@ export type JobDetailView = {
     voiceModeLabel: string;
     cloningLabel: string;
     deploymentLabel: string;
+  };
+  visualConsistencySummary: {
+    styleLabel: string;
+    personaLabel: string;
+    styleDescription: string;
+    personaDescription: string;
+    consistencyRule: string;
   };
   qualitySummary: {
     fileSizeLabel: string;
@@ -859,22 +871,6 @@ function formatWorkflowStepLabel(step?: string) {
   return labels[step || ""] || step || "当前暂无执行步骤";
 }
 
-function formatStylePresetLabel(value?: string) {
-  const labels: Record<string, string> = {
-    john_vertical_comic: "John 竖屏讲解风格",
-  };
-
-  return labels[value || ""] || value || "未设置";
-}
-
-function formatPersonaPresetLabel(value?: string) {
-  const labels: Record<string, string> = {
-    john_persona_v1: "John 专属人物形象",
-  };
-
-  return labels[value || ""] || value || "未设置";
-}
-
 function formatOutputKindLabel(kind?: string) {
   const labels: Record<string, string> = {
     video: "视频文件",
@@ -1031,6 +1027,11 @@ export function buildJobDetailView(record: JobDashboardRecord, context?: JobDeta
   const state = normalizeState(record.state);
   const priorityBucket = resolvePriorityBucket(record);
   const readyLane = resolveReadyLane(record, priorityBucket);
+  const stylePresetId = readCheckpointField(record.lastCheckpoint, "stylePreset");
+  const personaPresetId = readCheckpointField(record.lastCheckpoint, "personaPreset");
+  const visualConsistency = stylePresetId && personaPresetId
+    ? buildVisualConsistencySummary({ stylePresetId, personaPresetId })
+    : null;
   const progress =
     typeof record.progress === "number" && Number.isFinite(record.progress)
       ? Math.max(0, Math.min(100, Math.round(record.progress)))
@@ -1069,6 +1070,13 @@ export function buildJobDetailView(record: JobDashboardRecord, context?: JobDeta
       voiceModeLabel: formatVoiceModeLabel(readCheckpointField(record.lastCheckpoint, "voiceMode")),
       cloningLabel: formatTtsCloningLabel(readCheckpointField(record.lastCheckpoint, "voiceMode")),
       deploymentLabel: formatTtsDeploymentLabel(readCheckpointField(record.lastCheckpoint, "ttsProviderId")),
+    },
+    visualConsistencySummary: {
+      styleLabel: visualConsistency?.styleLabel ?? "未设置",
+      personaLabel: visualConsistency?.personaLabel ?? "未设置",
+      styleDescription: visualConsistency?.styleDescription ?? "当前没有记录清晰的风格说明。",
+      personaDescription: visualConsistency?.personaDescription ?? "当前没有记录清晰的人物说明。",
+      consistencyRule: visualConsistency?.combinedNarrative ?? "当前没有记录统一的视觉一致性规则。",
     },
     qualitySummary: {
       fileSizeLabel: formatFileSize(record.qualitySummary?.fileSizeBytes),

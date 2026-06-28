@@ -34,6 +34,8 @@ export type ContentMetadata = {
   copyright_license: string;
   tts_provider_id?: string;
   tts_route_label?: string;
+  style_preset?: string;
+  persona_preset?: string;
 };
 
 export type ContentManifest = {

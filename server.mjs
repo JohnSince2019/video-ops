@@ -24,6 +24,7 @@ import { buildAcceptanceLead, buildJobDetailView, buildJobListView } from "./lib
 import { buildComplianceReport, exportComplianceReportJson } from "./lib/compliance/compliance-report.ts";
 import { exportComplianceReportPdf } from "./lib/compliance/compliance-report-pdf.ts";
 import { runComplianceGuard } from "./lib/domain/compliance-guard.ts";
+import { buildVisualConsistencySummary } from "./lib/image/style-presets.ts";
 import {
   buildStoryboardPreview,
   SUBTITLE_STYLES,
@@ -40,6 +41,7 @@ const createdJobs = new Map();
 const workspaceRoot = process.cwd();
 const voicePreviewRoot = path.join(workspaceRoot, "tmp", "voice-previews");
 const customVoiceReferenceRoot = getCustomVoiceReferenceRoot();
+const createdJobsStorePath = path.join(workspaceRoot, "tmp", "created-jobs-store.json");
 const voicePresetCardsHtml = listVoicePresets()
   .map((preset, index) => {
     const provider = getTtsProviderProfile(preset.providerId);
@@ -139,6 +141,58 @@ const ttsProviderStrategyCardsHtml = listTtsProviderProfiles()
       </article>`;
   })
   .join("");
+
+async function ensureParentDirectory(filePath) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+}
+
+async function persistCreatedJobs() {
+  await ensureParentDirectory(createdJobsStorePath);
+  const payload = [...createdJobs.values()];
+  await fs.writeFile(createdJobsStorePath, JSON.stringify(payload, null, 2), "utf8");
+}
+
+async function resetCreatedJobsStore() {
+  createdJobs.clear();
+  await persistCreatedJobs();
+}
+
+async function loadPersistedCreatedJobs() {
+  try {
+    const raw = await fs.readFile(createdJobsStorePath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return;
+    }
+    parsed.forEach((item) => {
+      const jobId = item?.record?.id;
+      if (typeof jobId === "string" && jobId) {
+        createdJobs.set(jobId, item);
+      }
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return;
+    }
+    console.error("Failed to load persisted created jobs", error);
+  }
+}
+
+function getAllKnownJobRecords() {
+  const records = [...createdJobs.values()].map((item) => item.record);
+  return records.length ? records : demoJobs;
+}
+
+function splitReviewHistory(list) {
+  const recommendedJobId = buildAcceptanceLead(list)?.jobId ?? null;
+  const readyStandardItems = list.filter((item) => item.priorityBucket === "ready" && item.readyLane === "standard_review");
+  const olderCompletedHistory = readyStandardItems.filter((item) => item.id !== recommendedJobId);
+
+  return {
+    recommendedJobId,
+    olderCompletedHistoryIds: new Set(olderCompletedHistory.map((item) => item.id)),
+  };
+}
 
 const sharedPageStyles = `
   .workspace-page {
@@ -615,6 +669,21 @@ function profileLabel(value) {
   if (value === "draft") return "草稿";
   if (value === "high_quality") return "高质量";
   return "标准";
+}
+
+function buildVisualConsistencyView(stylePresetId, personaPresetId) {
+  const summary = buildVisualConsistencySummary({
+    stylePresetId: stylePresetId || "john_vertical_comic",
+    personaPresetId: personaPresetId || "john_persona_v1",
+  });
+
+  return {
+    styleLabel: summary.styleLabel,
+    personaLabel: summary.personaLabel,
+    styleDescription: summary.styleDescription,
+    personaDescription: summary.personaDescription,
+    consistencyRule: summary.combinedNarrative,
+  };
 }
 
 function scriptModeLabel(value) {
@@ -2326,7 +2395,19 @@ ${sharedPageStyles}
                 <div class="preview-stage" id="previewStage">
                   <div class="preview-placeholder">当前还没有完成的 MP4。渲染结束后，这里会出现播放器和下载链接。</div>
                 </div>
+                <div class="summary-item artifact-section" id="publishReadinessSection">
+                  <b style="display:block;margin-bottom:8px">发布就绪判断</b>
+                  <div class="quality-list" id="publishReadinessSummary">
+                    <div class="summary-item empty">任务完成后，这里会直接告诉你这条视频现在能不能发、为什么能发，以及下一步该做什么。</div>
+                  </div>
+                </div>
                 <div class="preview-links" id="previewLinks"></div>
+                <div class="summary-item artifact-section" id="deliveryPackageSection">
+                  <b style="display:block;margin-bottom:8px">交付包清单</b>
+                  <div class="quality-list" id="deliveryPackageSummary">
+                    <div class="summary-item empty">任务完成后，这里会把播放器、下载链接、元数据和关键发布信息组织成一组交付清单。</div>
+                  </div>
+                </div>
                 <div class="summary-item">
                   <div class="mini-section-title" id="artifactSupportNote">当前还没进入产物验收阶段，等任务创建后再看质量、成本和预览结果。</div>
                 </div>
@@ -2352,6 +2433,12 @@ ${sharedPageStyles}
                   <b style="display:block;margin-bottom:8px">声音继承摘要</b>
                   <div class="quality-list" id="jobVoiceCarrySummary">
                     <div class="summary-item empty">进入合成阶段后，这里会解释第 4 步选定的声音路线、音色和验收重点是如何被带进当前成片的。</div>
+                  </div>
+                </div>
+                <div class="summary-item artifact-section" id="jobVisualConsistencySection">
+                  <b style="display:block;margin-bottom:8px">视觉一致性摘要</b>
+                  <div class="quality-list" id="jobVisualConsistencySummary">
+                    <div class="summary-item empty">创建任务后，这里会用大白话说明这条视频当前沿用了哪套画面风格、人物形象和统一视觉规则。</div>
                   </div>
                 </div>
                 <div class="summary-item artifact-section" id="jobDiagnosisSection">
@@ -2406,10 +2493,15 @@ ${sharedPageStyles}
         const platformBilibili = document.getElementById("platformBilibili");
         const previewStage = document.getElementById("previewStage");
         const previewLinks = document.getElementById("previewLinks");
+        const publishReadinessSection = document.getElementById("publishReadinessSection");
+        const publishReadinessSummary = document.getElementById("publishReadinessSummary");
+        const deliveryPackageSection = document.getElementById("deliveryPackageSection");
+        const deliveryPackageSummary = document.getElementById("deliveryPackageSummary");
         const jobQualitySummary = document.getElementById("jobQualitySummary");
         const jobCostSummary = document.getElementById("jobCostSummary");
         const jobTtsStrategySummary = document.getElementById("jobTtsStrategySummary");
         const jobVoiceCarrySummary = document.getElementById("jobVoiceCarrySummary");
+        const jobVisualConsistencySummary = document.getElementById("jobVisualConsistencySummary");
         const jobDiagnosisSummary = document.getElementById("jobDiagnosisSummary");
         const jobRouteOutcomeSummary = document.getElementById("jobRouteOutcomeSummary");
         const jobResilienceSummary = document.getElementById("jobResilienceSummary");
@@ -2469,6 +2561,7 @@ ${sharedPageStyles}
         const jobCostSection = document.getElementById("jobCostSection");
         const jobTtsStrategySection = document.getElementById("jobTtsStrategySection");
         const jobVoiceCarrySection = document.getElementById("jobVoiceCarrySection");
+        const jobVisualConsistencySection = document.getElementById("jobVisualConsistencySection");
         const jobDiagnosisSection = document.getElementById("jobDiagnosisSection");
         const jobRouteOutcomeSection = document.getElementById("jobRouteOutcomeSection");
         const jobResilienceSection = document.getElementById("jobResilienceSection");
@@ -2971,6 +3064,75 @@ ${sharedPageStyles}
           button.classList.toggle("busy-state", Boolean(disabled) && /中|保存|上传|加载/.test(text));
         }
 
+        function buildPublishReadiness(detail) {
+          if (!detail?.qualitySummary) {
+            return {
+              status: "当前还不能判断是否可发布",
+              reason: "因为这条任务还没有形成完整产物，系统暂时无法判断最终是否具备发布条件。",
+              nextAction: "先把任务跑完，再看 MP4、音频、合规和交付包是否齐全。",
+              ready: false,
+            };
+          }
+
+          const audioOk = !String(detail.qualitySummary.audioPresenceLabel || "").includes("无");
+          const subtitleMissing = String(detail.qualitySummary.subtitleStatusLabel || "").includes("缺失");
+          const complianceBlocked = String(detail.qualitySummary.complianceStatusLabel || "").includes("拦截");
+          const fallbackUsed = String(detail.qualitySummary.fallbackStatusLabel || "").includes("fallback");
+          const hasPreview = Boolean(detail.previewUrl);
+
+          if (!hasPreview) {
+            return {
+              status: "当前还不能发",
+              reason: "因为最终 MP4 还没有准备好，用户现在拿不到可直接交付的成片。",
+              nextAction: "先等成片输出完成，再回来确认交付包。",
+              ready: false,
+            };
+          }
+
+          if (!audioOk) {
+            return {
+              status: "当前还不能发",
+              reason: "因为这条成片缺少音频，发出去会直接影响观看体验。",
+              nextAction: "先修声音链路，再重新确认交付包。",
+              ready: false,
+            };
+          }
+
+          if (complianceBlocked) {
+            return {
+              status: "当前还不能发",
+              reason: "因为合规检查没有通过，现在更适合先处理风险，而不是直接发布。",
+              nextAction: "先解决合规问题，再重新生成或重新验收。",
+              ready: false,
+            };
+          }
+
+          if (subtitleMissing) {
+            return {
+              status: "勉强可交付，但不建议直接发",
+              reason: "因为视频主体已经可看，但字幕缺失会明显降低最终发布质量。",
+              nextAction: "先补字幕或确认字幕策略，再决定是否直接发布。",
+              ready: false,
+            };
+          }
+
+          if (fallbackUsed) {
+            return {
+              status: "可以发，但建议谨慎",
+              reason: "因为成片已经可交付，但这次走过 fallback 路线，最好再完整看一遍最终观感。",
+              nextAction: "先完整看一遍成片，再决定是直接发还是重跑主链路。",
+              ready: true,
+            };
+          }
+
+          return {
+            status: "这条视频已经具备发布条件",
+            reason: "因为 MP4、音频、合规和基础交付信息都已经齐全，现在更像一条可直接进入发布动作的成片。",
+            nextAction: "可以继续做平台文案、封面和发布动作；如果你要更稳，再做一轮人工复看。",
+            ready: true,
+          };
+        }
+
         function resetButtonState(button) {
           if (!button) return;
           button.textContent = button.dataset.defaultText || button.textContent;
@@ -3441,9 +3603,20 @@ ${sharedPageStyles}
 
         function renderPreview(detail) {
           const previewUrl = detail?.previewUrl;
+          const publishReadiness = buildPublishReadiness(detail);
           if (!previewUrl) {
             previewStage.innerHTML = '<div class="preview-placeholder">当前还没有完成的 MP4。渲染结束后，这里会出现播放器和下载链接。</div>';
             previewLinks.innerHTML = "";
+            if (publishReadinessSummary) {
+              publishReadinessSummary.innerHTML = [
+                '<div class="quality-item warn">' + publishReadiness.status + '</div>',
+                '<div class="quality-item warn">' + publishReadiness.reason + '</div>',
+                '<div class="quality-item warn">下一步：' + publishReadiness.nextAction + '</div>',
+              ].join("");
+            }
+            if (deliveryPackageSummary) {
+              deliveryPackageSummary.innerHTML = '<div class="summary-item empty">交付包还没有准备好，等 MP4、元数据和下载入口生成后，这里会集中展示。</div>';
+            }
             return;
           }
 
@@ -3453,6 +3626,24 @@ ${sharedPageStyles}
             '<a href="' + previewUrl + '" download>下载 MP4</a>',
             detail.outputPaths?.metadataPath ? '<a href="/' + detail.outputPaths.metadataPath + '" target="_blank" rel="noreferrer">元数据 JSON</a>' : ''
           ].filter(Boolean).join("");
+          if (publishReadinessSummary) {
+            publishReadinessSummary.innerHTML = [
+              '<div class="quality-item ' + (publishReadiness.ready ? 'pass' : 'warn') + '">' + publishReadiness.status + '</div>',
+              '<div class="quality-item ' + (publishReadiness.ready ? 'pass' : 'warn') + '">' + publishReadiness.reason + '</div>',
+              '<div class="quality-item pass">下一步：' + publishReadiness.nextAction + '</div>',
+            ].join("");
+          }
+          if (deliveryPackageSummary) {
+            const packageItems = [
+              '主交付物：可直接播放的 MP4 成片',
+              '下载能力：支持直接下载当前 MP4',
+              detail.outputPaths?.metadataPath ? '元数据：已附带 JSON 产物说明，便于复盘和继续发布' : '元数据：当前还没有附带元数据文件',
+              '发布判断：' + publishReadiness.status,
+            ];
+            deliveryPackageSummary.innerHTML = packageItems
+              .map((item) => '<div class="quality-item pass">' + item + '</div>')
+              .join("");
+          }
         }
 
         function renderJobQuality(detail) {
@@ -3509,6 +3700,21 @@ ${sharedPageStyles}
             jobVoiceCarrySummary.innerHTML = carryNarratives
               .map((item) => '<div class="quality-item pass">' + item + '</div>')
               .join("");
+          }
+
+          if (jobVisualConsistencySummary) {
+            const visual = detail?.visualConsistencySummary;
+            if (!visual) {
+              jobVisualConsistencySummary.innerHTML = '<div class="summary-item empty">创建任务后，这里会用大白话解释当前沿用的风格、人物和统一视觉规则。</div>';
+            } else {
+              jobVisualConsistencySummary.innerHTML = [
+                '<div class="quality-item pass">当前画面风格：' + (visual.styleLabel || "未设置") + '</div>',
+                '<div class="quality-item pass">当前人物形象：' + (visual.personaLabel || "未设置") + '</div>',
+                '<div class="quality-item pass">风格解释：' + (visual.styleDescription || "未设置") + '</div>',
+                '<div class="quality-item pass">人物解释：' + (visual.personaDescription || "未设置") + '</div>',
+                '<div class="quality-item pass">统一规则：' + (visual.consistencyRule || "未设置") + '</div>',
+              ].join("");
+            }
           }
 
           if (jobDiagnosisSummary) {
@@ -3733,8 +3939,11 @@ ${sharedPageStyles}
           }
           if (jobQualitySection) jobQualitySection.hidden = !showArtifactSections;
           if (jobCostSection) jobCostSection.hidden = !showArtifactSections;
+          if (publishReadinessSection) publishReadinessSection.hidden = !showArtifactSections;
+          if (deliveryPackageSection) deliveryPackageSection.hidden = !showArtifactSections;
           if (jobTtsStrategySection) jobTtsStrategySection.hidden = !showArtifactSections;
           if (jobVoiceCarrySection) jobVoiceCarrySection.hidden = !showArtifactSections;
+          if (jobVisualConsistencySection) jobVisualConsistencySection.hidden = !showArtifactSections;
           if (jobDiagnosisSection) jobDiagnosisSection.hidden = !showArtifactSections;
           if (jobRouteOutcomeSection) jobRouteOutcomeSection.hidden = !showArtifactSections;
           if (jobResilienceSection) jobResilienceSection.hidden = !showArtifactSections;
@@ -3767,6 +3976,12 @@ ${sharedPageStyles}
                 textMode: "original",
                 subtitleStyle: "minimal",
                 transitionStyle: "crossfade"
+              },
+              visualConsistency: {
+                styleLabel: document.getElementById("stylePreset")?.selectedOptions?.[0]?.textContent?.trim() || "John 竖屏讲解风格",
+                personaLabel: document.getElementById("personaPreset")?.selectedOptions?.[0]?.textContent?.trim() || "John 专属人物形象",
+                consistencyRule:
+                  "所有场景都要保持同一条视觉规则：同一个 John、同一套竖屏讲解构图、同一种字幕安全区和相同的编辑插画气质。",
               }
             }),
           });
@@ -3786,8 +4001,10 @@ ${sharedPageStyles}
             '    <span class="scene-title">' + card.title + '</span>',
             '    <span class="scene-duration">' + card.durationLabel + '</span>',
             '  </div>',
+            '  <div class="scene-caption">统一风格：' + (card.visualConsistencyLabel || "未指定统一视觉方案") + '</div>',
             '  <div class="scene-visual">' + (card.visualHint || "暂时还没有画面建议") + '</div>',
             '  <div>' + card.narration + '</div>',
+            '  <div class="scene-caption">一致性规则：' + (card.visualConsistencyRule || "当前没有额外的一致性说明") + '</div>',
             '  <div class="scene-caption">字幕：' + card.subtitleStyle + ' · 转场：' + card.transition + '</div>',
             '</article>'
           ].join("")).join("");
@@ -4284,10 +4501,10 @@ function renderDemoPage() {
 }
 
 function renderJobDashboardPage() {
-  const jobRecords = [...createdJobs.values()].map((item) => item.record);
-  const list = buildJobListView(jobRecords.length ? jobRecords : demoJobs);
+  const jobRecords = getAllKnownJobRecords();
+  const list = buildJobListView(jobRecords);
   const lead = buildAcceptanceLead(list);
-  const selectedRecord = jobRecords[0] ?? demoJobs[0];
+  const selectedRecord = jobRecords[0];
   const selectedListItem = list.find((item) => item.id === selectedRecord.id);
   const detail = buildJobDetailView(selectedRecord, {
     reviewRank: selectedListItem?.reviewRank ?? null,
@@ -4879,10 +5096,20 @@ ${sharedPageStyles}
           if (bucket === "ready") {
             return "这些任务已经具备人工验收条件，优先听声音、看节奏，再决定是否进入发布。";
           }
+          if (bucket === "history") {
+            return "这些任务已经完成主要验收动作，保留在这里供你回看历史成片、复盘路线和比较不同方案。";
+          }
           if (bucket === "queued") {
             return "这些任务已经入队，但系统还没有真正开始生产。";
           }
           return "这些任务当前信息不完整，建议结合右侧详情判断。";
+        }
+
+        function getGroupTitle(bucket, defaultLabel) {
+          if (bucket === "history") {
+            return "历史已完成";
+          }
+          return defaultLabel;
         }
 
         function getReadyLaneHint(lane) {
@@ -4890,6 +5117,16 @@ ${sharedPageStyles}
             return "这些任务更值得你先手动验收，通常涉及自定义声音、高质量档位或更高发布风险。";
           }
           return "这些任务已经可以验收，但优先级低于需要重点把关的成片。";
+        }
+
+        function splitReviewHistoryClient(items) {
+          const recommendedJobId = acceptanceLead?.jobId || null;
+          const readyStandardItems = items.filter((item) => item.priorityBucket === "ready" && item.readyLane === "standard_review");
+          const olderCompletedHistory = readyStandardItems.filter((item) => item.id !== recommendedJobId);
+          return {
+            recommendedJobId,
+            olderCompletedHistoryIds: new Set(olderCompletedHistory.map((item) => item.id)),
+          };
         }
 
         function renderAcceptanceRelation(detail) {
@@ -4983,11 +5220,12 @@ ${sharedPageStyles}
         function renderList(selectedId) {
           const root = document.getElementById("jobList");
           root.innerHTML = "";
-          const order = ["attention", "running", "ready", "queued", "other"];
+          const order = ["attention", "running", "ready", "history", "queued", "other"];
           const grouped = new Map();
+          const historySplit = splitReviewHistoryClient(jobs);
 
           jobs.forEach((job) => {
-            const bucket = job.priorityBucket || "other";
+            const bucket = historySplit.olderCompletedHistoryIds.has(job.id) ? "history" : (job.priorityBucket || "other");
             if (!grouped.has(bucket)) {
               grouped.set(bucket, []);
             }
@@ -5004,7 +5242,7 @@ ${sharedPageStyles}
             section.className = "job-group job-group-" + bucket;
             const headerHtml = [
               '<div class="job-group-header">',
-              '  <div class="job-group-title"><span class="job-group-dot"></span><span>' + escapeHtml(items[0].priorityBucketLabel) + '</span></div>',
+              '  <div class="job-group-title"><span class="job-group-dot"></span><span>' + escapeHtml(getGroupTitle(bucket, items[0].priorityBucketLabel)) + '</span></div>',
               '  <span class="job-group-count">' + items.length + ' 条任务</span>',
               '</div>',
               '<div class="job-group-hint">' + escapeHtml(getGroupHint(bucket)) + '</div>',
@@ -5209,6 +5447,16 @@ function renderStoryboardPage() {
       textMode: "original",
       subtitleStyle: SUBTITLE_STYLES[0],
       transitionStyle: TRANSITION_STYLES[1],
+    },
+    visualConsistency: {
+      ...buildVisualConsistencySummary({
+        stylePresetId: "john_vertical_comic",
+        personaPresetId: "john_persona_v1",
+      }),
+      consistencyRule: buildVisualConsistencySummary({
+        stylePresetId: "john_vertical_comic",
+        personaPresetId: "john_persona_v1",
+      }).combinedNarrative,
     },
   });
 
@@ -5515,8 +5763,9 @@ function pushDemoSequence(sequence) {
   }
 }
 
-function storeCreatedJob(job) {
+async function storeCreatedJob(job) {
   createdJobs.set(job.record.id, job);
+  await persistCreatedJobs();
   return job;
 }
 
@@ -5524,7 +5773,7 @@ function getCreatedJob(jobId) {
   return createdJobs.get(jobId);
 }
 
-function updateCreatedJob(jobId, updater) {
+async function updateCreatedJob(jobId, updater) {
   const existing = createdJobs.get(jobId);
   if (!existing) {
     return undefined;
@@ -5532,6 +5781,7 @@ function updateCreatedJob(jobId, updater) {
 
   const next = updater(existing);
   createdJobs.set(jobId, next);
+  await persistCreatedJobs();
   return next;
 }
 
@@ -5657,7 +5907,7 @@ async function runCreatedJobLifecycle(jobId) {
   const steps = getLifecycleStepNarration(job);
 
   for (const item of steps) {
-    updateCreatedJob(jobId, (current) => ({
+    await updateCreatedJob(jobId, (current) => ({
       ...current,
       record: {
         ...current.record,
@@ -5690,7 +5940,7 @@ async function runCreatedJobLifecycle(jobId) {
 
     const complianceSummary = getComplianceSummaryFromManifest(job.manifest);
 
-    updateCreatedJob(jobId, (current) => ({
+    await updateCreatedJob(jobId, (current) => ({
       ...current,
       outputPaths: {
         ...current.outputPaths,
@@ -5747,7 +5997,7 @@ async function runCreatedJobLifecycle(jobId) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Renderer failed";
-    updateCreatedJob(jobId, (current) => ({
+    await updateCreatedJob(jobId, (current) => ({
       ...current,
       record: {
         ...current.record,
@@ -5885,7 +6135,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const draft = normalizeWizardConfig(payload);
-      const created = storeCreatedJob(createVideoJobFromDraft(draft));
+      const created = await storeCreatedJob(createVideoJobFromDraft(draft));
 
       const responsePayload = {
         ok: true,
@@ -5965,8 +6215,8 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && url.pathname.startsWith("/api/jobs/")) {
     const jobId = url.pathname.replace("/api/jobs/", "");
-    const allRecords = [...createdJobs.values()].map((item) => item.record);
-    const listItems = buildJobListView(allRecords.length ? allRecords : demoJobs);
+    const allRecords = getAllKnownJobRecords();
+    const listItems = buildJobListView(allRecords);
     const created = getCreatedJob(jobId);
     if (created) {
       const videoPath = created.record.outputs?.find((item) => item.kind === "video")?.path ?? null;
@@ -5995,7 +6245,7 @@ const server = http.createServer(async (req, res) => {
       });
       return;
     }
-    const record = demoJobs.find((job) => job.id === jobId);
+    const record = allRecords.find((job) => job.id === jobId);
     if (!record) {
       sendJson(res, 404, { ok: false, error: "Job not found" });
       return;
@@ -6019,13 +6269,26 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "POST" && url.pathname === "/api/storyboard/preview") {
     try {
       const payload = await readJsonBody(req);
-      sendJson(res, 200, buildStoryboardPreview(payload));
+      const visualConsistency =
+        payload?.visualConsistency && typeof payload.visualConsistency === "object"
+          ? payload.visualConsistency
+          : buildVisualConsistencyView("john_vertical_comic", "john_persona_v1");
+      sendJson(res, 200, buildStoryboardPreview({
+        ...payload,
+        visualConsistency,
+      }));
     } catch (error) {
       sendJson(res, 400, {
         ok: false,
         error: error instanceof Error ? error.message : "Invalid storyboard payload",
       });
     }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/dev/reset-jobs") {
+    await resetCreatedJobsStore();
+    sendJson(res, 200, { ok: true });
     return;
   }
 
@@ -6103,6 +6366,8 @@ const server = http.createServer(async (req, res) => {
 
   sendJson(res, 404, { ok: false, error: "Not found" });
 });
+
+await loadPersistedCreatedJobs();
 
 server.listen(port, () => {
   console.log(`video-ops UI ready at http://localhost:${port}`);

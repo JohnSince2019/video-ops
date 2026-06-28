@@ -125,6 +125,9 @@ async function main() {
   };
 
   try {
+    const resetResponse = await fetch(new URL("/api/dev/reset-jobs", APP_URL), { method: "POST" });
+    assert.equal(resetResponse.ok, true);
+
     await page.goto(APP_URL, { waitUntil: "domcontentloaded" });
     console.log("[e2e] opened app");
 
@@ -200,12 +203,15 @@ async function main() {
       currentVoiceRoute: await text(page, "#activeTtsRouteLabel"),
       activePlatformSummary: await text(page, "#visiblePlatformSummaryLabel"),
       firstSceneLabels: (await page.locator(".scene-row").first().locator(".scene-row-label").allInnerTexts()).map((item) => item.trim()),
+      firstStoryboardConsistencyText: await page.locator(".story-scene").first().innerText(),
     };
     assert.ok(result.gatePanels.assetIntake.sectionTitles.includes("当前门槛"));
     assert.ok(result.gatePanels.assetIntake.sectionTitles.includes("当前已完成"));
     assert.match(result.gatePanels.assetIntake.currentVoiceRoute, /路线/);
     assert.match(result.gatePanels.assetIntake.activePlatformSummary, /微信视频号|小红书|抖音/);
     assert.deepEqual(result.gatePanels.assetIntake.firstSceneLabels, ["这一段的核心表达", "观众会看到什么", "建议占用时长"]);
+    assert.match(result.gatePanels.assetIntake.firstStoryboardConsistencyText, /统一风格：John 竖屏讲解风格 \/ John 专属人物形象/);
+    assert.match(result.gatePanels.assetIntake.firstStoryboardConsistencyText, /一致性规则：/);
 
     await page.goto(`${APP_URL}?step=voice_generation`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('.voice-card[data-voice-mode="male_clear_teacher"]');
@@ -381,6 +387,15 @@ async function main() {
     result.ttsStrategySummary = (await page.locator("#jobTtsStrategySummary .quality-item").allInnerTexts()).map((item) =>
       item.trim(),
     );
+    result.visualConsistencySummary = (await page.locator("#jobVisualConsistencySummary .quality-item").allInnerTexts()).map((item) =>
+      item.trim(),
+    );
+    result.publishReadinessSummary = (await page.locator("#publishReadinessSummary .quality-item").allInnerTexts()).map((item) =>
+      item.trim(),
+    );
+    result.deliveryPackageSummary = (await page.locator("#deliveryPackageSummary .quality-item").allInnerTexts()).map((item) =>
+      item.trim(),
+    );
 
     assert.ok(videoSrc && videoSrc.endsWith(".mp4"));
     assert.ok(result.preview.previewLinks.includes("打开 MP4"));
@@ -402,6 +417,13 @@ async function main() {
     assert.ok(result.ttsStrategySummary.some((item) => item.includes("TTS 引擎：")), "missing tts provider summary");
     assert.ok(result.ttsStrategySummary.some((item) => item.includes("音色策略：")), "missing tts cloning summary");
     assert.ok(result.ttsStrategySummary.some((item) => item.includes("部署策略：")), "missing tts deployment summary");
+    assert.ok(result.visualConsistencySummary.some((item) => item.includes("当前画面风格：John 竖屏讲解风格")), "missing visual style summary");
+    assert.ok(result.visualConsistencySummary.some((item) => item.includes("当前人物形象：John 专属人物形象")), "missing persona summary");
+    assert.ok(result.visualConsistencySummary.some((item) => item.includes("统一规则：")), "missing visual consistency rule");
+    assert.ok(result.publishReadinessSummary.some((item) => item.includes("具备发布条件") || item.includes("可以发") || item.includes("不能发")), "missing publish readiness status");
+    assert.ok(result.publishReadinessSummary.some((item) => item.includes("下一步：")), "missing publish next action");
+    assert.ok(result.deliveryPackageSummary.some((item) => item.includes("主交付物：可直接播放的 MP4 成片")), "missing delivery package mp4 summary");
+    assert.ok(result.deliveryPackageSummary.some((item) => item.includes("元数据：")), "missing delivery metadata summary");
 
     await page.goto(`${APP_URL}?step=voice_generation`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('.voice-card[data-voice-mode="female_energetic_creator"]');
@@ -411,6 +433,19 @@ async function main() {
     await page.waitForFunction(() => document.querySelector("#voiceMode")?.value === "female_energetic_creator", { timeout: 10000 });
     const secondJobPayload = await createCompletedJob(page);
     assert.notEqual(secondJobPayload.job.id, createJobPayload.job.id);
+
+    await page.goto(`${APP_URL}?step=voice_generation`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('.voice-card[data-voice-mode="male_clear_teacher"]');
+    await page.evaluate(() => {
+      const input = document.querySelector("#customVoiceReference");
+      if (input) input.value = "";
+    });
+    await page.locator("#ttsProviderIdVisible").selectOption("cosyvoice-mlx");
+    await page.waitForFunction(() => document.querySelector("#ttsProviderId")?.value === "cosyvoice-mlx", { timeout: 10000 });
+    await page.locator('.voice-card[data-voice-mode="male_clear_teacher"] .voice-apply-btn').click();
+    await page.waitForFunction(() => document.querySelector("#voiceMode")?.value === "male_clear_teacher", { timeout: 10000 });
+    const thirdJobPayload = await createCompletedJob(page);
+    assert.notEqual(thirdJobPayload.job.id, secondJobPayload.job.id);
 
     await page.goto(`${APP_URL}jobs`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector(".job-group", { timeout: 30000 });
@@ -494,6 +529,7 @@ async function main() {
     };
     assert.ok(jobGroups.length >= 1, "expected at least one grouped jobs section");
     assert.ok(jobGroups.some((item) => item.title === "可验收"), "expected a ready-for-review group");
+    assert.ok(jobGroups.some((item) => item.title === "历史已完成"), "expected a persisted history group");
     assert.ok(jobGroups.every((item) => item.count >= 1), "expected every visible group to contain jobs");
     assert.ok(readyLanes.length >= 1, "expected ready-for-review lanes inside jobs dashboard");
     assert.ok(readyLanes.some((item) => item.title === "优先人工验收"), "expected a priority review lane");
