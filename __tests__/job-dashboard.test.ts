@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildAcceptanceLead, buildJobDetailView, buildJobListView } from "../lib/ui/job-dashboard.js";
+import { evaluatePublishReadiness } from "../lib/ui/publish-readiness.js";
 
 test("task list normalization exposes state, platform, profile, progress, and updated time", () => {
   const list = buildJobListView([
@@ -374,6 +375,33 @@ test("generated subtitle artifacts surface as generated instead of planned", () 
   assert.equal(detail.qualitySummary.subtitleStatusLabel, "已生成字幕文件");
   assert.match(detail.outputsSummary[0] || "", /字幕 SRT/);
   assert.match(detail.outputsSummary[1] || "", /字幕 VTT/);
+});
+
+test("publish readiness evaluator can be shared across workbench and jobs detail", () => {
+  const record = {
+    id: "job-publish-shared",
+    title: "可发布任务",
+    state: "COMPLETED",
+    qualitySummary: {
+      audioPresence: true,
+      subtitleStatus: "generated" as const,
+      fallbackStatus: "primary" as const,
+      complianceStatus: "allowed" as const,
+    },
+    outputs: [
+      { kind: "video", path: "output/video.mp4" },
+      { kind: "cover", path: "output/cover.png" },
+      { kind: "metadata", path: "output/metadata.json" },
+      { kind: "subtitle_srt", path: "output/captions.srt" },
+    ],
+  };
+
+  const detail = buildJobDetailView(record);
+  const readiness = evaluatePublishReadiness(record);
+
+  assert.equal(detail.qualitySummary.subtitleStatusLabel, "已生成字幕文件");
+  assert.equal(readiness.level, "ready");
+  assert.match(readiness.status, /具备发布条件/);
 });
 
 test("task list priority bucket distinguishes attention, queued, and ready states", () => {

@@ -21,6 +21,7 @@ import {
 import { getTtsProviderProfile, listTtsProviderProfiles } from "./lib/audio/tts-providers.ts";
 import { ensureVoicePreviewAsset, getVoicePreviewMeta } from "./lib/audio/voice-preview.ts";
 import { buildAcceptanceLead, buildJobDetailView, buildJobListView } from "./lib/ui/job-dashboard.ts";
+import { evaluatePublishReadiness } from "./lib/ui/publish-readiness.ts";
 import { buildComplianceReport, exportComplianceReportJson } from "./lib/compliance/compliance-report.ts";
 import { exportComplianceReportPdf } from "./lib/compliance/compliance-report-pdf.ts";
 import { runComplianceGuard } from "./lib/domain/compliance-guard.ts";
@@ -3064,85 +3065,6 @@ ${sharedPageStyles}
           button.classList.toggle("busy-state", Boolean(disabled) && /中|保存|上传|加载/.test(text));
         }
 
-        function buildPublishReadiness(detail) {
-          if (!detail?.qualitySummary) {
-            return {
-              status: "当前还不能判断是否可发布",
-              reason: "因为这条任务还没有形成完整产物，系统暂时无法判断最终是否具备发布条件。",
-              nextAction: "先把任务跑完，再看 MP4、音频、合规和交付包是否齐全。",
-              ready: false,
-            };
-          }
-
-          const audioOk = !String(detail.qualitySummary.audioPresenceLabel || "").includes("无");
-          const subtitleMissing = String(detail.qualitySummary.subtitleStatusLabel || "").includes("缺失");
-          const subtitlePlanned = String(detail.qualitySummary.subtitleStatusLabel || "").includes("规划中");
-          const complianceBlocked = String(detail.qualitySummary.complianceStatusLabel || "").includes("拦截");
-          const fallbackUsed = String(detail.qualitySummary.fallbackStatusLabel || "").includes("fallback");
-          const hasPreview = Boolean(detail.previewUrl);
-
-          if (!hasPreview) {
-            return {
-              status: "当前还不能发",
-              reason: "因为最终 MP4 还没有准备好，用户现在拿不到可直接交付的成片。",
-              nextAction: "先等成片输出完成，再回来确认交付包。",
-              ready: false,
-            };
-          }
-
-          if (!audioOk) {
-            return {
-              status: "当前还不能发",
-              reason: "因为这条成片缺少音频，发出去会直接影响观看体验。",
-              nextAction: "先修声音链路，再重新确认交付包。",
-              ready: false,
-            };
-          }
-
-          if (complianceBlocked) {
-            return {
-              status: "当前还不能发",
-              reason: "因为合规检查没有通过，现在更适合先处理风险，而不是直接发布。",
-              nextAction: "先解决合规问题，再重新生成或重新验收。",
-              ready: false,
-            };
-          }
-
-          if (subtitleMissing) {
-            return {
-              status: "勉强可交付，但不建议直接发",
-              reason: "因为视频主体已经可看，但字幕缺失会明显降低最终发布质量。",
-              nextAction: "先补字幕或确认字幕策略，再决定是否直接发布。",
-              ready: false,
-            };
-          }
-
-          if (subtitlePlanned) {
-            return {
-              status: "接近可交付，但还差最后一环",
-              reason: "因为视频和音频已经齐了，但字幕还停留在规划状态，交付完整性还不够稳。",
-              nextAction: "先把字幕真正产出出来，再进入最终发布判断。",
-              ready: false,
-            };
-          }
-
-          if (fallbackUsed) {
-            return {
-              status: "可以发，但建议谨慎",
-              reason: "因为成片已经可交付，但这次走过 fallback 路线，最好再完整看一遍最终观感。",
-              nextAction: "先完整看一遍成片，再决定是直接发还是重跑主链路。",
-              ready: true,
-            };
-          }
-
-          return {
-            status: "这条视频已经具备发布条件",
-            reason: "因为 MP4、音频、合规和基础交付信息都已经齐全，现在更像一条可直接进入发布动作的成片。",
-            nextAction: "可以继续做平台文案、封面和发布动作；如果你要更稳，再做一轮人工复看。",
-            ready: true,
-          };
-        }
-
         function resetButtonState(button) {
           if (!button) return;
           button.textContent = button.dataset.defaultText || button.textContent;
@@ -3613,7 +3535,14 @@ ${sharedPageStyles}
 
         function renderPreview(detail) {
           const previewUrl = detail?.previewUrl;
-          const publishReadiness = buildPublishReadiness(detail);
+          const publishReadiness = detail?.publishReadiness || {
+            status: "当前还不能判断是否可发布",
+            reason: "系统暂时还没有拿到统一发布判断结果。",
+            nextAction: "先刷新任务详情，再确认交付包状态。",
+            ready: false,
+            level: "blocked",
+            missingItems: [],
+          };
           if (!previewUrl) {
             previewStage.innerHTML = '<div class="preview-placeholder">当前还没有完成的 MP4。渲染结束后，这里会出现播放器和下载链接。</div>';
             previewLinks.innerHTML = "";
@@ -6264,6 +6193,7 @@ const server = http.createServer(async (req, res) => {
         outputPaths: created.outputPaths,
         previewUrl,
         probe: created.renderResult?.probe ?? null,
+        publishReadiness: evaluatePublishReadiness(hydratedRecord),
         rawQualitySummary: hydratedRecord.qualitySummary ?? null,
         rawCostSummary: hydratedRecord.costSummary ?? null,
       });
@@ -6285,6 +6215,7 @@ const server = http.createServer(async (req, res) => {
       outputPaths: null,
       previewUrl: record.outputs?.find((item) => item.kind === "video")?.url ?? null,
       probe: null,
+      publishReadiness: evaluatePublishReadiness(record),
       rawQualitySummary: record.qualitySummary ?? null,
       rawCostSummary: record.costSummary ?? null,
     });
