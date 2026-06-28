@@ -69,6 +69,8 @@ Last updated: 2026-06-28
 - Active issue: `None`
 - Current state: `JOH-141` to `JOH-169` Done
 - Milestone closure status: `VIDEO-RAW-M0` to `VIDEO-RAW-M6` completed, and the created-job raw-video lifecycle has now been validated through a real local HTTP run, not only unit/integration tests.
+- Remote delivery status: committed as `2ba9705 feat: ship raw video edit pipeline` and pushed to `origin/dev`.
+- Audit boundary note: this project proves the P0 raw-video pipeline engine milestones are complete, but it should not be over-claimed as the entire raw-video PRD being finished. Higher-level product interaction items from the roadmap, such as the homepage dual-entry experience and a dedicated 5-step raw-video workbench, were not part of the proven M0-M6 closure evidence in this project.
 - Next required action: wait for a new product goal / new Linear milestone instead of inventing post-M6 backlog work.
 
 ## JOH-141 / VIDEO-RAW-M0-01 Evidence
