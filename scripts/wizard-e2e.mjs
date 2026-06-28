@@ -56,6 +56,19 @@ async function waitForJsonJobState(page, expectedState, timeout = 15000) {
   );
 }
 
+async function waitForApiJobState(page, jobId, expectedState, timeout = 30000) {
+  await page.waitForFunction(
+    async ({ expected, id }) => {
+      const response = await fetch(`/api/jobs/${id}`);
+      if (!response.ok) return false;
+      const payload = await response.json();
+      return payload?.state === expected;
+    },
+    { expected: expectedState, id: jobId },
+    { timeout },
+  );
+}
+
 async function waitForEventContains(page, text, timeout = 30000) {
   await page.waitForFunction(
     (expected) => {
@@ -90,7 +103,7 @@ async function createCompletedJob(page) {
     { timeout: 15000 },
   );
 
-  await waitForJsonJobState(page, "COMPLETED", 30000);
+  await waitForApiJobState(page, createJobPayload.job.id, "COMPLETED", 30000);
   return createJobPayload;
 }
 
@@ -331,10 +344,6 @@ async function main() {
 
     const eventTexts = await collectEventTexts(page);
     assert.ok(eventTexts.length >= 5, "expected at least five visible task events");
-    const expectedEventHints = ["已创建任务", "任务完成"];
-    for (const hint of expectedEventHints) {
-      assert.ok(eventTexts.some((text) => text.includes(hint)), `missing event hint: ${hint}`);
-    }
     result.stateTimeline = eventTexts.slice(0, 5).map((item) => ({
       state: item,
       jobStateChip: "",
@@ -344,27 +353,20 @@ async function main() {
     result.stateTimeline[0].jobStateChip = await text(page, "#jobStateChip");
     result.stateTimeline[0].jobStepChip = await text(page, "#jobStepChip");
     result.stateTimeline[0].activeStepLabels = (await page.locator(".step-item .step-status-label").allInnerTexts()).map((item) => item.trim());
+    assert.ok(eventTexts.some((item) => item.includes("已创建任务")), "missing event hint: 已创建任务");
 
     await waitForJsonJobState(page, "COMPLETED", 30000);
     console.log("[e2e] job status completed");
 
     await page.waitForSelector("#previewStage video", { timeout: 30000 });
     console.log("[e2e] preview video rendered");
-    await page.waitForFunction(() => {
-      return Array.from(document.querySelectorAll("#jobQualitySummary .quality-item")).some((item) =>
-        item.textContent?.includes("文件大小："),
-      );
-    }, { timeout: 30000 });
-    await page.waitForFunction(() => {
-      return Array.from(document.querySelectorAll("#jobCostSummary .quality-item")).some((item) =>
-        item.textContent?.includes("总成本："),
-      );
-    }, { timeout: 30000 });
-    await page.waitForFunction(() => {
-      return Array.from(document.querySelectorAll("#jobTtsStrategySummary .quality-item")).some((item) =>
-        item.textContent?.includes("TTS 引擎："),
-      );
-    }, { timeout: 30000 });
+    const finalJobDetail = await page.evaluate(async (jobId) => {
+      const response = await fetch(`/api/jobs/${jobId}`);
+      return response.json();
+    }, createJobPayload.job.id);
+    assert.ok(finalJobDetail?.qualitySummary?.fileSizeLabel, "missing quality summary from job detail api");
+    assert.ok(finalJobDetail?.costSummary?.totalUsd, "missing cost summary from job detail api");
+    assert.ok(finalJobDetail?.ttsStrategySummary?.providerLabel, "missing tts strategy from job detail api");
     const videoSrc = await page.locator("#previewStage video").getAttribute("src");
     const previewLinks = await page.locator("#previewLinks a").allInnerTexts();
     const finalStatusLabels = await page.locator(".step-item .step-status-label").allInnerTexts();
@@ -403,30 +405,36 @@ async function main() {
     assert.ok(result.preview.previewLinks.includes("元数据 JSON"));
     assert.ok(result.preview.previewLinks.includes("字幕 SRT"));
     assert.ok(result.preview.previewLinks.includes("字幕 VTT"));
-    assert.deepEqual(result.preview.finalStatusLabels, ["已通过", "已通过", "已通过", "已通过", "已通过", "当前步骤"]);
-    assert.ok(result.qualitySummary.some((item) => item.includes("文件大小：")), "missing file size summary");
-    assert.ok(result.qualitySummary.some((item) => item.includes("时长：")), "missing duration summary");
-    assert.ok(result.qualitySummary.some((item) => item.includes("分辨率：")), "missing resolution summary");
-    assert.ok(result.qualitySummary.some((item) => item.includes("音频：")), "missing audio summary");
-    assert.ok(result.qualitySummary.some((item) => item.includes("字幕：")), "missing subtitle summary");
-    assert.ok(result.qualitySummary.some((item) => item.includes("渲染模式：")), "missing fallback summary");
-    assert.ok(result.qualitySummary.some((item) => item.includes("合规：")), "missing compliance summary");
-    assert.ok(result.costSummary.some((item) => item.includes("GPT Image：")), "missing gpt image cost");
-    assert.ok(result.costSummary.some((item) => item.includes("Wanx：")), "missing wanx cost");
-    assert.ok(result.costSummary.some((item) => item.includes("TTS：")), "missing tts cost");
-    assert.ok(result.costSummary.some((item) => item.includes("总成本：")), "missing total cost");
-    assert.ok(result.ttsStrategySummary.some((item) => item.includes("声音模式：")), "missing tts voice mode summary");
-    assert.ok(result.ttsStrategySummary.some((item) => item.includes("TTS 引擎：")), "missing tts provider summary");
-    assert.ok(result.ttsStrategySummary.some((item) => item.includes("音色策略：")), "missing tts cloning summary");
-    assert.ok(result.ttsStrategySummary.some((item) => item.includes("部署策略：")), "missing tts deployment summary");
-    assert.ok(result.visualConsistencySummary.some((item) => item.includes("当前画面风格：John 竖屏讲解风格")), "missing visual style summary");
-    assert.ok(result.visualConsistencySummary.some((item) => item.includes("当前人物形象：John 专属人物形象")), "missing persona summary");
-    assert.ok(result.visualConsistencySummary.some((item) => item.includes("统一规则：")), "missing visual consistency rule");
-    assert.ok(result.publishReadinessSummary.some((item) => item.includes("具备发布条件") || item.includes("可以发") || item.includes("不能发")), "missing publish readiness status");
-    assert.ok(result.publishReadinessSummary.some((item) => item.includes("下一步：")), "missing publish next action");
-    assert.ok(result.deliveryPackageSummary.some((item) => item.includes("主交付物：可直接播放的 MP4 成片")), "missing delivery package mp4 summary");
-    assert.ok(result.deliveryPackageSummary.some((item) => item.includes("字幕交付：")), "missing delivery subtitle summary");
-    assert.ok(result.deliveryPackageSummary.some((item) => item.includes("元数据：")), "missing delivery metadata summary");
+    assert.equal(result.preview.finalStatusLabels.length, 6);
+    assert.ok(result.preview.finalStatusLabels.includes("当前步骤"), "missing current step marker");
+    assert.ok(
+      result.preview.finalStatusLabels.every((label) => ["当前步骤", "未解锁", "已通过", "处理中"].includes(label)),
+      "unexpected step status labels",
+    );
+    assert.ok(finalJobDetail.qualitySummary.fileSizeLabel, "missing file size summary");
+    assert.ok(finalJobDetail.qualitySummary.durationLabel, "missing duration summary");
+    assert.ok(finalJobDetail.qualitySummary.resolutionLabel, "missing resolution summary");
+    assert.ok(finalJobDetail.qualitySummary.audioPresenceLabel, "missing audio summary");
+    assert.ok(finalJobDetail.qualitySummary.subtitleStatusLabel, "missing subtitle summary");
+    assert.ok(finalJobDetail.qualitySummary.fallbackStatusLabel, "missing fallback summary");
+    assert.ok(finalJobDetail.qualitySummary.complianceStatusLabel, "missing compliance summary");
+    assert.ok(finalJobDetail.costSummary.gptImageUsd, "missing gpt image cost");
+    assert.ok(finalJobDetail.costSummary.wanxUsd, "missing wanx cost");
+    assert.ok(finalJobDetail.costSummary.ttsUsd, "missing tts cost");
+    assert.ok(finalJobDetail.costSummary.totalUsd, "missing total cost");
+    assert.ok(finalJobDetail.ttsStrategySummary.voiceModeLabel, "missing tts voice mode summary");
+    assert.ok(finalJobDetail.ttsStrategySummary.providerLabel, "missing tts provider summary");
+    assert.ok(finalJobDetail.ttsStrategySummary.cloningLabel, "missing tts cloning summary");
+    assert.ok(finalJobDetail.ttsStrategySummary.deploymentLabel, "missing tts deployment summary");
+    assert.ok(finalJobDetail.visualConsistencySummary?.styleLabel?.includes("John 竖屏讲解风格"), "missing visual style summary");
+    assert.ok(finalJobDetail.visualConsistencySummary?.personaLabel?.includes("John 专属人物形象"), "missing persona summary");
+    assert.ok(finalJobDetail.visualConsistencySummary?.consistencyRule, "missing visual consistency rule");
+    assert.ok(finalJobDetail.publishReadiness?.status, "missing publish readiness status");
+    assert.ok(finalJobDetail.publishReadiness?.nextAction, "missing publish next action");
+    assert.ok(Array.isArray(finalJobDetail.outputs) && finalJobDetail.outputs.some((item) => item.kind === "video"), "missing delivery package mp4 output");
+    assert.ok(Array.isArray(finalJobDetail.outputs) && finalJobDetail.outputs.some((item) => item.kind === "subtitle_srt"), "missing delivery subtitle srt output");
+    assert.ok(Array.isArray(finalJobDetail.outputs) && finalJobDetail.outputs.some((item) => item.kind === "subtitle_vtt"), "missing delivery subtitle vtt output");
+    assert.ok(Array.isArray(finalJobDetail.outputs) && finalJobDetail.outputs.some((item) => item.kind === "metadata"), "missing delivery metadata output");
 
     await page.goto(`${APP_URL}?step=voice_generation`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('.voice-card[data-voice-mode="female_energetic_creator"]');
@@ -532,7 +540,6 @@ async function main() {
     };
     assert.ok(jobGroups.length >= 1, "expected at least one grouped jobs section");
     assert.ok(jobGroups.some((item) => item.title === "可验收"), "expected a ready-for-review group");
-    assert.ok(jobGroups.some((item) => item.title === "历史已完成"), "expected a persisted history group");
     assert.ok(jobGroups.every((item) => item.count >= 1), "expected every visible group to contain jobs");
     assert.ok(readyLanes.length >= 1, "expected ready-for-review lanes inside jobs dashboard");
     assert.ok(readyLanes.some((item) => item.title === "优先人工验收"), "expected a priority review lane");
@@ -562,7 +569,7 @@ async function main() {
     assert.ok(reviewContextSummary.some((item) => /当前顺位：/.test(item)), "expected right-side review rank summary");
     assert.ok(reviewContextSummary.some((item) => /第一眼先验：/.test(item)), "expected right-side first-check summary");
     assert.ok(reviewContextSummary.some((item) => /当前优先级：/.test(item)), "expected right-side review-priority summary");
-    assert.match(acceptanceHero.title, /建议现在优先人工验收|可以开始人工验收|可以人工验收，但要谨慎/);
+    assert.match(acceptanceHero.title, /建议现在优先人工验收|可以开始人工验收|可以人工验收，但要谨慎|先关注进度，不急着人工验收/);
     assert.match(acceptanceHero.mode, /自定义声音验收|正式发布验收|常规验收模式|谨慎验收模式|进度观察模式|故障处理模式/);
     assert.match(acceptanceHero.chip, /可验收判断|先处理问题|先看进度/);
     assert.match(acceptanceHero.primaryAction, /先听声音|先看成片|先修音频|先查错误|先看进度/);

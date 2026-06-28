@@ -79,6 +79,47 @@ test("creates a manifest from markdown drafts and records style/voice checkpoint
   assert.equal(checkpoint?.ttsProviderId, "cosyvoice-mlx");
 });
 
+test("wizard markdown script without low-level manifest metadata falls back to production-friendly parsing", () => {
+  const draft = normalizeWizardConfig({
+    title: "AI 输出系统",
+    platform: "videox",
+    renderProfile: "standard",
+    author: "John",
+    ownerToken: "owner-markdown-fallback-001",
+    scriptText: [
+      "# 短视频脚本：你不是不会用 AI，你只是还没有一套高输出操作系统",
+      "",
+      "## 标题",
+      "你不是不会用 AI，你只是还没有一套高输出操作系统",
+      "",
+      "## 开场钩子",
+      "很多高强度上班的人，不是真的不会用 AI。",
+      "",
+      "## 正文",
+      "- 你只是多了一个工具，但没有多一套系统。",
+      "- 建立一套能接住素材、沉淀经验、复用内容的工作流。",
+      "",
+      "## 结尾",
+      "把工作沉淀成资产，而不是额外挤时间创作。",
+      "",
+      "## CTA",
+      "关注我，继续一起搭高输出操作系统。",
+    ].join("\n"),
+    scriptMode: "markdown",
+    stylePreset: "john_vertical_comic",
+    personaPreset: "john_persona_v1",
+    voiceMode: "male_coach_deep",
+  });
+
+  const created = createVideoJobFromDraft(draft);
+
+  assert.equal(created.manifest.platform, "videox");
+  assert.equal(created.manifest.renderProfile, "standard");
+  assert.equal(created.manifest.metadata.author, "John");
+  assert.equal(created.manifest.scenes.length >= 3, true);
+  assert.equal(created.manifest.metadata.tts_provider_id, "cosyvoice-mlx");
+});
+
 test("premium production route stores route role and acceptance hint in checkpoint metadata", () => {
   const draft = normalizeWizardConfig({
     title: "Premium Route Demo",

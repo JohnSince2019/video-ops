@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "node -e \"process.exit(0)\"",
     "dev": "node --import tsx server.mjs",
-    "wizard:e2e": "node scripts/wizard-e2e.mjs",
+    "wizard:e2e": "VIDEO_OPS_RENDERER_MODE=mock node scripts/wizard-e2e.mjs",
     "m3:acceptance": "node scripts/m3-acceptance-prep.mjs",
     "queue:smoke": "node scripts/queue-smoke-test.mjs",
     "idempotency:smoke": "node --import tsx scripts/idempotency-smoke.mjs",

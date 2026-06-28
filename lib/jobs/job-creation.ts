@@ -39,6 +39,13 @@ function hashOwnerToken(ownerToken: string) {
   return crypto.createHash("sha256").update(ownerToken).digest("hex");
 }
 
+function normalizeMarkdownForWizardFallback(scriptText: string) {
+  return scriptText
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*]\s+/gm, "")
+    .trim();
+}
+
 function toManifest(draft: WizardConfigDraft) {
   const referenceAudioPath = draft.customVoiceReference
     ? buildCustomVoiceReferenceAbsolutePath(draft.customVoiceReference)
@@ -52,15 +59,28 @@ function toManifest(draft: WizardConfigDraft) {
         : "默认中文解说路线";
 
   if (draft.scriptMode === "markdown") {
-    const manifest = parseMarkdownToSceneGraph(draft.scriptText);
-    return {
-      ...manifest,
-      metadata: {
-        ...manifest.metadata,
-        tts_provider_id: draft.ttsProviderId,
-        tts_route_label: ttsRouteLabel,
-      },
-    };
+    try {
+      const manifest = parseMarkdownToSceneGraph(draft.scriptText);
+      return {
+        ...manifest,
+        metadata: {
+          ...manifest.metadata,
+          tts_provider_id: draft.ttsProviderId,
+          tts_route_label: ttsRouteLabel,
+        },
+      };
+    } catch {
+      return parseTextToSceneGraph(normalizeMarkdownForWizardFallback(draft.scriptText), {
+        title: draft.title,
+        platform: draft.platform,
+        renderProfile: draft.renderProfile,
+        author: draft.author,
+        ttsVoice: draft.ttsVoice,
+        ttsProviderId: draft.ttsProviderId,
+        ttsRouteLabel,
+        referenceAudioPath,
+      });
+    }
   }
 
   return parseTextToSceneGraph(draft.scriptText, {

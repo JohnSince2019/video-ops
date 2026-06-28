@@ -21,6 +21,7 @@ import {
 import { getTtsProviderProfile, listTtsProviderProfiles } from "./lib/audio/tts-providers.ts";
 import { ensureVoicePreviewAsset, getVoicePreviewMeta } from "./lib/audio/voice-preview.ts";
 import { buildAcceptanceLead, buildJobDetailView, buildJobListView } from "./lib/ui/job-dashboard.ts";
+import { buildDeliveryPackageSummary } from "./lib/ui/delivery-package-summary.ts";
 import { evaluatePublishReadiness } from "./lib/ui/publish-readiness.ts";
 import { buildComplianceReport, exportComplianceReportJson } from "./lib/compliance/compliance-report.ts";
 import { exportComplianceReportPdf } from "./lib/compliance/compliance-report-pdf.ts";
@@ -2577,6 +2578,7 @@ ${sharedPageStyles}
         let recorderChunks = [];
         let activeEventSource = null;
         let currentJobId = "";
+        let jobDetailPollTimer = null;
         let lastPreviewedVoiceMode = "";
         let lastPreviewedVoiceLabel = "";
         let lastPreviewSourceLabel = "";
@@ -3320,6 +3322,10 @@ ${sharedPageStyles}
           }
         }
 
+        function hasVisibleEvent(text) {
+          return Array.from(jobEvents.querySelectorAll(".event-item-compact")).some((item) => item.textContent === text);
+        }
+
         function deriveScriptStructure(text) {
           const normalized = (text || "").trim();
           if (!normalized) {
@@ -3553,8 +3559,10 @@ ${sharedPageStyles}
                 '<div class="quality-item warn">下一步：' + publishReadiness.nextAction + '</div>',
               ].join("");
             }
-            if (deliveryPackageSummary) {
-              deliveryPackageSummary.innerHTML = '<div class="summary-item empty">交付包还没有准备好，等 MP4、元数据和下载入口生成后，这里会集中展示。</div>';
+          if (deliveryPackageSummary) {
+              deliveryPackageSummary.innerHTML = buildDeliveryPackageSummary(detail, publishReadiness)
+                .map((item) => '<div class="quality-item ' + item.tone + '">' + item.text + '</div>')
+                .join("");
             }
             return;
           }
@@ -3579,17 +3587,61 @@ ${sharedPageStyles}
             ].join("");
           }
           if (deliveryPackageSummary) {
-            const packageItems = [
-              '主交付物：可直接播放的 MP4 成片',
-              '下载能力：支持直接下载当前 MP4',
-              subtitleLinks.length ? '字幕交付：已附带字幕文件，可继续发布或二次加工' : '字幕交付：当前还没有字幕文件',
-              detail.outputPaths?.metadataPath ? '元数据：已附带 JSON 产物说明，便于复盘和继续发布' : '元数据：当前还没有附带元数据文件',
-              '发布判断：' + publishReadiness.status,
-            ];
-            deliveryPackageSummary.innerHTML = packageItems
-              .map((item) => '<div class="quality-item pass">' + item + '</div>')
+            deliveryPackageSummary.innerHTML = buildDeliveryPackageSummary(detail, publishReadiness)
+              .map((item) => '<div class="quality-item ' + item.tone + '">' + item.text + '</div>')
               .join("");
           }
+        }
+
+        async function refreshJobDetail(jobId) {
+          if (!jobId) return null;
+          const detailResponse = await fetch("/api/jobs/" + jobId);
+          const detail = await detailResponse.json();
+          renderJobSnapshot({
+            jobId,
+            state: detail.state,
+            progress: detail.progress,
+            currentStep: detail.currentStep,
+            checkpointReadableSummary: detail.checkpointReadableSummary,
+            outputs: detail.outputsSummary,
+            previewUrl: detail.previewUrl,
+          });
+          renderPreview(detail);
+          renderJobQuality(detail);
+          return detail;
+        }
+
+        function stopJobDetailPolling() {
+          if (jobDetailPollTimer) {
+            clearInterval(jobDetailPollTimer);
+            jobDetailPollTimer = null;
+          }
+        }
+
+        function startJobDetailPolling(jobId) {
+          stopJobDetailPolling();
+          jobDetailPollTimer = setInterval(async () => {
+            try {
+              const detail = await refreshJobDetail(jobId);
+              if (!detail) return;
+              if (detail.state === "COMPLETED") {
+                setHeroStatus("任务已完成", "ok");
+                setWorkflowStatus("视频任务已完成", "现在可以预览 MP4、查看产物质量，并继续进入后续验收。");
+                syncGateAssistant("completed_job");
+                if (!hasVisibleEvent("任务完成")) {
+                  appendEvent("任务完成");
+                }
+              } else if (detail.state === "FAILED" || detail.state === "INTERRUPTED") {
+                setHeroStatus("任务异常", "warn");
+                setWorkflowStatus("任务执行中断", "请查看右侧任务进度和错误信息，确认问题后重新创建或继续修复。");
+                syncGateAssistant("failed_job");
+              }
+              if (detail.state === "COMPLETED" || detail.state === "FAILED" || detail.state === "INTERRUPTED") {
+                stopJobDetailPolling();
+              }
+            } catch {
+            }
+          }, 1200);
         }
 
         function renderJobQuality(detail) {
@@ -4315,31 +4367,30 @@ ${sharedPageStyles}
             activeEventSource.close();
           }
 
+          startJobDetailPolling(result.job.id);
           activeEventSource = new EventSource("/events?jobId=" + result.job.id);
           activeEventSource.addEventListener("job-progress", async (event) => {
             const payload = JSON.parse(event.data);
-            const detailResponse = await fetch("/api/jobs/" + payload.jobId);
-            const detail = await detailResponse.json();
+            const detail = await refreshJobDetail(payload.jobId);
             renderJobSnapshot({
               jobId: payload.jobId,
               state: payload.state,
               progress: payload.progress,
               currentStep: payload.step,
               message: payload.message,
-              outputs: detail.outputsSummary,
-              previewUrl: detail.previewUrl,
             });
             updateWizardRail(payload.state);
-            renderPreview(detail);
-            renderJobQuality(detail);
             if (payload.state === "COMPLETED") {
               setHeroStatus("任务已完成", "ok");
               setWorkflowStatus("视频任务已完成", "现在可以预览 MP4、查看产物质量，并继续进入后续验收。");
               syncGateAssistant("completed_job");
+              appendEvent("任务完成");
+              stopJobDetailPolling();
             } else if (payload.state === "FAILED" || payload.state === "INTERRUPTED") {
               setHeroStatus("任务异常", "warn");
               setWorkflowStatus("任务执行中断", "请查看右侧任务进度和错误信息，确认问题后重新创建或继续修复。");
               syncGateAssistant("failed_job");
+              stopJobDetailPolling();
             } else {
               setHeroStatus("处理中", "busy");
               setWorkflowStatus("任务处理中", "系统正在持续推进当前任务，可在右侧查看阶段、预览和产物状态。");
