@@ -84,6 +84,41 @@ const DEFAULT_SCRIPT_MODE: ScriptMode = "plain_text";
 const DEFAULT_STYLE_PRESET: StylePresetId = "john_vertical_comic";
 const DEFAULT_PERSONA_PRESET: PersonaPresetId = "john_persona_v1";
 const DEFAULT_VOICE_MODE: VoicePresetId = "male_coach_deep";
+const DEFAULT_AUTHOR = "John";
+const DEFAULT_OWNER_TOKEN = "john-ai-lab";
+
+function deriveTitleFromScript(scriptText: string) {
+  const normalized = scriptText.trim();
+  if (!normalized) {
+    return "";
+  }
+
+  const explicitTitleLine = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .find((line) => /^title:/i.test(line));
+  if (explicitTitleLine) {
+    return explicitTitleLine.replace(/^title:/i, "").trim().slice(0, 48);
+  }
+
+  const firstHeading = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .find((line) => /^#{1,6}\s+/.test(line));
+  if (firstHeading) {
+    return firstHeading.replace(/^#{1,6}\s+/, "").trim().slice(0, 48);
+  }
+
+  const firstMeaningfulLine = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .find((line) => line && !/^(hook|summary|durationsec|cta|scene\s+\d+)/i.test(line));
+
+  return (firstMeaningfulLine || normalized)
+    .replace(/\s+/g, " ")
+    .slice(0, 48)
+    .trim();
+}
 
 function estimateScenes(scriptText: string, scriptMode: ScriptMode) {
   const normalized = scriptText.trim();
@@ -140,12 +175,12 @@ function estimateScenes(scriptText: string, scriptMode: ScriptMode) {
 
 export function validateWizardConfig(input: WizardConfigInput) {
   const errors: string[] = [];
-  const title = input.title?.trim() ?? "";
+  const scriptText = input.scriptText?.trim() ?? "";
+  const title = input.title?.trim() ?? deriveTitleFromScript(scriptText);
   const platform = input.platform?.trim() ?? DEFAULT_PLATFORM;
   const renderProfile = input.renderProfile?.trim() ?? DEFAULT_RENDER_PROFILE;
-  const author = input.author?.trim() ?? "";
-  const ownerToken = input.ownerToken?.trim() ?? "";
-  const scriptText = input.scriptText?.trim() ?? "";
+  const author = input.author?.trim() ?? DEFAULT_AUTHOR;
+  const ownerToken = input.ownerToken?.trim() ?? DEFAULT_OWNER_TOKEN;
   const scriptMode = input.scriptMode?.trim() ?? DEFAULT_SCRIPT_MODE;
   const stylePreset = input.stylePreset?.trim() ?? DEFAULT_STYLE_PRESET;
   const personaPreset = input.personaPreset?.trim() ?? DEFAULT_PERSONA_PRESET;
@@ -200,14 +235,6 @@ export function validateWizardConfig(input: WizardConfigInput) {
     }
   }
 
-  if (!author) {
-    errors.push("author is required");
-  }
-
-  if (!ownerToken) {
-    errors.push("ownerToken is required");
-  }
-
   if (!scriptText) {
     errors.push("scriptText is required");
   }
@@ -226,6 +253,7 @@ export function normalizeWizardConfig(input: WizardConfigInput): WizardConfigDra
 
   const scriptMode = (input.scriptMode?.trim() ?? DEFAULT_SCRIPT_MODE) as ScriptMode;
   const scriptText = input.scriptText!.trim();
+  const inferredTitle = deriveTitleFromScript(scriptText);
   const voiceMode = (input.voiceMode?.trim() ?? DEFAULT_VOICE_MODE) as VoiceMode;
   const ttsVoice = isCustomVoiceMode(voiceMode)
     ? "custom-reference-voice"
@@ -236,11 +264,11 @@ export function normalizeWizardConfig(input: WizardConfigInput): WizardConfigDra
   const ttsProviderId = (input.ttsProviderId?.trim() || inferredTtsProviderId) as TtsProviderProfile["id"];
 
   return {
-    title: input.title!.trim(),
+    title: (input.title?.trim() || inferredTitle || "未命名视频脚本").trim(),
     platform: (input.platform?.trim() ?? DEFAULT_PLATFORM) as SupportedPlatform,
     renderProfile: (input.renderProfile?.trim() ?? DEFAULT_RENDER_PROFILE) as RenderProfile,
-    author: input.author!.trim(),
-    ownerToken: input.ownerToken!.trim(),
+    author: (input.author?.trim() ?? DEFAULT_AUTHOR).trim(),
+    ownerToken: (input.ownerToken?.trim() ?? DEFAULT_OWNER_TOKEN).trim(),
     scriptText,
     scriptMode,
     stylePreset: (input.stylePreset?.trim() ?? DEFAULT_STYLE_PRESET) as StylePresetId,

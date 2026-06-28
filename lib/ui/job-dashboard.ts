@@ -51,6 +51,17 @@ export type JobListItem = {
   routeRoleLabel: string;
   renderSourceLabel: string;
   rerunRecommendationLabel: string;
+  acceptanceFocusLabel: string;
+  priorityBucket: "attention" | "running" | "ready" | "queued" | "other";
+  priorityBucketLabel: string;
+  readyLane: "priority_review" | "standard_review" | null;
+  readyLaneLabel: string | null;
+  prioritySignals: string[];
+  reviewModeLabel: string;
+  firstCheckLabel: string;
+  reviewPriorityLabel: string;
+  reviewRank: number | null;
+  reviewRankLabel: string;
 };
 
 export type JobDetailView = {
@@ -102,6 +113,38 @@ export type JobDetailView = {
     fallbackInterpretationLabel: string;
     rerunRecommendationLabel: string;
   };
+  reviewContext: {
+    bucketLabel: string;
+    laneLabel: string;
+    firstCheckLabel: string;
+    reviewPriorityLabel: string;
+    reviewModeLabel: string;
+    reviewRankLabel: string;
+  };
+  acceptanceAssistant: {
+    heroLabel: string;
+    readinessLabel: string;
+    reviewModeLabel: string;
+    primaryActionLabel: string;
+    secondaryActionLabel: string;
+    primaryChecks: string[];
+    blockerLabel: string;
+    nextActionLabel: string;
+  };
+};
+
+type JobDetailContext = {
+  reviewRank?: number | null;
+};
+
+export type JobAcceptanceLead = {
+  jobId: string;
+  title: string;
+  reviewRankLabel: string;
+  firstCheckLabel: string;
+  reviewPriorityLabel: string;
+  reviewModeLabel: string;
+  reasonLabel: string;
 };
 
 function normalizeState(state?: string | null): JobState | "UNKNOWN" {
@@ -387,6 +430,416 @@ function formatRerunRecommendation(record: JobDashboardRecord) {
   return "当前没有强制重跑信号，可以先按路线目标做人工验收。";
 }
 
+function formatListAcceptanceFocus(record: JobDashboardRecord) {
+  const state = normalizeState(record.state);
+  const routeRole = readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel");
+  const voiceMode = readCheckpointField(record.lastCheckpoint, "voiceMode");
+  const audioPresence = record.qualitySummary?.audioPresence;
+  const subtitleStatus = record.qualitySummary?.subtitleStatus;
+  const fallbackStatus = record.qualitySummary?.fallbackStatus;
+
+  if (state === "FAILED" || state === "INTERRUPTED") {
+    return "先查失败步骤和重跑条件，这条任务暂时不适合直接人工验收。";
+  }
+  if (audioPresence === false) {
+    return "先查音频链路，确认配音是否真正写进了成片。";
+  }
+  if (voiceMode === "custom_reference" || routeRole === "自定义声音保真路线") {
+    return "先听音色像不像本人，再决定要不要继续验收画面节奏。";
+  }
+  if (fallbackStatus === "fallback" && routeRole === "高拟真正式产线") {
+    return "先看 fallback 是否影响正式发布质量，必要时优先重跑主链路。";
+  }
+  if (fallbackStatus === "fallback") {
+    return "先判断这份 fallback 成片够不够交付，再决定是否升级重跑。";
+  }
+  if (subtitleStatus === "missing") {
+    return "先查字幕缺失，再看声音和画面节奏是否还值得继续验收。";
+  }
+  if (state === "COMPLETED") {
+    if (routeRole === "高拟真正式产线") {
+      return "可直接进人工验收，先看成片自然度和整体完成度。";
+    }
+    return "可直接进人工验收，先听声音和镜头节奏是否匹配。";
+  }
+  if (
+    state === "PARSING" ||
+    state === "AI_PROCESSING" ||
+    state === "ASSEMBLING" ||
+    state === "RENDERING" ||
+    state === "POST_PROCESSING"
+  ) {
+    return "先看当前处理步骤是否顺畅，等成片落地后再做正式人工验收。";
+  }
+
+  return "先确认路线和产物状态，再决定优先验声音还是优先验成片。";
+}
+
+function resolvePriorityBucket(record: JobDashboardRecord): JobListItem["priorityBucket"] {
+  const state = normalizeState(record.state);
+  const audioPresence = record.qualitySummary?.audioPresence;
+  const subtitleStatus = record.qualitySummary?.subtitleStatus;
+  const fallbackStatus = record.qualitySummary?.fallbackStatus;
+
+  if (state === "FAILED" || state === "INTERRUPTED" || audioPresence === false || subtitleStatus === "missing") {
+    return "attention";
+  }
+  if (
+    state === "PARSING" ||
+    state === "AI_PROCESSING" ||
+    state === "ASSEMBLING" ||
+    state === "RENDERING" ||
+    state === "POST_PROCESSING"
+  ) {
+    return "running";
+  }
+  if (state === "COMPLETED") {
+    return fallbackStatus === "fallback" ? "attention" : "ready";
+  }
+  if (state === "QUEUED") {
+    return "queued";
+  }
+  return "other";
+}
+
+function formatPriorityBucketLabel(bucket: JobListItem["priorityBucket"]) {
+  const labels: Record<JobListItem["priorityBucket"], string> = {
+    attention: "优先关注",
+    running: "处理中",
+    ready: "可验收",
+    queued: "待开始",
+    other: "其他任务",
+  };
+
+  return labels[bucket];
+}
+
+function resolveReadyLane(record: JobDashboardRecord, bucket: JobListItem["priorityBucket"]): JobListItem["readyLane"] {
+  if (bucket !== "ready") {
+    return null;
+  }
+
+  const routeRole = readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel");
+  const voiceMode = readCheckpointField(record.lastCheckpoint, "voiceMode");
+  const renderProfile = record.renderProfile?.trim();
+
+  if (
+    voiceMode === "custom_reference" ||
+    routeRole === "自定义声音保真路线" ||
+    routeRole === "高拟真正式产线" ||
+    renderProfile === "high_quality"
+  ) {
+    return "priority_review";
+  }
+
+  return "standard_review";
+}
+
+function formatReadyLaneLabel(lane: JobListItem["readyLane"]) {
+  const labels: Record<NonNullable<JobListItem["readyLane"]>, string> = {
+    priority_review: "优先人工验收",
+    standard_review: "普通验收",
+  };
+
+  return lane ? labels[lane] : null;
+}
+
+function buildPrioritySignals(record: JobDashboardRecord, lane: JobListItem["readyLane"]) {
+  if (lane !== "priority_review") {
+    return [];
+  }
+
+  const routeRole = readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel");
+  const voiceMode = readCheckpointField(record.lastCheckpoint, "voiceMode");
+  const signals: string[] = [];
+
+  if (voiceMode === "custom_reference" || routeRole === "自定义声音保真路线") {
+    signals.push("自定义声音");
+  }
+  if (routeRole === "高拟真正式产线") {
+    signals.push("正式产线");
+  }
+  if (record.renderProfile?.trim() === "high_quality") {
+    signals.push("高质量档位");
+  }
+
+  return signals;
+}
+
+function buildReviewModeLabel(record: JobDashboardRecord) {
+  const state = normalizeState(record.state);
+  const routeRole = readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel");
+  const voiceMode = readCheckpointField(record.lastCheckpoint, "voiceMode");
+  const audioPresence = record.qualitySummary?.audioPresence;
+  const fallbackStatus = record.qualitySummary?.fallbackStatus;
+
+  if (state === "FAILED" || state === "INTERRUPTED") {
+    return "故障处理模式";
+  }
+  if (state !== "COMPLETED") {
+    return "进度观察模式";
+  }
+  if (audioPresence === false) {
+    return "音频排查模式";
+  }
+  if (voiceMode === "custom_reference" || routeRole === "自定义声音保真路线") {
+    return "自定义声音验收";
+  }
+  if (fallbackStatus === "fallback") {
+    return "谨慎验收模式";
+  }
+  if (routeRole === "高拟真正式产线" || record.renderProfile?.trim() === "high_quality") {
+    return "正式发布验收";
+  }
+  return "常规验收模式";
+}
+
+function buildFirstCheckLabel(record: JobDashboardRecord) {
+  const state = normalizeState(record.state);
+  const routeRole = readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel");
+  const voiceMode = readCheckpointField(record.lastCheckpoint, "voiceMode");
+  const audioPresence = record.qualitySummary?.audioPresence;
+  const fallbackStatus = record.qualitySummary?.fallbackStatus;
+
+  if (state === "FAILED" || state === "INTERRUPTED") {
+    return "先查失败步骤";
+  }
+  if (state !== "COMPLETED") {
+    return "先看进度卡点";
+  }
+  if (audioPresence === false) {
+    return "先修音频链路";
+  }
+  if (voiceMode === "custom_reference" || routeRole === "自定义声音保真路线") {
+    return "先验音色像不像本人";
+  }
+  if (fallbackStatus === "fallback" && routeRole === "高拟真正式产线") {
+    return "先验 fallback 风险";
+  }
+  if (routeRole === "高拟真正式产线" || record.renderProfile?.trim() === "high_quality") {
+    return "先验成片自然度";
+  }
+  return "先验声音和节奏";
+}
+
+function buildReviewPriorityLabel(record: JobDashboardRecord) {
+  const state = normalizeState(record.state);
+  const routeRole = readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel");
+  const voiceMode = readCheckpointField(record.lastCheckpoint, "voiceMode");
+  const audioPresence = record.qualitySummary?.audioPresence;
+  const fallbackStatus = record.qualitySummary?.fallbackStatus;
+
+  if (state === "FAILED" || state === "INTERRUPTED") {
+    return "最高优先处理";
+  }
+  if (audioPresence === false) {
+    return "先补关键缺口";
+  }
+  if (voiceMode === "custom_reference" || routeRole === "自定义声音保真路线") {
+    return "优先听声音";
+  }
+  if (fallbackStatus === "fallback") {
+    return "优先看降级风险";
+  }
+  if (routeRole === "高拟真正式产线" || record.renderProfile?.trim() === "high_quality") {
+    return "优先看发布质量";
+  }
+  if (state === "COMPLETED") {
+    return "可以常规验收";
+  }
+  if (state === "QUEUED") {
+    return "等待系统开始";
+  }
+  return "先看当前进度";
+}
+
+function computeReviewPriorityScore(record: JobDashboardRecord) {
+  const state = normalizeState(record.state);
+  const routeRole = readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel");
+  const voiceMode = readCheckpointField(record.lastCheckpoint, "voiceMode");
+  const audioPresence = record.qualitySummary?.audioPresence;
+  const subtitleStatus = record.qualitySummary?.subtitleStatus;
+  const fallbackStatus = record.qualitySummary?.fallbackStatus;
+  const renderProfile = record.renderProfile?.trim();
+  const progress =
+    typeof record.progress === "number" && Number.isFinite(record.progress)
+      ? Math.max(0, Math.min(100, Math.round(record.progress)))
+      : 0;
+
+  let score = 0;
+
+  if (state === "FAILED" || state === "INTERRUPTED") score += 100;
+  if (audioPresence === false) score += 95;
+  if (subtitleStatus === "missing") score += 85;
+  if (voiceMode === "custom_reference" || routeRole === "自定义声音保真路线") score += 82;
+  if (routeRole === "高拟真正式产线") score += 78;
+  if (renderProfile === "high_quality") score += 74;
+  if (fallbackStatus === "fallback") score += 72;
+  if (state === "COMPLETED") score += 60;
+  if (
+    state === "PARSING" ||
+    state === "AI_PROCESSING" ||
+    state === "ASSEMBLING" ||
+    state === "RENDERING" ||
+    state === "POST_PROCESSING"
+  ) {
+    score += 30 + Math.floor(progress / 10);
+  }
+  if (state === "QUEUED") score += 10;
+
+  return score;
+}
+
+function formatReviewRankLabel(rank: number | null, lane: JobListItem["readyLane"]) {
+  if (!rank || !lane) {
+    return "当前不参与人工验收顺位";
+  }
+
+  if (lane === "priority_review") {
+    return `优先人工验收第 ${rank} 位`;
+  }
+
+  return `普通验收第 ${rank} 位`;
+}
+
+function buildLeadReasonLabel(item: JobListItem) {
+  if (item.prioritySignals.length) {
+    return `因为它带有：${item.prioritySignals.join(" / ")}`;
+  }
+  if (item.priorityBucket === "attention") {
+    return "因为它存在需要先处理的风险或缺口";
+  }
+  if (item.readyLane === "priority_review") {
+    return "因为它属于更值得先人工把关的任务";
+  }
+  if (item.readyLane === "standard_review") {
+    return "因为它已经具备基础验收条件";
+  }
+  if (item.priorityBucket === "running") {
+    return "因为它现在最需要先看进度是否卡住";
+  }
+  return "因为它当前最值得你优先查看";
+}
+
+function buildAcceptanceAssistant(record: JobDashboardRecord) {
+  const state = normalizeState(record.state);
+  const routeRole = readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel");
+  const voiceMode = readCheckpointField(record.lastCheckpoint, "voiceMode");
+  const audioPresence = record.qualitySummary?.audioPresence;
+  const subtitleStatus = record.qualitySummary?.subtitleStatus;
+  const fallbackStatus = record.qualitySummary?.fallbackStatus;
+
+  if (state === "FAILED" || state === "INTERRUPTED") {
+    return {
+      heroLabel: "暂时不建议人工验收",
+      readinessLabel: "当前更适合先修复任务问题，再进入人工验收。",
+      reviewModeLabel: "故障处理模式",
+      primaryActionLabel: "先查错误",
+      secondaryActionLabel: "再决定是否重跑",
+      primaryChecks: [
+        "先看失败步骤和报错信息，确认问题发生在声音、画面还是渲染阶段。",
+        "先判断这次失败是否需要直接重跑，还是应该先修配置再重试。",
+      ],
+      blockerLabel: "当前阻塞：任务还没有产出稳定成片。",
+      nextActionLabel: "下一步建议：先处理错误和重跑条件。",
+    };
+  }
+
+  if (state !== "COMPLETED") {
+    return {
+      heroLabel: "先关注进度，不急着人工验收",
+      readinessLabel: "当前任务还在处理中，先看阶段进展和系统是否顺畅推进。",
+      reviewModeLabel: "进度观察模式",
+      primaryActionLabel: "先看进度",
+      secondaryActionLabel: "再等成片落地",
+      primaryChecks: [
+        "先看当前步骤是否停滞，确认任务有没有卡在解析、合成或渲染阶段。",
+        "先看阶段说明是否符合预期，再决定要不要继续等待或介入处理。",
+      ],
+      blockerLabel: "当前阻塞：正式成片还没有完全落地。",
+      nextActionLabel: "下一步建议：继续观察进度，等成片完成后再进入人工验收。",
+    };
+  }
+
+  if (audioPresence === false) {
+    return {
+      heroLabel: "先补音频，再谈人工验收",
+      readinessLabel: "成片缺少音频，当前不建议直接通过人工验收。",
+      reviewModeLabel: "音频排查模式",
+      primaryActionLabel: "先修音频",
+      secondaryActionLabel: "再回看成片",
+      primaryChecks: [
+        "先回看第 4 步声音应用是否成功，确认 TTS 是否真正产出了音轨。",
+        "再确认渲染阶段有没有把音频正确合入最终 MP4。",
+      ],
+      blockerLabel: "当前阻塞：成片无音频。",
+      nextActionLabel: "下一步建议：先修声音链路，再重看成片。",
+    };
+  }
+
+  if (voiceMode === "custom_reference" || routeRole === "自定义声音保真路线") {
+    return {
+      heroLabel: "建议现在优先人工验收",
+      readinessLabel: "这条任务适合你先手动验收，而且第一优先级是听音色像不像本人。",
+      reviewModeLabel: "自定义声音验收",
+      primaryActionLabel: "先听声音",
+      secondaryActionLabel: "再看成片",
+      primaryChecks: [
+        "先听音色一致性和辨识度，不要先被画面节奏分散注意力。",
+        "再看声音和镜头节奏是否匹配，确认不是只有音色像但整体观感不顺。",
+      ],
+      blockerLabel: "当前风险：参考音频稳定性会直接影响最终验收结果。",
+      nextActionLabel: "下一步建议：先听声音，再决定是否继续验收画面与字幕。",
+    };
+  }
+
+  if (fallbackStatus === "fallback") {
+    return {
+      heroLabel: "可以人工验收，但要谨慎",
+      readinessLabel: "这条成片已经能看，但当前带有 fallback 痕迹，建议带着风险意识验收。",
+      reviewModeLabel: "谨慎验收模式",
+      primaryActionLabel: "先看成片",
+      secondaryActionLabel: "再判断是否重跑",
+      primaryChecks: [
+        "先看 fallback 是否影响正式发布质量，再决定是否接受当前结果。",
+        "再看字幕、画面节奏和声音自然度，确认是不是还能继续交付。",
+      ],
+      blockerLabel: "当前风险：渲染链路发生过降级。",
+      nextActionLabel: "下一步建议：如果观感不够稳定，优先考虑重跑主链路。",
+    };
+  }
+
+  if (routeRole === "高拟真正式产线" || record.renderProfile?.trim() === "high_quality") {
+    return {
+      heroLabel: "建议现在优先人工验收",
+      readinessLabel: "这条成片已经具备验收条件，而且更值得你优先把关最终发布质量。",
+      reviewModeLabel: "正式发布验收",
+      primaryActionLabel: "先看成片",
+      secondaryActionLabel: "再听细节",
+      primaryChecks: [
+        "先看整体成片自然度和完成度，而不是只听某一段声音样本。",
+        "再看字幕、镜头节奏和画面观感，确认它是否真的达到了正式发布标准。",
+      ],
+      blockerLabel: "当前风险：高质量路线的验收标准更高，不能只看“能播”。",
+      nextActionLabel: "下一步建议：按正式发布标准完整看完一遍成片。",
+    };
+  }
+
+  return {
+    heroLabel: "可以开始人工验收",
+    readinessLabel: "这条任务已经具备基本验收条件，适合先听声音，再看成片节奏。",
+    reviewModeLabel: "常规验收模式",
+    primaryActionLabel: "先听声音",
+    secondaryActionLabel: "再看成片",
+    primaryChecks: [
+      "先听声音自然度和语速是否合适，再确认是否需要回退到声音策略层面。",
+      "再看字幕、镜头节奏和整体观感，判断是否可以继续交付。",
+    ],
+    blockerLabel: subtitleStatus === "missing" ? "当前风险：字幕仍缺失，可能影响最终观感。" : "当前没有明显阻塞，可以进入常规人工验收。",
+    nextActionLabel: "下一步建议：按声音、字幕、画面顺序快速验一遍。",
+  };
+}
+
 function formatWorkflowStepLabel(step?: string) {
   const labels: Record<string, string> = {
     waiting_for_worker: "等待系统开始处理",
@@ -482,8 +935,11 @@ function formatRenderProfileLabel(profile: string) {
 }
 
 export function buildJobListView(records: JobDashboardRecord[]): JobListItem[] {
-  return records.map((record, index) => {
+  const sorted = records
+    .map((record, index) => {
     const state = normalizeState(record.state);
+    const priorityBucket = resolvePriorityBucket(record);
+    const readyLane = resolveReadyLane(record, priorityBucket);
     const progressValue =
       typeof record.progress === "number" && Number.isFinite(record.progress)
         ? Math.max(0, Math.min(100, Math.round(record.progress)))
@@ -508,12 +964,73 @@ export function buildJobListView(records: JobDashboardRecord[]): JobListItem[] {
       routeRoleLabel: formatTtsRouteRoleLabel(readCheckpointField(record.lastCheckpoint, "ttsRouteRoleLabel")),
       renderSourceLabel: formatRenderSourceLabel(record),
       rerunRecommendationLabel: formatRerunRecommendation(record),
+      acceptanceFocusLabel: formatListAcceptanceFocus(record),
+      priorityBucket,
+      priorityBucketLabel: formatPriorityBucketLabel(priorityBucket),
+      readyLane,
+      readyLaneLabel: formatReadyLaneLabel(readyLane),
+      prioritySignals: buildPrioritySignals(record, readyLane),
+      reviewModeLabel: buildReviewModeLabel(record),
+      firstCheckLabel: buildFirstCheckLabel(record),
+      reviewPriorityLabel: buildReviewPriorityLabel(record),
+      reviewRank: null,
+      reviewRankLabel: "当前不参与人工验收顺位",
+    };
+    })
+    .sort((left, right) => {
+      const leftRecord = records.find((item) => item.id === left.id);
+      const rightRecord = records.find((item) => item.id === right.id);
+      const leftScore = leftRecord ? computeReviewPriorityScore(leftRecord) : 0;
+      const rightScore = rightRecord ? computeReviewPriorityScore(rightRecord) : 0;
+      if (rightScore !== leftScore) {
+        return rightScore - leftScore;
+      }
+      return left.title.localeCompare(right.title, "zh-Hans-CN");
+    });
+
+  const laneCounters = new Map<NonNullable<JobListItem["readyLane"]>, number>();
+  return sorted.map((item) => {
+    if (!item.readyLane) {
+      return item;
+    }
+
+    const nextRank = (laneCounters.get(item.readyLane) || 0) + 1;
+    laneCounters.set(item.readyLane, nextRank);
+
+    return {
+      ...item,
+      reviewRank: nextRank,
+      reviewRankLabel: formatReviewRankLabel(nextRank, item.readyLane),
     };
   });
 }
 
-export function buildJobDetailView(record: JobDashboardRecord): JobDetailView {
+export function buildAcceptanceLead(list: JobListItem[]): JobAcceptanceLead | null {
+  const lead =
+    list.find((item) => item.readyLane === "priority_review") ||
+    list.find((item) => item.readyLane === "standard_review") ||
+    list.find((item) => item.priorityBucket === "attention") ||
+    list[0];
+
+  if (!lead) {
+    return null;
+  }
+
+  return {
+    jobId: lead.id,
+    title: lead.title,
+    reviewRankLabel: lead.reviewRankLabel,
+    firstCheckLabel: lead.firstCheckLabel,
+    reviewPriorityLabel: lead.reviewPriorityLabel,
+    reviewModeLabel: lead.reviewModeLabel,
+    reasonLabel: buildLeadReasonLabel(lead),
+  };
+}
+
+export function buildJobDetailView(record: JobDashboardRecord, context?: JobDetailContext): JobDetailView {
   const state = normalizeState(record.state);
+  const priorityBucket = resolvePriorityBucket(record);
+  const readyLane = resolveReadyLane(record, priorityBucket);
   const progress =
     typeof record.progress === "number" && Number.isFinite(record.progress)
       ? Math.max(0, Math.min(100, Math.round(record.progress)))
@@ -603,5 +1120,17 @@ export function buildJobDetailView(record: JobDashboardRecord): JobDetailView {
       fallbackInterpretationLabel: formatFallbackInterpretation(record),
       rerunRecommendationLabel: formatRerunRecommendation(record),
     },
+    reviewContext: {
+      bucketLabel: formatPriorityBucketLabel(priorityBucket),
+      laneLabel: formatReadyLaneLabel(readyLane) || "当前不在验收分道",
+      firstCheckLabel: buildFirstCheckLabel(record),
+      reviewPriorityLabel: buildReviewPriorityLabel(record),
+      reviewModeLabel: buildReviewModeLabel(record),
+      reviewRankLabel: formatReviewRankLabel(
+        context?.reviewRank ?? (readyLane ? 1 : null),
+        readyLane,
+      ),
+    },
+    acceptanceAssistant: buildAcceptanceAssistant(record),
   };
 }

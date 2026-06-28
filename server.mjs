@@ -20,7 +20,7 @@ import {
 } from "./lib/audio/voice-presets.ts";
 import { getTtsProviderProfile, listTtsProviderProfiles } from "./lib/audio/tts-providers.ts";
 import { ensureVoicePreviewAsset, getVoicePreviewMeta } from "./lib/audio/voice-preview.ts";
-import { buildJobDetailView, buildJobListView } from "./lib/ui/job-dashboard.ts";
+import { buildAcceptanceLead, buildJobDetailView, buildJobListView } from "./lib/ui/job-dashboard.ts";
 import { buildComplianceReport, exportComplianceReportJson } from "./lib/compliance/compliance-report.ts";
 import { exportComplianceReportPdf } from "./lib/compliance/compliance-report-pdf.ts";
 import { runComplianceGuard } from "./lib/domain/compliance-guard.ts";
@@ -1099,6 +1099,35 @@ ${sharedPageStyles}
         color: #44506a;
         line-height: 1.6;
       }
+      .voice-state-board {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin: 12px 0 14px;
+      }
+      .voice-state-card {
+        border-radius: 16px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245, 248, 255, 0.98));
+        padding: 12px 13px;
+        display: grid;
+        gap: 6px;
+      }
+      .voice-state-card strong {
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+      }
+      .voice-state-card p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.65;
+        color: var(--ink);
+      }
+      .voice-state-card .voice-state-note {
+        font-size: 12px;
+        color: var(--muted);
+      }
       .micro-copy {
         font-size: 12px;
         color: var(--muted);
@@ -1283,6 +1312,109 @@ ${sharedPageStyles}
         align-items: center;
         gap: 10px;
         flex-wrap: wrap;
+      }
+      .script-entry-note {
+        margin-top: 10px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, rgba(255,122,89,.08), rgba(31,122,140,.06));
+        border: 1px solid rgba(20,33,61,.08);
+        display: grid;
+        gap: 6px;
+      }
+      .script-entry-note strong {
+        font-size: 13px;
+        color: var(--ink);
+      }
+      .script-entry-note p {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.65;
+        color: var(--muted);
+      }
+      .optional-config {
+        margin-top: 14px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        background: #fbfcff;
+      }
+      .optional-config summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .optional-config summary::-webkit-details-marker {
+        display: none;
+      }
+      .optional-config-body {
+        display: grid;
+        gap: 14px;
+        padding: 0 16px 16px;
+      }
+      .optional-config-title {
+        display: grid;
+        gap: 4px;
+      }
+      .optional-config-title strong {
+        font-size: 13px;
+        color: var(--ink);
+      }
+      .optional-config-title span {
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+      .platform-summary-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .intake-snapshot-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+      .quick-plan-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .quick-plan-card {
+        padding: 12px 13px;
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        background: #fff;
+        display: grid;
+        gap: 5px;
+      }
+      .quick-plan-card b {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .quick-plan-card strong {
+        font-size: 14px;
+        color: var(--ink);
+      }
+      .quick-plan-card p {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--muted);
+      }
+      .summary-mini-chip {
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: #f6f7fb;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
       }
       .tiny-chip {
         border-radius: 999px;
@@ -1624,6 +1756,7 @@ ${sharedPageStyles}
         .auto-grid,
         .voice-preset-grid,
         .field-grid.workbench,
+        .quick-plan-grid,
         .storyboard-grid,
         .status-pair {
           grid-template-columns: 1fr;
@@ -1691,15 +1824,9 @@ ${sharedPageStyles}
                   <input id="ttsProviderId" type="hidden" value="${defaultVoiceProvider.id}" />
                   <textarea id="scriptText" placeholder="在这里直接粘贴你的短视频脚本。建议包含：标题、开场抓手、摘要、总时长、分段内容、行动引导。"></textarea>
                   <div class="micro-copy">支持自然语言脚本，也支持接近 JSON / Markdown 的结构化脚本。脚本模式将自动识别，无需手动选择。</div>
-                </div>
-
-                <div class="field">
-                  <label class="tip-label">发布平台 <span class="tip-icon" data-tip="这里不是单选。一次勾选多个平台后，后续会按平台分别输出适配的视频规格和发布信息。">?</span></label>
-                  <div class="platform-grid">
-                    <label class="check-card"><input type="checkbox" id="platformWechat" checked /><span>微信视频号</span></label>
-                    <label class="check-card"><input type="checkbox" id="platformXiaohongshu" checked /><span>小红书</span></label>
-                    <label class="check-card"><input type="checkbox" id="platformDouyin" checked /><span>抖音</span></label>
-                    <label class="check-card"><input type="checkbox" id="platformBilibili" /><span>B站</span></label>
+                  <div class="script-entry-note">
+                    <strong>这里真正必填的只有脚本</strong>
+                    <p>先把完整脚本粘进来，再点“开始校验”。标题、作者、任务归属和声音路线都会优先自动补齐，只有你真的想微调时才需要展开下面的可选设置。</p>
                   </div>
                 </div>
 
@@ -1727,7 +1854,62 @@ ${sharedPageStyles}
                   <div class="scene-outline" id="sceneOutline">
                     <div class="summary-item empty">粘贴脚本后，这里会自动生成分段草稿。</div>
                   </div>
+                  <div class="intake-snapshot-row">
+                    <span class="summary-mini-chip" id="visiblePlatformSummaryLabel">微信视频号 / 小红书 / 抖音</span>
+                    <span class="summary-mini-chip" id="visibleVoicePrepLabel">第 4 步再决定最终声音</span>
+                  </div>
                 </div>
+
+                <details class="optional-config">
+                  <summary>
+                    <div class="optional-config-title">
+                      <strong>分发与后续设置</strong>
+                      <span>这里放“发到哪些平台”和“后面准备用哪类声音”的信息。默认不用先展开，不影响你完成这一步。</span>
+                    </div>
+                    <span class="advanced-config-caret">展开查看</span>
+                  </summary>
+                  <div class="optional-config-body">
+                    <div class="field">
+                      <label class="tip-label">发布平台 <span class="tip-icon" data-tip="这里不是单选。一次勾选多个平台后，后续会按平台分别输出适配的视频规格和发布信息。">?</span></label>
+                      <div class="platform-grid">
+                        <label class="check-card"><input type="checkbox" id="platformWechat" checked /><span>微信视频号</span></label>
+                        <label class="check-card"><input type="checkbox" id="platformXiaohongshu" checked /><span>小红书</span></label>
+                        <label class="check-card"><input type="checkbox" id="platformDouyin" checked /><span>抖音</span></label>
+                        <label class="check-card"><input type="checkbox" id="platformBilibili" /><span>B站</span></label>
+                      </div>
+                      <div class="platform-summary-row" id="platformSummaryRow">
+                        <span class="summary-mini-chip">默认多平台分发已开启</span>
+                        <span class="summary-mini-chip">第 4 步再决定最终声音</span>
+                      </div>
+                    </div>
+                    <div class="field full">
+                      <label class="tip-label">后续声音方向 <span class="tip-icon" data-tip="素材收集阶段不做声音选择，只确认你后面准备走预设声音还是你自己的声音。完整试听、录音、应用操作都放到第 4 步“声音应用”里完成。">?</span></label>
+                      <div class="quick-plan-grid">
+                        <article class="quick-plan-card">
+                          <b>当前声音准备</b>
+                          <strong id="activeVoiceModeLabel">先用默认预设声音</strong>
+                          <p>这一步只记方向，不在这里定稿音色。</p>
+                        </article>
+                        <article class="quick-plan-card">
+                          <b>下一步动作</b>
+                          <strong>第 4 步试听并定稿</strong>
+                          <p>先让脚本和分段稳定，再决定最终声音，避免太早纠结细节。</p>
+                        </article>
+                        <article class="quick-plan-card">
+                          <b>本人声音参考</b>
+                          <strong id="activeVoiceReferenceLabel">未使用自定义参考</strong>
+                          <p>如果后面要做 John 本人音色，第 4 步再上传或录入声音样本。</p>
+                        </article>
+                        <article class="quick-plan-card">
+                          <b>当前分发计划</b>
+                          <strong id="activePlatformSummaryLabel">微信视频号 / 小红书 / 抖音</strong>
+                          <p>这里只先定目标平台，具体平台适配细节等成片阶段再展开看。</p>
+                        </article>
+                      </div>
+                      <div class="hint">这一步只做输入整理，不做声音定稿。先确认脚本和场景拆分是对的，等到第 4 步再真正决定声音。</div>
+                    </div>
+                  </div>
+                </details>
 
                 <details class="advanced-config">
                   <summary>
@@ -1776,31 +1958,6 @@ ${sharedPageStyles}
                 </details>
 
                 ${
-                  isAssetIntakeStep
-                    ? `
-                <div class="field full">
-                  <label class="tip-label">后续声音方向 <span class="tip-icon" data-tip="素材收集阶段不做声音选择，只确认你后面准备走预设声音还是你自己的声音。完整试听、录音、应用操作都放到第 4 步“声音应用”里完成。">?</span></label>
-                  <div class="auto-grid">
-                    <div class="auto-card">
-                      <b>当前准备方式</b>
-                      <strong id="activeVoiceModeLabel">先用默认预设声音</strong>
-                    </div>
-                    <div class="auto-card">
-                      <b>第 4 步要做的事</b>
-                      <strong>试听并确认最终声音</strong>
-                    </div>
-                    <div class="auto-card">
-                      <b>是否已有本人声音参考</b>
-                      <strong id="activeVoiceReferenceLabel">未使用自定义参考</strong>
-                    </div>
-                  </div>
-                  <div class="hint">这一步只做输入整理，不做声音定稿。先确认脚本和场景拆分是对的，等到第 4 步再真正决定声音。</div>
-                </div>
-                    `
-                    : ""
-                }
-
-                ${
                   isVoiceGenerationStep
                     ? `
                 <div class="field">
@@ -1820,6 +1977,28 @@ ${sharedPageStyles}
                   <div class="field compact" style="margin-bottom:12px">
                     <label class="tip-label" for="ttsProviderIdVisible">TTS 引擎 <span class="tip-icon" data-tip="这里决定最终任务优先走哪套 TTS provider。你可以按自然度、是否支持克隆、以及是否要考虑云端 SaaS 部署来切换。">?</span></label>
                     <select id="ttsProviderIdVisible">${ttsProviderSelectOptionsHtml}</select>
+                  </div>
+                  <div class="voice-state-board">
+                    <article class="voice-state-card">
+                      <strong>当前试听对象</strong>
+                      <p id="voiceAuditionTargetLabel">暂未试听，你可以先试听任一预设声音。</p>
+                      <span class="voice-state-note" id="voiceAuditionHintLabel">试听只用于判断方向，不代表最终成片自然度。</span>
+                    </article>
+                    <article class="voice-state-card">
+                      <strong>当前已应用声音</strong>
+                      <p id="voiceAppliedTargetLabel">${defaultVoicePreset.chineseLabel}</p>
+                      <span class="voice-state-note" id="voiceAppliedHintLabel">这会作为当前任务默认使用的声音方案。</span>
+                    </article>
+                    <article class="voice-state-card">
+                      <strong>自定义参考状态</strong>
+                      <p id="customVoiceReferenceStateLabel">还没有上传或录音，暂未启用你自己的声音。</p>
+                      <span class="voice-state-note" id="customVoiceReferenceHintLabel">如果你要保留本人辨识度，先上传或录一段标准口播。</span>
+                    </article>
+                    <article class="voice-state-card">
+                      <strong>最终产线路线</strong>
+                      <p id="voiceFinalRouteLabel">默认中文解说路线 · 适合当前第一阶段工作台</p>
+                      <span class="voice-state-note" id="voiceFinalRouteHintLabel">创建任务后会按这里显示的路线进入正式 TTS 生产。</span>
+                    </article>
                   </div>
                   <div class="hint" id="voiceQualityHint">当前工作台试听主要用于确认声音方向；正式验收请以创建任务后的最终 TTS 产物为准。</div>
                   <div class="voice-preset-grid">
@@ -1908,6 +2087,28 @@ ${sharedPageStyles}
                   <div class="field compact" style="margin-bottom:12px">
                     <label class="tip-label" for="ttsProviderIdVisible">TTS 引擎 <span class="tip-icon" data-tip="这里决定最终任务优先走哪套 TTS provider。你可以按自然度、是否支持克隆、以及是否要考虑云端 SaaS 部署来切换。">?</span></label>
                     <select id="ttsProviderIdVisible">${ttsProviderSelectOptionsHtml}</select>
+                  </div>
+                  <div class="voice-state-board">
+                    <article class="voice-state-card">
+                      <strong>当前试听对象</strong>
+                      <p id="voiceAuditionTargetLabel">暂未试听，你可以先试听任一预设声音。</p>
+                      <span class="voice-state-note" id="voiceAuditionHintLabel">试听只用于判断方向，不代表最终成片自然度。</span>
+                    </article>
+                    <article class="voice-state-card">
+                      <strong>当前已应用声音</strong>
+                      <p id="voiceAppliedTargetLabel">${defaultVoicePreset.chineseLabel}</p>
+                      <span class="voice-state-note" id="voiceAppliedHintLabel">这会作为当前任务默认使用的声音方案。</span>
+                    </article>
+                    <article class="voice-state-card">
+                      <strong>自定义参考状态</strong>
+                      <p id="customVoiceReferenceStateLabel">还没有上传或录音，暂未启用你自己的声音。</p>
+                      <span class="voice-state-note" id="customVoiceReferenceHintLabel">如果你要保留本人辨识度，先上传或录一段标准口播。</span>
+                    </article>
+                    <article class="voice-state-card">
+                      <strong>最终产线路线</strong>
+                      <p id="voiceFinalRouteLabel">默认中文解说路线 · 适合当前第一阶段工作台</p>
+                      <span class="voice-state-note" id="voiceFinalRouteHintLabel">创建任务后会按这里显示的路线进入正式 TTS 生产。</span>
+                    </article>
                   </div>
                   <div class="voice-preset-grid">
                     ${voicePresetCardsHtml}
@@ -2233,6 +2434,14 @@ ${sharedPageStyles}
         const routeBehaviorNote = document.getElementById("routeBehaviorNote");
         const routeBehaviorList = document.getElementById("routeBehaviorList");
         const voiceQualityHint = document.getElementById("voiceQualityHint");
+        const voiceAuditionTargetLabel = document.getElementById("voiceAuditionTargetLabel");
+        const voiceAuditionHintLabel = document.getElementById("voiceAuditionHintLabel");
+        const voiceAppliedTargetLabel = document.getElementById("voiceAppliedTargetLabel");
+        const voiceAppliedHintLabel = document.getElementById("voiceAppliedHintLabel");
+        const customVoiceReferenceStateLabel = document.getElementById("customVoiceReferenceStateLabel");
+        const customVoiceReferenceHintLabel = document.getElementById("customVoiceReferenceHintLabel");
+        const voiceFinalRouteLabel = document.getElementById("voiceFinalRouteLabel");
+        const voiceFinalRouteHintLabel = document.getElementById("voiceFinalRouteHintLabel");
         const validateBtn = document.getElementById("validateBtn");
         const createJobBtn = document.getElementById("createJobBtn");
         const loadDemoBtn = document.getElementById("loadDemoBtn");
@@ -2274,6 +2483,11 @@ ${sharedPageStyles}
         let recorderChunks = [];
         let activeEventSource = null;
         let currentJobId = "";
+        let lastPreviewedVoiceMode = "";
+        let lastPreviewedVoiceLabel = "";
+        let lastPreviewSourceLabel = "";
+        let appliedVoiceMode = "${defaultVoicePreset.id}";
+        let appliedVoiceLabel = "${defaultVoicePreset.chineseLabel}";
 
         function syncAdvancedConfigLabel() {
           if (!advancedConfig) return;
@@ -2607,6 +2821,9 @@ ${sharedPageStyles}
           const voiceModeValue = document.getElementById("voiceMode").value;
           const ttsProviderIdValue = document.getElementById("ttsProviderId").value;
           const customReferenceValue = customVoiceReferenceInput?.value?.trim() || "";
+          const platformSummaryLabel = document.getElementById("activePlatformSummaryLabel");
+          const visiblePlatformSummaryLabel = document.getElementById("visiblePlatformSummaryLabel");
+          const visibleVoicePrepLabel = document.getElementById("visibleVoicePrepLabel");
           const routeBehavior = getRouteBehaviorConfig(ttsProviderIdValue, voiceModeValue);
           if (activeVoiceModeLabel) {
             activeVoiceModeLabel.textContent = clientVoiceModeLabel(voiceModeValue);
@@ -2631,6 +2848,19 @@ ${sharedPageStyles}
           }
           if (activeVoiceReferenceLabel) {
             activeVoiceReferenceLabel.textContent = customReferenceValue || "未使用自定义参考";
+          }
+          if (platformSummaryLabel) {
+            const labels = getSelectedPlatformLabels();
+            platformSummaryLabel.textContent = labels.length ? labels.join(" / ") : "暂未选择平台";
+            if (visiblePlatformSummaryLabel) {
+              visiblePlatformSummaryLabel.textContent = platformSummaryLabel.textContent;
+            }
+          } else if (visiblePlatformSummaryLabel) {
+            const labels = getSelectedPlatformLabels();
+            visiblePlatformSummaryLabel.textContent = labels.length ? labels.join(" / ") : "暂未选择平台";
+          }
+          if (visibleVoicePrepLabel) {
+            visibleVoicePrepLabel.textContent = voiceModeValue === "custom_reference" ? "后面会用你的声音做定稿" : "第 4 步再决定最终声音";
           }
           if (ttsProviderSelect) {
             ttsProviderSelect.value = ttsProviderIdValue || "${defaultVoiceProvider.id}";
@@ -2660,6 +2890,59 @@ ${sharedPageStyles}
             } else {
               voiceQualityHint.textContent = "当前工作台试听主要用于确认声音方向；正式验收请以创建任务后的最终 TTS 产物为准。";
             }
+          }
+          if (voiceAuditionTargetLabel) {
+            voiceAuditionTargetLabel.textContent = lastPreviewedVoiceLabel
+              ? lastPreviewedVoiceLabel + " · " + lastPreviewSourceLabel
+              : "暂未试听，你可以先试听任一预设声音。";
+          }
+          if (voiceAuditionHintLabel) {
+            if (lastPreviewedVoiceMode === "custom_reference") {
+              voiceAuditionHintLabel.textContent = "这里听到的是你上传的参考声音本身，用来确认是否选对了本人音色。";
+            } else if (lastPreviewedVoiceLabel) {
+              voiceAuditionHintLabel.textContent = "当前已试听这组预设声音，可以继续决定是否应用到本次任务。";
+            } else {
+              voiceAuditionHintLabel.textContent = "试听只用于判断方向，不代表最终成片自然度。";
+            }
+          }
+          if (voiceAppliedTargetLabel) {
+            voiceAppliedTargetLabel.textContent =
+              appliedVoiceMode === "custom_reference" && customReferenceValue
+                ? "已应用你的声音 · " + customReferenceValue
+                : appliedVoiceLabel || clientVoiceModeLabel(voiceModeValue);
+          }
+          if (voiceAppliedHintLabel) {
+            voiceAppliedHintLabel.textContent =
+              appliedVoiceMode === "custom_reference"
+                ? "创建任务后会优先保留本人辨识度，并走自定义声音克隆路线。"
+                : "这会作为当前任务默认使用的声音方案。";
+          }
+          if (customVoiceReferenceStateLabel) {
+            if (!customReferenceValue) {
+              customVoiceReferenceStateLabel.textContent = "还没有上传或录音，暂未启用你自己的声音。";
+            } else if (voiceModeValue === "custom_reference") {
+              customVoiceReferenceStateLabel.textContent = "已应用自定义参考： " + customReferenceValue;
+            } else {
+              customVoiceReferenceStateLabel.textContent = "已准备参考音频： " + customReferenceValue + "，待你决定是否应用。";
+            }
+          }
+          if (customVoiceReferenceHintLabel) {
+            customVoiceReferenceHintLabel.textContent = customReferenceValue
+              ? "如果你要保留本人辨识度，现在可以直接试听或应用这段参考声音。"
+              : "如果你要保留本人辨识度，先上传或录一段标准口播。";
+          }
+          if (voiceFinalRouteLabel) {
+            voiceFinalRouteLabel.textContent = clientTtsRouteLabel(ttsProviderIdValue, voiceModeValue) + " · " + clientTtsProviderRole(ttsProviderIdValue);
+          }
+          if (voiceFinalRouteHintLabel) {
+            voiceFinalRouteHintLabel.textContent =
+              voiceModeValue === "custom_reference"
+                ? "创建任务后会按你的参考声音进入自定义克隆流程，重点验收音色一致性。"
+                : ttsProviderIdValue === "f5-tts"
+                  ? "创建任务后会优先走高拟真正式产线，更适合看最终成片效果。"
+                  : ttsProviderIdValue === "melotts"
+                    ? "创建任务后会走低成本兜底路线，更适合快速出样和 fallback。"
+                    : "创建任务后会按这里显示的路线进入正式 TTS 生产。";
           }
           document.querySelectorAll(".voice-preview-btn").forEach((button) => {
             const card = button.closest(".voice-card");
@@ -3140,11 +3423,20 @@ ${sharedPageStyles}
           sceneOutline.innerHTML = derived.scenes.map((scene) => [
             '<article class="scene-row">',
             '  <strong>第 ' + scene.index + ' 段 · ' + (scene.title || "场景片段") + '</strong>',
-            '  <div><div class="scene-row-label">这一段要说什么</div><div class="scene-row-value">' + scene.voiceover + '</div></div>',
-            '  <div><div class="scene-row-label">建议画面</div><div class="scene-row-value">' + scene.visualSuggestion + '</div></div>',
-            '  <div><div class="scene-row-label">建议时长</div><div class="scene-row-value">' + scene.durationSec + ' 秒</div></div>',
+            '  <div><div class="scene-row-label">这一段的核心表达</div><div class="scene-row-value">' + scene.voiceover + '</div></div>',
+            '  <div><div class="scene-row-label">观众会看到什么</div><div class="scene-row-value">' + scene.visualSuggestion + '</div></div>',
+            '  <div><div class="scene-row-label">建议占用时长</div><div class="scene-row-value">' + scene.durationSec + ' 秒</div></div>',
             '</article>'
           ].join("")).join("");
+        }
+
+        function getSelectedPlatformLabels() {
+          const labels = [];
+          if (platformWechat?.checked) labels.push("微信视频号");
+          if (platformXiaohongshu?.checked) labels.push("小红书");
+          if (platformDouyin?.checked) labels.push("抖音");
+          if (platformBilibili?.checked) labels.push("B站");
+          return labels;
         }
 
         function renderPreview(detail) {
@@ -3363,8 +3655,6 @@ ${sharedPageStyles}
           errorList.innerHTML = "";
           if (!errors.length) return;
           const errorLabelMap = {
-            "title is required": "标题不能为空。",
-            "ownerToken is required": "任务归属标签不能为空。",
             "scriptText is required": "脚本文本不能为空。",
             "platform must be one of: douyin, xiaohongshu, videox": "发布平台配置无效，请重新选择。",
             "renderProfile must be one of: draft, standard, high_quality": "渲染档位配置无效，请重新选择。",
@@ -3594,6 +3884,11 @@ ${sharedPageStyles}
             setInlineStatus(presetVoiceStatus, "正在应用：" + voiceName, "busy");
             document.getElementById("voiceMode").value = selectedVoiceMode;
             document.getElementById("ttsProviderId").value = inferredProviderId;
+            appliedVoiceMode = selectedVoiceMode;
+            appliedVoiceLabel = voiceName;
+            if (applyCustomVoiceBtn) {
+              applyCustomVoiceBtn.textContent = applyCustomVoiceBtn.dataset.defaultText || "应用我的声音";
+            }
             markActiveVoiceCard(card);
             setHeroStatus("应用声音中", "busy");
             syncVoiceStatus();
@@ -3710,12 +4005,14 @@ ${sharedPageStyles}
           setInlineStatus(customVoiceStatus, "正在应用你的声音...", "busy");
           document.getElementById("voiceMode").value = "custom_reference";
           document.getElementById("ttsProviderId").value = "cosyvoice-mlx";
+          appliedVoiceMode = "custom_reference";
+          appliedVoiceLabel = "你的声音";
           markActiveVoiceCard(null);
           setHeroStatus("应用自定义声音中", "busy");
           await sync();
           setHeroStatus("已应用自定义声音", "ok");
           appendEvent("已应用自定义声音参考。");
-          setInlineStatus(customVoiceStatus, "已应用你的声音。", "success");
+          setInlineStatus(customVoiceStatus, "已应用你的声音，创建任务后会优先走自定义声音克隆路线。", "success");
           resetButtonState(applyCustomVoiceBtn);
           applyCustomVoiceBtn.textContent = "已应用";
           syncVoiceStatus();
@@ -3745,9 +4042,13 @@ ${sharedPageStyles}
           voicePreviewPlayer.src = result.previewUrl;
           voicePreviewPlayer.currentTime = 0;
           await voicePreviewPlayer.play();
+          lastPreviewedVoiceMode = "custom_reference";
+          lastPreviewedVoiceLabel = "你的声音";
+          lastPreviewSourceLabel = "参考音频试听";
           appendEvent("正在试听：自定义声音");
           setInlineStatus(customVoiceStatus, "正在试听你的声音。", "success");
           resetButtonState(previewCustomVoiceBtn);
+          syncVoiceStatus();
         });
         document.querySelectorAll(".voice-preview-btn").forEach((button) => {
           button.addEventListener("click", async (event) => {
@@ -3779,9 +4080,13 @@ ${sharedPageStyles}
             voicePreviewPlayer.src = result.previewUrl;
             voicePreviewPlayer.currentTime = 0;
             await voicePreviewPlayer.play();
+            lastPreviewedVoiceMode = voiceMode;
+            lastPreviewedVoiceLabel = name;
+            lastPreviewSourceLabel = routeConfig.previewAllowed ? "预设声音试听" : "正式产线试听";
             appendEvent("正在试听：" + name);
             setInlineStatus(presetVoiceStatus, "正在试听：" + name, "success");
             resetButtonState(event.currentTarget);
+            syncVoiceStatus();
           });
         });
         document.querySelectorAll(".provider-strategy-card").forEach((card) => {
@@ -3981,7 +4286,12 @@ function renderDemoPage() {
 function renderJobDashboardPage() {
   const jobRecords = [...createdJobs.values()].map((item) => item.record);
   const list = buildJobListView(jobRecords.length ? jobRecords : demoJobs);
-  const detail = buildJobDetailView(jobRecords[0] ?? demoJobs[0]);
+  const lead = buildAcceptanceLead(list);
+  const selectedRecord = jobRecords[0] ?? demoJobs[0];
+  const selectedListItem = list.find((item) => item.id === selectedRecord.id);
+  const detail = buildJobDetailView(selectedRecord, {
+    reviewRank: selectedListItem?.reviewRank ?? null,
+  });
 
   return renderZenPageShell({
     title: "任务总控台",
@@ -3991,19 +4301,202 @@ function renderJobDashboardPage() {
 ${sharedPageStyles}
       .jobs-layout { display: grid; gap: 18px; grid-template-columns: 0.95fr 1.05fr; margin-top: 20px; }
       .job-list { display: grid; gap: 12px; margin-top: 14px; }
+      .lead-pick-card {
+        display: grid;
+        gap: 10px;
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(255,122,89,.16);
+        background: linear-gradient(135deg, rgba(255,248,245,0.98), rgba(247,249,252,0.96));
+      }
+      .lead-pick-label {
+        font-size: 11px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: #b94825;
+        font-weight: 800;
+      }
+      .lead-pick-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: #233142;
+      }
+      .lead-pick-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .lead-pick-reason {
+        font-size: 13px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+      .lead-followup-banner {
+        margin-top: 12px;
+        display: none;
+        gap: 10px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(255,122,89,.14);
+        background: rgba(255,248,245,.92);
+        align-items: center;
+        justify-content: space-between;
+      }
+      .lead-followup-banner.active {
+        display: flex;
+      }
+      .lead-followup-text {
+        font-size: 13px;
+        color: #233142;
+        line-height: 1.6;
+        font-weight: 600;
+      }
+      .lead-followup-btn {
+        border: 0;
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: #ff7a59;
+        color: #fff;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .job-group-list { display: grid; gap: 16px; margin-top: 14px; }
+      .job-group {
+        display: grid;
+        gap: 12px;
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(20, 33, 61, 0.08);
+        background: rgba(247, 249, 252, 0.75);
+      }
+      .job-group-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .job-group-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #233142;
+      }
+      .job-group-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #1f7a8c;
+      }
+      .job-group-attention .job-group-dot { background: #ff7a59; }
+      .job-group-running .job-group-dot { background: #f59e0b; }
+      .job-group-ready .job-group-dot { background: #16a34a; }
+      .job-group-queued .job-group-dot { background: #1f7a8c; }
+      .job-group-other .job-group-dot { background: #94a3b8; }
+      .job-group-count {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .job-group-hint {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .job-group-items {
+        display: grid;
+        gap: 12px;
+      }
+      .job-ready-lanes {
+        display: grid;
+        gap: 12px;
+      }
+      .job-ready-lane {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 16px;
+        border: 1px solid rgba(20, 33, 61, 0.08);
+        background: rgba(255, 255, 255, 0.74);
+      }
+      .job-ready-lane.priority-review {
+        border-color: rgba(255,122,89,.18);
+        background: linear-gradient(180deg, rgba(255,248,245,0.96), rgba(255,255,255,0.92));
+      }
+      .job-ready-lane-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .job-ready-lane-title {
+        font-size: 12px;
+        font-weight: 800;
+        color: #233142;
+        letter-spacing: .04em;
+      }
+      .job-ready-lane-count {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .job-ready-lane-hint {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .job-ready-lane-items {
+        display: grid;
+        gap: 12px;
+      }
       .job-row {
         border: 1px solid rgba(20, 33, 61, 0.08);
-        background: rgba(255,255,255,0.62);
-        border-radius: 18px;
-        padding: 14px;
+        background:
+          radial-gradient(circle at top right, rgba(31,122,140,0.08), transparent 38%),
+          rgba(255,255,255,0.76);
+        border-radius: 20px;
+        padding: 16px;
         cursor: pointer;
-        transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+        transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        text-align: left;
       }
-      .job-row:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(20,33,61,.08); }
-      .job-row.active { border-color: rgba(255,122,89,.42); box-shadow: 0 12px 32px rgba(255,122,89,.12); }
+      .job-row:hover {
+        transform: translateY(-2px);
+        border-color: rgba(31,122,140,.16);
+        box-shadow: 0 14px 34px rgba(20,33,61,.08);
+      }
+      .job-row.active {
+        border-color: rgba(255,122,89,.42);
+        background:
+          radial-gradient(circle at top right, rgba(255,122,89,0.12), transparent 40%),
+          linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,248,245,0.98));
+        box-shadow: 0 16px 38px rgba(255,122,89,.14);
+      }
       .job-row-top, .job-meta, .detail-grid { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
       .job-row-top { justify-content: space-between; margin-bottom: 10px; }
+      .job-row-top-main {
+        display: grid;
+        gap: 8px;
+      }
       .job-title { font-family: "Avenir Next", "Trebuchet MS", sans-serif; font-weight: 800; }
+      .job-priority-signals {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .job-priority-signal {
+        display: inline-flex;
+        align-items: center;
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: rgba(255,122,89,0.12);
+        border: 1px solid rgba(255,122,89,0.16);
+        color: #b94825;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .04em;
+      }
       .badge {
         display: inline-flex;
         align-items: center;
@@ -4036,6 +4529,40 @@ ${sharedPageStyles}
         gap: 8px;
         margin-top: 10px;
       }
+      .job-mode-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(31,122,140,0.12);
+        border: 1px solid rgba(31,122,140,0.16);
+        color: #1f5f6d;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .04em;
+      }
+      .job-focus-card {
+        margin-top: 12px;
+        border-radius: 16px;
+        padding: 12px 14px;
+        background: linear-gradient(135deg, rgba(255,122,89,0.12), rgba(31,122,140,0.08));
+        border: 1px solid rgba(255,122,89,0.12);
+        display: grid;
+        gap: 6px;
+      }
+      .job-focus-label {
+        font-size: 11px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: #9c5b00;
+        font-weight: 800;
+      }
+      .job-focus-text {
+        font-size: 13px;
+        line-height: 1.6;
+        color: #233142;
+        font-weight: 600;
+      }
       .job-summary-chip {
         display: block;
         border-radius: 12px;
@@ -4047,6 +4574,130 @@ ${sharedPageStyles}
         text-align: left;
       }
       .detail-card { display: grid; gap: 14px; }
+      .acceptance-hero-card {
+        display: grid;
+        gap: 12px;
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(255,122,89,.14);
+        background: linear-gradient(135deg, rgba(255,248,245,0.98), rgba(247,249,252,0.96));
+      }
+      .acceptance-hero-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .acceptance-hero-title {
+        font-size: 15px;
+        font-weight: 800;
+        color: #233142;
+      }
+      .acceptance-hero-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(255,122,89,0.12);
+        color: #b94825;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .acceptance-mode-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(31,122,140,0.12);
+        color: #1f5f6d;
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .acceptance-hero-body {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      .acceptance-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .acceptance-action-card {
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(20,33,61,.08);
+        background: rgba(255,255,255,0.92);
+        display: grid;
+        gap: 6px;
+      }
+      .acceptance-action-card.primary {
+        border-color: rgba(255,122,89,.18);
+        background: linear-gradient(135deg, rgba(255,122,89,0.14), rgba(255,255,255,0.98));
+      }
+      .acceptance-action-label {
+        font-size: 11px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 800;
+      }
+      .acceptance-action-value {
+        font-size: 16px;
+        font-weight: 800;
+        color: #233142;
+      }
+      .acceptance-checks {
+        display: grid;
+        gap: 8px;
+      }
+      .acceptance-relation-banner {
+        display: none;
+        gap: 6px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(20,33,61,.08);
+        background: rgba(255,255,255,.88);
+      }
+      .acceptance-relation-banner.active {
+        display: grid;
+      }
+      .acceptance-relation-banner.recommended {
+        border-color: rgba(31,122,140,.18);
+        background: linear-gradient(135deg, rgba(31,122,140,.1), rgba(255,255,255,.96));
+      }
+      .acceptance-relation-banner.offtrack {
+        border-color: rgba(255,122,89,.18);
+        background: linear-gradient(135deg, rgba(255,122,89,.12), rgba(255,255,255,.96));
+      }
+      .acceptance-relation-label {
+        font-size: 11px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 800;
+      }
+      .acceptance-relation-title {
+        font-size: 15px;
+        line-height: 1.5;
+        color: #233142;
+        font-weight: 800;
+      }
+      .acceptance-relation-body {
+        font-size: 13px;
+        line-height: 1.65;
+        color: #465467;
+      }
+      .acceptance-check-item {
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(255,255,255,0.84);
+        border: 1px solid rgba(20,33,61,.08);
+        font-size: 13px;
+        line-height: 1.6;
+        color: #233142;
+      }
       .detail-grid { margin-top: 6px; }
       .detail-kv {
         min-width: 160px;
@@ -4084,10 +4735,63 @@ ${sharedPageStyles}
       <section class="jobs-layout">
         <section class="card">
           <p>任务列表</p>
+          ${
+            lead
+              ? `<button type="button" class="lead-pick-card" id="leadPickCard" data-job-id="${lead.jobId}">
+                  <div class="lead-pick-label">推荐先验任务</div>
+                  <div class="lead-pick-title" id="leadPickTitle">${lead.title}</div>
+                  <div class="lead-pick-meta">
+                    <span class="job-mode-chip" id="leadPickRank">${lead.reviewRankLabel}</span>
+                    <span class="job-mode-chip" id="leadPickMode">${lead.reviewModeLabel}</span>
+                  </div>
+                  <div class="lead-pick-reason" id="leadPickReason">${lead.reasonLabel}</div>
+                  <div class="job-summary-grid">
+                    <div class="job-summary-chip" id="leadPickFirstCheck">第一眼先验：${lead.firstCheckLabel}</div>
+                    <div class="job-summary-chip" id="leadPickPriority">当前优先级：${lead.reviewPriorityLabel}</div>
+                  </div>
+                </button>`
+              : ""
+          }
+          ${
+            lead
+              ? `<div class="lead-followup-banner" id="leadFollowupBanner">
+                  <div class="lead-followup-text" id="leadFollowupText">你当前看的不是推荐任务，可以一键回到建议优先验收的目标。</div>
+                  <button type="button" class="lead-followup-btn" id="leadFollowupBtn" data-job-id="${lead.jobId}">回到推荐任务</button>
+                </div>`
+              : ""
+          }
           <div class="job-list" id="jobList"></div>
         </section>
         <aside class="card detail-card">
           <p><span id="detailStatus" class="ok">已选任务</span></p>
+          <section class="acceptance-hero-card">
+            <div class="acceptance-hero-top">
+              <div style="display:grid;gap:8px">
+                <div class="acceptance-hero-title" id="acceptanceHeroTitle">验收建议</div>
+                <div class="acceptance-mode-chip" id="acceptanceModeChip">待分析</div>
+              </div>
+              <div class="acceptance-hero-chip" id="acceptanceHeroChip">待分析</div>
+            </div>
+            <div class="acceptance-hero-body" id="acceptanceHeroBody"></div>
+            <div class="acceptance-actions">
+              <div class="acceptance-action-card primary">
+                <div class="acceptance-action-label">主动作</div>
+                <div class="acceptance-action-value" id="acceptancePrimaryAction">待分析</div>
+              </div>
+              <div class="acceptance-action-card">
+                <div class="acceptance-action-label">次动作</div>
+                <div class="acceptance-action-value" id="acceptanceSecondaryAction">待分析</div>
+              </div>
+            </div>
+            <div class="acceptance-relation-banner" id="acceptanceRelationBanner">
+              <div class="acceptance-relation-label" id="acceptanceRelationLabel">推荐关系</div>
+              <div class="acceptance-relation-title" id="acceptanceRelationTitle">待分析</div>
+              <div class="acceptance-relation-body" id="acceptanceRelationBody">待分析</div>
+            </div>
+            <div class="acceptance-checks" id="acceptanceChecks"></div>
+            <div class="summary-item" id="acceptanceBlocker"></div>
+            <div class="summary-item" id="acceptanceNextAction"></div>
+          </section>
           <div class="detail-grid" id="detailGrid"></div>
           <div class="detail-section">
             <div class="summary-item">
@@ -4119,6 +4823,10 @@ ${sharedPageStyles}
               <div class="detail-list" id="routeOutcomeSummary"></div>
             </div>
             <div class="summary-item">
+              <b style="display:block;margin-bottom:8px">验收上下文</b>
+              <div class="detail-list" id="reviewContextSummary"></div>
+            </div>
+            <div class="summary-item">
               <b style="display:block;margin-bottom:8px">兜底与重跑建议</b>
               <div class="detail-list" id="resilienceSummary"></div>
             </div>
@@ -4141,6 +4849,7 @@ ${sharedPageStyles}
       <script>
         const jobs = ${JSON.stringify(list)};
         const initialDetail = ${JSON.stringify(detail)};
+        const acceptanceLead = ${JSON.stringify(lead)};
 
         async function fetchDetail(jobId) {
           const response = await fetch("/api/jobs/" + jobId);
@@ -4151,45 +4860,229 @@ ${sharedPageStyles}
           return "tone-" + tone;
         }
 
+        function escapeHtml(value) {
+          return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+        }
+
+        function getGroupHint(bucket) {
+          if (bucket === "attention") {
+            return "这些任务存在失败、fallback、缺音频或缺字幕等信号，适合先处理风险，再决定是否继续验收。";
+          }
+          if (bucket === "running") {
+            return "这些任务还在生产链路中，当前更适合看进度与阶段说明，不急着做最终人工验收。";
+          }
+          if (bucket === "ready") {
+            return "这些任务已经具备人工验收条件，优先听声音、看节奏，再决定是否进入发布。";
+          }
+          if (bucket === "queued") {
+            return "这些任务已经入队，但系统还没有真正开始生产。";
+          }
+          return "这些任务当前信息不完整，建议结合右侧详情判断。";
+        }
+
+        function getReadyLaneHint(lane) {
+          if (lane === "priority_review") {
+            return "这些任务更值得你先手动验收，通常涉及自定义声音、高质量档位或更高发布风险。";
+          }
+          return "这些任务已经可以验收，但优先级低于需要重点把关的成片。";
+        }
+
+        function renderAcceptanceRelation(detail) {
+          const banner = document.getElementById("acceptanceRelationBanner");
+          const label = document.getElementById("acceptanceRelationLabel");
+          const title = document.getElementById("acceptanceRelationTitle");
+          const body = document.getElementById("acceptanceRelationBody");
+          if (!banner || !label || !title || !body) {
+            return;
+          }
+
+          if (!acceptanceLead) {
+            banner.className = "acceptance-relation-banner";
+            title.textContent = "当前没有推荐任务";
+            body.textContent = "当前任务列表还没有形成明确的优先验收顺位。";
+            return;
+          }
+
+          if (detail.id === acceptanceLead.jobId) {
+            banner.className = "acceptance-relation-banner active recommended";
+            label.textContent = "推荐关系";
+            title.textContent = "当前查看的就是推荐优先验收任务";
+            body.textContent =
+              "你现在看的就是 " +
+              acceptanceLead.reviewRankLabel +
+              "，建议先按“" +
+              acceptanceLead.firstCheckLabel +
+              "”开始验收，再决定是否继续看画面和字幕。";
+            return;
+          }
+
+          banner.className = "acceptance-relation-banner active offtrack";
+          label.textContent = "推荐关系";
+          title.textContent = "你当前看的不是推荐任务";
+          body.textContent =
+            "你现在查看的是“" +
+            detail.reviewContext.reviewRankLabel +
+            "”，系统推荐先看的是“" +
+            acceptanceLead.reviewRankLabel +
+            "”。如果没有特殊原因，建议先回到“" +
+            acceptanceLead.title +
+            "”。";
+        }
+
+        function buildJobRowHtml(job, selectedId) {
+          const prioritySignalsHtml = job.prioritySignals && job.prioritySignals.length
+            ? '<div class="job-priority-signals">' + job.prioritySignals.map((signal) =>
+                '<span class="job-priority-signal">' + escapeHtml(signal) + '</span>'
+              ).join("") + '</div>'
+            : "";
+          return [
+            '<button type="button" class="job-row' + (job.id === selectedId ? ' active' : '') + '" data-job-id="' + escapeHtml(job.id) + '">',
+            '<div class="job-row-top">',
+            '  <div class="job-row-top-main">',
+            '    <span class="job-title">' + escapeHtml(job.title) + '</span>',
+            prioritySignalsHtml,
+            '  </div>',
+            '  <span class="badge ' + toneClass(job.statusTone) + '">' + escapeHtml(job.stateLabel) + '</span>',
+            '</div>',
+            '<div class="job-meta">' +
+              '<span>' + escapeHtml(job.platformLabel) + '</span>' +
+              '<span>•</span>' +
+              '<span>' + escapeHtml(job.renderProfileLabel) + '</span>' +
+              '<span>•</span>' +
+              '<span>' + escapeHtml(job.updatedLabel) + '</span>' +
+            '</div>',
+            '<div class="job-meta" style="margin-top:8px">' +
+              '<span>TTS：' + escapeHtml(job.ttsProviderLabel) + '</span>' +
+              '<span>•</span>' +
+              '<span>路线：' + escapeHtml(job.ttsRouteLabel) + '</span>' +
+            '</div>',
+            '<div style="margin-top:10px"><span class="job-mode-chip">' + escapeHtml(job.reviewModeLabel) + '</span></div>',
+            '<div style="margin-top:8px"><span class="job-mode-chip">' + escapeHtml(job.reviewRankLabel) + '</span></div>',
+            '<div class="job-focus-card">' +
+              '<div class="job-focus-label">当前最该关注什么</div>' +
+              '<div class="job-focus-text">' + escapeHtml(job.acceptanceFocusLabel) + '</div>' +
+            '</div>',
+            '<div class="job-summary-grid">' +
+              '<div class="job-summary-chip">第一眼先验：' + escapeHtml(job.firstCheckLabel) + '</div>' +
+              '<div class="job-summary-chip">当前优先级：' + escapeHtml(job.reviewPriorityLabel) + '</div>' +
+              '<div class="job-summary-chip">路线定位：' + escapeHtml(job.routeRoleLabel) + '</div>' +
+              '<div class="job-summary-chip">渲染来源：' + escapeHtml(job.renderSourceLabel) + '</div>' +
+              '<div class="job-summary-chip">当前建议：' + escapeHtml(job.rerunRecommendationLabel) + '</div>' +
+            '</div>',
+            '<div class="progress-bar"><div class="progress-fill" style="width:' + escapeHtml(job.progressLabel) + ';"></div></div>',
+            '<div class="hint" style="margin-top:8px">任务进度 ' + escapeHtml(job.progressLabel) + '</div>',
+            '</button>'
+          ].join("");
+        }
+
         function renderList(selectedId) {
           const root = document.getElementById("jobList");
           root.innerHTML = "";
+          const order = ["attention", "running", "ready", "queued", "other"];
+          const grouped = new Map();
+
           jobs.forEach((job) => {
-            const row = document.createElement("button");
-            row.type = "button";
-            row.className = "job-row" + (job.id === selectedId ? " active" : "");
-            row.innerHTML = [
-              '<div class="job-row-top">',
-              '  <span class="job-title">' + job.title + '</span>',
-              '  <span class="badge ' + toneClass(job.statusTone) + '">' + job.stateLabel + '</span>',
-              '</div>',
-              '<div class="job-meta">' +
-                '<span>' + job.platformLabel + '</span>' +
-                '<span>•</span>' +
-                '<span>' + job.renderProfileLabel + '</span>' +
-                '<span>•</span>' +
-                '<span>' + job.updatedLabel + '</span>' +
-              '</div>',
-              '<div class="job-meta" style="margin-top:8px">' +
-                '<span>TTS：' + job.ttsProviderLabel + '</span>' +
-                '<span>•</span>' +
-                '<span>路线：' + job.ttsRouteLabel + '</span>' +
-              '</div>',
-              '<div class="job-summary-grid">' +
-                '<div class="job-summary-chip">路线定位：' + job.routeRoleLabel + '</div>' +
-                '<div class="job-summary-chip">渲染来源：' + job.renderSourceLabel + '</div>' +
-                '<div class="job-summary-chip">当前建议：' + job.rerunRecommendationLabel + '</div>' +
-              '</div>',
-              '<div class="progress-bar"><div class="progress-fill" style="width:' + job.progressLabel + ';"></div></div>',
-              '<div class="hint" style="margin-top:8px">任务进度 ' + job.progressLabel + '</div>'
-            ].join("");
-            row.addEventListener("click", async () => {
-              const detail = await fetchDetail(job.id);
-              renderDetail(detail);
-              renderList(job.id);
-            });
-            root.appendChild(row);
+            const bucket = job.priorityBucket || "other";
+            if (!grouped.has(bucket)) {
+              grouped.set(bucket, []);
+            }
+            grouped.get(bucket).push(job);
           });
+
+          order.forEach((bucket) => {
+            const items = grouped.get(bucket) || [];
+            if (!items.length) {
+              return;
+            }
+
+            const section = document.createElement("section");
+            section.className = "job-group job-group-" + bucket;
+            const headerHtml = [
+              '<div class="job-group-header">',
+              '  <div class="job-group-title"><span class="job-group-dot"></span><span>' + escapeHtml(items[0].priorityBucketLabel) + '</span></div>',
+              '  <span class="job-group-count">' + items.length + ' 条任务</span>',
+              '</div>',
+              '<div class="job-group-hint">' + escapeHtml(getGroupHint(bucket)) + '</div>',
+            ].join("");
+            let bodyHtml = "";
+
+            if (bucket === "ready") {
+              const laneOrder = ["priority_review", "standard_review"];
+              const laneMap = new Map();
+              items.forEach((job) => {
+                const lane = job.readyLane || "standard_review";
+                if (!laneMap.has(lane)) {
+                  laneMap.set(lane, []);
+                }
+                laneMap.get(lane).push(job);
+              });
+
+              bodyHtml = '<div class="job-ready-lanes">' + laneOrder.map((lane) => {
+                const laneItems = laneMap.get(lane) || [];
+                if (!laneItems.length) {
+                  return "";
+                }
+
+                const laneLabel = laneItems[0].readyLaneLabel || (lane === "priority_review" ? "优先人工验收" : "普通验收");
+                return [
+                  '<section class="job-ready-lane ' + (lane === "priority_review" ? "priority-review" : "standard-review") + '">',
+                  '  <div class="job-ready-lane-header">',
+                  '    <div class="job-ready-lane-title">' + escapeHtml(laneLabel) + '</div>',
+                  '    <div class="job-ready-lane-count">' + laneItems.length + ' 条</div>',
+                  '  </div>',
+                  '  <div class="job-ready-lane-hint">' + escapeHtml(getReadyLaneHint(lane)) + '</div>',
+                  '  <div class="job-ready-lane-items">' + laneItems.map((job) => buildJobRowHtml(job, selectedId)).join("") + '</div>',
+                  '</section>',
+                ].join("");
+              }).join("") + '</div>';
+            } else {
+              bodyHtml = '<div class="job-group-items">' + items.map((job) => buildJobRowHtml(job, selectedId)).join("") + '</div>';
+            }
+
+            section.innerHTML = headerHtml + bodyHtml;
+
+            section.querySelectorAll(".job-row").forEach((row) => {
+              row.addEventListener("click", async () => {
+                const jobId = row.getAttribute("data-job-id");
+                const detail = await fetchDetail(jobId);
+                renderDetail(detail);
+                renderList(jobId);
+              });
+            });
+
+            root.appendChild(section);
+          });
+
+          const leadPickCard = document.getElementById("leadPickCard");
+          if (leadPickCard) {
+            leadPickCard.onclick = async () => {
+              const jobId = leadPickCard.getAttribute("data-job-id");
+              if (!jobId) return;
+              const detail = await fetchDetail(jobId);
+              renderDetail(detail);
+              renderList(jobId);
+            };
+          }
+
+          const leadFollowupBanner = document.getElementById("leadFollowupBanner");
+          const leadFollowupBtn = document.getElementById("leadFollowupBtn");
+          const leadJobId = leadPickCard?.getAttribute("data-job-id");
+          if (leadFollowupBanner && leadFollowupBtn && leadJobId) {
+            const showBanner = Boolean(selectedId && selectedId !== leadJobId);
+            leadFollowupBanner.classList.toggle("active", showBanner);
+            leadFollowupBtn.onclick = async () => {
+              const jobId = leadFollowupBtn.getAttribute("data-job-id");
+              if (!jobId) return;
+              const detail = await fetchDetail(jobId);
+              renderDetail(detail);
+              renderList(jobId);
+            };
+          }
         }
 
         function renderDetail(detail) {
@@ -4197,9 +5090,23 @@ ${sharedPageStyles}
           document.getElementById("detailStatus").className =
             detail.state === "COMPLETED" ? "ok" : (detail.state === "FAILED" || detail.state === "INTERRUPTED" ? "warn" : "ok");
 
+          document.getElementById("acceptanceHeroTitle").textContent = detail.acceptanceAssistant.heroLabel;
+          document.getElementById("acceptanceModeChip").textContent = detail.acceptanceAssistant.reviewModeLabel;
+          document.getElementById("acceptanceHeroChip").textContent =
+            detail.state === "COMPLETED" ? "可验收判断" : (detail.state === "FAILED" || detail.state === "INTERRUPTED" ? "先处理问题" : "先看进度");
+          document.getElementById("acceptanceHeroBody").textContent = detail.acceptanceAssistant.readinessLabel;
+          document.getElementById("acceptancePrimaryAction").textContent = detail.acceptanceAssistant.primaryActionLabel;
+          document.getElementById("acceptanceSecondaryAction").textContent = detail.acceptanceAssistant.secondaryActionLabel;
+          renderAcceptanceRelation(detail);
+          document.getElementById("acceptanceChecks").innerHTML = detail.acceptanceAssistant.primaryChecks
+            .map((item) => '<div class="acceptance-check-item">' + item + '</div>')
+            .join("");
+          document.getElementById("acceptanceBlocker").textContent = detail.acceptanceAssistant.blockerLabel;
+          document.getElementById("acceptanceNextAction").textContent = detail.acceptanceAssistant.nextActionLabel;
+
           const grid = document.getElementById("detailGrid");
           const items = [
-            ["标题", detail.title],
+            ["标题", '<span id="detailTitleValue">' + detail.title + '</span>'],
             ["平台", detail.platform],
             ["档位", detail.renderProfile],
             ["进度", detail.progress + "%"],
@@ -4265,6 +5172,14 @@ ${sharedPageStyles}
             '质量重点：' + detail.routeOutcomeSummary.qualityFocusLabel,
             '成本解读：' + detail.routeOutcomeSummary.costInterpretationLabel,
             '验收优先级：' + detail.routeOutcomeSummary.acceptancePriorityLabel,
+          ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
+          document.getElementById("reviewContextSummary").innerHTML = [
+            '当前分组：' + detail.reviewContext.bucketLabel,
+            '当前分道：' + detail.reviewContext.laneLabel,
+            '当前顺位：' + detail.reviewContext.reviewRankLabel,
+            '第一眼先验：' + detail.reviewContext.firstCheckLabel,
+            '当前优先级：' + detail.reviewContext.reviewPriorityLabel,
+            '当前模式：' + detail.reviewContext.reviewModeLabel,
           ].map((item) => '<div class="summary-item">' + item + '</div>').join("");
           document.getElementById("resilienceSummary").innerHTML = [
             '渲染来源：' + detail.resilienceSummary.renderSourceLabel,
@@ -5050,6 +5965,8 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "GET" && url.pathname.startsWith("/api/jobs/")) {
     const jobId = url.pathname.replace("/api/jobs/", "");
+    const allRecords = [...createdJobs.values()].map((item) => item.record);
+    const listItems = buildJobListView(allRecords.length ? allRecords : demoJobs);
     const created = getCreatedJob(jobId);
     if (created) {
       const videoPath = created.record.outputs?.find((item) => item.kind === "video")?.path ?? null;
@@ -5063,8 +5980,11 @@ const server = http.createServer(async (req, res) => {
           fileSizeBytes,
         },
       };
+      const listItem = listItems.find((item) => item.id === hydratedRecord.id);
       sendJson(res, 200, {
-        ...buildJobDetailView(hydratedRecord),
+        ...buildJobDetailView(hydratedRecord, {
+          reviewRank: listItem?.reviewRank ?? null,
+        }),
         storyboard: created.storyboard,
         manifest: created.manifest,
         outputPaths: created.outputPaths,
@@ -5080,8 +6000,11 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 404, { ok: false, error: "Job not found" });
       return;
     }
+    const listItem = listItems.find((item) => item.id === record.id);
     sendJson(res, 200, {
-      ...buildJobDetailView(record),
+      ...buildJobDetailView(record, {
+        reviewRank: listItem?.reviewRank ?? null,
+      }),
       storyboard: null,
       manifest: null,
       outputPaths: null,

@@ -19,10 +19,21 @@ test("detects missing title, missing script, invalid platform, and invalid rende
   });
 
   assert.equal(result.valid, false);
-  assert.match(result.errors.join("\n"), /title is required/);
   assert.match(result.errors.join("\n"), /platform must be one of/);
   assert.match(result.errors.join("\n"), /renderProfile must be one of/);
   assert.match(result.errors.join("\n"), /scriptText is required/);
+});
+
+test("script-only input can be normalized with derived title and default author context", () => {
+  const draft = normalizeWizardConfig({
+    scriptText: "卧推肩疼？先看手肘角度。\n\n很多人卧推肩疼，不是肩脆弱，而是手肘开太大。",
+  });
+
+  assert.equal(draft.title, "卧推肩疼？先看手肘角度。");
+  assert.equal(draft.author, "John");
+  assert.equal(draft.ownerToken, "john-ai-lab");
+  assert.equal(draft.platform, "douyin");
+  assert.equal(draft.renderProfile, "standard");
 });
 
 test("rejects invalid tts provider and cloning-incompatible provider selections", () => {

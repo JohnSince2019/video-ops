@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildJobDetailView, buildJobListView } from "../lib/ui/job-dashboard.js";
+import { buildAcceptanceLead, buildJobDetailView, buildJobListView } from "../lib/ui/job-dashboard.js";
 
 test("task list normalization exposes state, platform, profile, progress, and updated time", () => {
   const list = buildJobListView([
@@ -39,6 +39,10 @@ test("task list normalization exposes state, platform, profile, progress, and up
   assert.equal(list[0]?.routeRoleLabel, "高拟真正式产线");
   assert.equal(list[0]?.renderSourceLabel, "当前产物来自 fallback 渲染链路");
   assert.match(list[0]?.rerunRecommendationLabel || "", /重跑|fallback/);
+  assert.match(list[0]?.acceptanceFocusLabel || "", /fallback|主链路|正式发布质量/);
+  assert.equal(list[0]?.priorityBucket, "running");
+  assert.equal(list[0]?.priorityBucketLabel, "处理中");
+  assert.equal(list[0]?.reviewModeLabel, "进度观察模式");
 });
 
 test("task detail output includes step, progress, errors, checkpoint, and outputs", () => {
@@ -101,6 +105,11 @@ test("task detail output includes step, progress, errors, checkpoint, and output
   assert.equal(detail.resilienceSummary.renderSourceLabel, "当前产物来自 fallback 渲染链路");
   assert.match(detail.resilienceSummary.fallbackInterpretationLabel, /fallback/);
   assert.match(detail.resilienceSummary.rerunRecommendationLabel, /人工验收|重跑/);
+  assert.equal(detail.acceptanceAssistant.heroLabel, "暂时不建议人工验收");
+  assert.match(detail.acceptanceAssistant.blockerLabel, /当前阻塞/);
+  assert.equal(detail.acceptanceAssistant.reviewModeLabel, "故障处理模式");
+  assert.equal(detail.acceptanceAssistant.primaryActionLabel, "先查错误");
+  assert.equal(detail.acceptanceAssistant.secondaryActionLabel, "再决定是否重跑");
 });
 
 test("checkpoint readable summary surfaces stage narration when provided", () => {
@@ -163,6 +172,10 @@ test("task detail checkpoint summary includes custom voice reference when presen
   assert.equal(detail.resilienceSummary.renderSourceLabel, "当前还没有明确的渲染来源结论");
   assert.equal(detail.resilienceSummary.fallbackInterpretationLabel, "当前还没有足够信息解释渲染来源是否发生了降级。");
   assert.match(detail.resilienceSummary.rerunRecommendationLabel, /参考音频|人工验收/);
+  assert.equal(detail.acceptanceAssistant.heroLabel, "先关注进度，不急着人工验收");
+  assert.match(detail.acceptanceAssistant.readinessLabel, /还在处理中|先看阶段进展/);
+  assert.equal(detail.acceptanceAssistant.reviewModeLabel, "进度观察模式");
+  assert.equal(detail.acceptanceAssistant.primaryActionLabel, "先看进度");
 });
 
 test("premium production route with fallback surfaces stronger rerun guidance", () => {
@@ -208,6 +221,11 @@ test("premium production route with fallback surfaces stronger rerun guidance", 
   assert.equal(detail.routeOutcomeSummary.qualityFocusLabel, "优先关注最终成片自然度与整体观感，不用过度依赖即时试听。");
   assert.match(detail.resilienceSummary.fallbackInterpretationLabel, /正式产线质量/);
   assert.match(detail.resilienceSummary.rerunRecommendationLabel, /建议修复主链路后重跑/);
+  assert.equal(detail.acceptanceAssistant.heroLabel, "可以人工验收，但要谨慎");
+  assert.equal(detail.acceptanceAssistant.reviewModeLabel, "谨慎验收模式");
+  assert.match(detail.acceptanceAssistant.nextActionLabel, /重跑主链路|谨慎/);
+  assert.equal(detail.acceptanceAssistant.primaryActionLabel, "先看成片");
+  assert.equal(detail.acceptanceAssistant.secondaryActionLabel, "再判断是否重跑");
 });
 
 test("unknown state and missing fields fall back to safe display values", () => {
@@ -239,4 +257,328 @@ test("unknown state and missing fields fall back to safe display values", () => 
   assert.equal(detail.ttsStrategySummary.providerLabel, "未设置");
   assert.equal(detail.qualitySummary.fileSizeLabel, "未生成");
   assert.equal(detail.costSummary.totalUsd, "$0.0000");
+  assert.equal(detail.acceptanceAssistant.heroLabel, "先关注进度，不急着人工验收");
+});
+
+test("task list acceptance focus highlights custom voice and completed priorities", () => {
+  const list = buildJobListView([
+    {
+      id: "job-custom",
+      title: "John 音色任务",
+      state: "COMPLETED",
+      platform: "douyin",
+      renderProfile: "standard",
+      lastCheckpoint: {
+        voiceMode: "custom_reference",
+        ttsRouteRoleLabel: "自定义声音保真路线",
+      },
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+    },
+    {
+      id: "job-completed",
+      title: "普通已完成任务",
+      state: "COMPLETED",
+      platform: "douyin",
+      renderProfile: "standard",
+      lastCheckpoint: {
+        voiceMode: "male_clear_teacher",
+        ttsRouteRoleLabel: "第一阶段默认主链路",
+      },
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+    },
+  ]);
+
+  assert.match(list[0]?.acceptanceFocusLabel || "", /像不像本人|画面节奏/);
+  assert.match(list[1]?.acceptanceFocusLabel || "", /人工验收|声音和镜头节奏/);
+  assert.equal(list[0]?.priorityBucket, "ready");
+  assert.equal(list[1]?.priorityBucket, "ready");
+  assert.equal(list[0]?.readyLane, "priority_review");
+  assert.equal(list[0]?.readyLaneLabel, "优先人工验收");
+  assert.deepEqual(list[0]?.prioritySignals, ["自定义声音"]);
+  assert.equal(list[0]?.reviewModeLabel, "自定义声音验收");
+  assert.equal(list[1]?.readyLane, "standard_review");
+  assert.equal(list[1]?.readyLaneLabel, "普通验收");
+  assert.deepEqual(list[1]?.prioritySignals, []);
+  assert.equal(list[1]?.reviewModeLabel, "常规验收模式");
+  assert.equal(list[0]?.firstCheckLabel, "先验音色像不像本人");
+  assert.equal(list[0]?.reviewPriorityLabel, "优先听声音");
+  assert.equal(list[0]?.reviewRank, 1);
+  assert.equal(list[0]?.reviewRankLabel, "优先人工验收第 1 位");
+  assert.equal(list[1]?.firstCheckLabel, "先验声音和节奏");
+  assert.equal(list[1]?.reviewPriorityLabel, "可以常规验收");
+  assert.equal(list[1]?.reviewRank, 1);
+  assert.equal(list[1]?.reviewRankLabel, "普通验收第 1 位");
+});
+
+test("task list priority bucket distinguishes attention, queued, and ready states", () => {
+  const list = buildJobListView([
+    {
+      id: "job-attention",
+      title: "缺字幕任务",
+      state: "COMPLETED",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "missing",
+        fallbackStatus: "primary",
+      },
+    },
+    {
+      id: "job-queued",
+      title: "等待任务",
+      state: "QUEUED",
+    },
+    {
+      id: "job-ready",
+      title: "标准成片",
+      state: "COMPLETED",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+    },
+  ]);
+  const byId = Object.fromEntries(list.map((item) => [item.id, item]));
+
+  assert.equal(byId["job-attention"]?.priorityBucket, "attention");
+  assert.equal(byId["job-attention"]?.priorityBucketLabel, "优先关注");
+  assert.equal(byId["job-attention"]?.readyLane, null);
+  assert.equal(byId["job-queued"]?.priorityBucket, "queued");
+  assert.equal(byId["job-queued"]?.priorityBucketLabel, "待开始");
+  assert.equal(byId["job-queued"]?.readyLane, null);
+  assert.equal(byId["job-ready"]?.priorityBucket, "ready");
+  assert.equal(byId["job-ready"]?.priorityBucketLabel, "可验收");
+  assert.equal(byId["job-ready"]?.readyLane, "standard_review");
+  assert.equal(byId["job-ready"]?.readyLaneLabel, "普通验收");
+  assert.deepEqual(byId["job-ready"]?.prioritySignals, []);
+});
+
+test("high quality completed tasks are promoted into priority review lane", () => {
+  const list = buildJobListView([
+    {
+      id: "job-hq",
+      title: "高质量成片",
+      state: "COMPLETED",
+      renderProfile: "high_quality",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "male_clear_teacher",
+        ttsRouteRoleLabel: "第一阶段默认主链路",
+      },
+    },
+  ]);
+
+  assert.equal(list[0]?.priorityBucket, "ready");
+  assert.equal(list[0]?.readyLane, "priority_review");
+  assert.equal(list[0]?.readyLaneLabel, "优先人工验收");
+  assert.deepEqual(list[0]?.prioritySignals, ["高质量档位"]);
+  assert.equal(list[0]?.reviewModeLabel, "正式发布验收");
+});
+
+test("premium production route exposes multiple priority signals", () => {
+  const list = buildJobListView([
+    {
+      id: "job-premium",
+      title: "正式发布任务",
+      state: "COMPLETED",
+      renderProfile: "high_quality",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "female_energetic_creator",
+        ttsRouteRoleLabel: "高拟真正式产线",
+      },
+    },
+  ]);
+
+  assert.equal(list[0]?.readyLane, "priority_review");
+  assert.deepEqual(list[0]?.prioritySignals, ["正式产线", "高质量档位"]);
+  assert.equal(list[0]?.firstCheckLabel, "先验成片自然度");
+  assert.equal(list[0]?.reviewPriorityLabel, "优先看发布质量");
+});
+
+test("job list sorts higher-review-priority tasks before standard completed tasks", () => {
+  const list = buildJobListView([
+    {
+      id: "job-standard",
+      title: "标准成片",
+      state: "COMPLETED",
+      renderProfile: "standard",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "male_clear_teacher",
+        ttsRouteRoleLabel: "第一阶段默认主链路",
+      },
+    },
+    {
+      id: "job-custom",
+      title: "自定义声音成片",
+      state: "COMPLETED",
+      renderProfile: "standard",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "custom_reference",
+        ttsRouteRoleLabel: "自定义声音保真路线",
+      },
+    },
+  ]);
+
+  assert.equal(list[0]?.id, "job-custom");
+  assert.equal(list[1]?.id, "job-standard");
+  assert.equal(list[0]?.reviewRankLabel, "优先人工验收第 1 位");
+  assert.equal(list[1]?.reviewRankLabel, "普通验收第 1 位");
+});
+
+test("jobs in the same ready lane get increasing review ranks", () => {
+  const list = buildJobListView([
+    {
+      id: "job-custom-a",
+      title: "自定义声音 A",
+      state: "COMPLETED",
+      renderProfile: "standard",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "custom_reference",
+        ttsRouteRoleLabel: "自定义声音保真路线",
+      },
+    },
+    {
+      id: "job-custom-b",
+      title: "自定义声音 B",
+      state: "COMPLETED",
+      renderProfile: "high_quality",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "custom_reference",
+        ttsRouteRoleLabel: "自定义声音保真路线",
+      },
+    },
+  ]);
+
+  assert.equal(list[0]?.readyLane, "priority_review");
+  assert.equal(list[1]?.readyLane, "priority_review");
+  assert.equal(list[0]?.reviewRank, 1);
+  assert.equal(list[1]?.reviewRank, 2);
+  assert.equal(list[0]?.reviewRankLabel, "优先人工验收第 1 位");
+  assert.equal(list[1]?.reviewRankLabel, "优先人工验收第 2 位");
+});
+
+test("acceptance lead picks the highest-priority review target", () => {
+  const list = buildJobListView([
+    {
+      id: "job-standard",
+      title: "标准成片",
+      state: "COMPLETED",
+      renderProfile: "standard",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "male_clear_teacher",
+        ttsRouteRoleLabel: "第一阶段默认主链路",
+      },
+    },
+    {
+      id: "job-custom",
+      title: "自定义声音成片",
+      state: "COMPLETED",
+      renderProfile: "standard",
+      qualitySummary: {
+        audioPresence: true,
+        subtitleStatus: "planned",
+        fallbackStatus: "primary",
+      },
+      lastCheckpoint: {
+        voiceMode: "custom_reference",
+        ttsRouteRoleLabel: "自定义声音保真路线",
+      },
+    },
+  ]);
+
+  const lead = buildAcceptanceLead(list);
+
+  assert.equal(lead?.jobId, "job-custom");
+  assert.equal(lead?.reviewRankLabel, "优先人工验收第 1 位");
+  assert.equal(lead?.firstCheckLabel, "先验音色像不像本人");
+  assert.equal(lead?.reviewPriorityLabel, "优先听声音");
+  assert.match(lead?.reasonLabel || "", /自定义声音|更值得先人工把关/);
+});
+
+test("completed standard task gets ready-for-acceptance assistant guidance", () => {
+  const detail = buildJobDetailView({
+    id: "job-standard-ready",
+    title: "标准成片",
+    state: "COMPLETED",
+    platform: "douyin",
+    renderProfile: "standard",
+    updatedAt: "2026-06-27T05:00:00.000Z",
+    createdAt: "2026-06-27T04:00:00.000Z",
+    progress: 100,
+    currentStep: "done",
+    lastCheckpoint: {
+      step: "done",
+      voiceMode: "male_clear_teacher",
+      ttsProviderId: "cosyvoice-mlx",
+      ttsRouteLabel: "默认中文解说路线",
+      ttsRouteRoleLabel: "第一阶段默认主链路",
+    },
+    qualitySummary: {
+      fileSizeBytes: 1_048_576,
+      durationSec: 20.4,
+      resolution: "1080x1920",
+      audioPresence: true,
+      subtitleStatus: "planned",
+      fallbackStatus: "primary",
+      complianceStatus: "allowed",
+      complianceViolations: 0,
+    },
+    outputs: [{ kind: "video", path: "output/video.mp4" }],
+    errors: [],
+  });
+
+  assert.equal(detail.acceptanceAssistant.heroLabel, "可以开始人工验收");
+  assert.match(detail.acceptanceAssistant.readinessLabel, /具备基本验收条件/);
+  assert.match(detail.acceptanceAssistant.nextActionLabel, /声音、字幕、画面顺序/);
+  assert.equal(detail.acceptanceAssistant.reviewModeLabel, "常规验收模式");
+  assert.equal(detail.acceptanceAssistant.primaryActionLabel, "先听声音");
+  assert.equal(detail.acceptanceAssistant.secondaryActionLabel, "再看成片");
+  assert.equal(detail.reviewContext.bucketLabel, "可验收");
+  assert.equal(detail.reviewContext.laneLabel, "普通验收");
+  assert.equal(detail.reviewContext.reviewRankLabel, "普通验收第 1 位");
+  assert.equal(detail.reviewContext.firstCheckLabel, "先验声音和节奏");
+  assert.equal(detail.reviewContext.reviewPriorityLabel, "可以常规验收");
+  assert.equal(detail.reviewContext.reviewModeLabel, "常规验收模式");
 });

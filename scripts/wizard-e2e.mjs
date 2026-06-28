@@ -72,6 +72,28 @@ async function collectEventTexts(page) {
   return (await page.locator("#jobEvents .event-item-compact").allInnerTexts()).map((item) => item.trim());
 }
 
+async function createCompletedJob(page) {
+  const createJobResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/jobs") && response.request().method() === "POST",
+  );
+  await page.locator("#createJobBtn").click();
+  const createJobResponse = await createJobResponsePromise;
+  const createJobPayload = await createJobResponse.json();
+  assert.equal(createJobPayload.ok, true);
+  assert.match(createJobPayload.job.id, /^job-/);
+
+  await page.waitForFunction(
+    (jobId) => {
+      return document.querySelector("#currentTaskChip")?.textContent?.trim() === jobId;
+    },
+    createJobPayload.job.id,
+    { timeout: 15000 },
+  );
+
+  await waitForJsonJobState(page, "COMPLETED", 30000);
+  return createJobPayload;
+}
+
 async function main() {
   const TEST_SCRIPT = await fs.readFile(TEST_SCRIPT_PATH, "utf8");
   const customVoiceFixturePath = "/tmp/video-ops-custom-voice-e2e.wav";
@@ -99,6 +121,7 @@ async function main() {
     qualitySummary: [],
     costSummary: [],
     ttsStrategySummary: [],
+    jobsDashboard: {},
   };
 
   try {
@@ -141,8 +164,8 @@ async function main() {
     await page.waitForSelector("#scriptText");
 
     await page.locator("#scriptText").fill(TEST_SCRIPT);
-    await page.locator("#loadDemoBtn").click();
-    console.log("[e2e] script filled and demo loaded");
+    await page.locator("#validateBtn").click();
+    console.log("[e2e] script filled and validation triggered");
 
     await page.waitForFunction(() => {
       const title = document.querySelector("#derivedTitle")?.textContent?.trim();
@@ -159,20 +182,30 @@ async function main() {
       scenes: await page.locator(".scene-row").count(),
       status: await text(page, "#status"),
       storyboardCards: await page.locator(".story-scene").count(),
+      titleInputValue: await page.locator("#title").inputValue(),
+      authorInputValue: await page.locator("#author").inputValue(),
+      ownerTokenValue: await page.locator("#ownerToken").inputValue(),
     };
 
     assert.match(result.extracted.title, /卧推肩疼/);
     assert.equal(result.extracted.scenes, 3);
     assert.equal(result.extracted.duration, "30 秒");
     assert.ok(result.extracted.storyboardCards >= 3);
+    assert.match(result.extracted.titleInputValue, /卧推肩疼/);
+    assert.equal(result.extracted.authorInputValue, "John");
+    assert.equal(result.extracted.ownerTokenValue, "john-ai-lab");
 
     result.gatePanels.assetIntake = {
       sectionTitles: (await page.locator(".gate-card").nth(1).locator(".mini-section-title").allInnerTexts()).map((item) => item.trim()),
       currentVoiceRoute: await text(page, "#activeTtsRouteLabel"),
+      activePlatformSummary: await text(page, "#visiblePlatformSummaryLabel"),
+      firstSceneLabels: (await page.locator(".scene-row").first().locator(".scene-row-label").allInnerTexts()).map((item) => item.trim()),
     };
     assert.ok(result.gatePanels.assetIntake.sectionTitles.includes("当前门槛"));
     assert.ok(result.gatePanels.assetIntake.sectionTitles.includes("当前已完成"));
     assert.match(result.gatePanels.assetIntake.currentVoiceRoute, /路线/);
+    assert.match(result.gatePanels.assetIntake.activePlatformSummary, /微信视频号|小红书|抖音/);
+    assert.deepEqual(result.gatePanels.assetIntake.firstSceneLabels, ["这一段的核心表达", "观众会看到什么", "建议占用时长"]);
 
     await page.goto(`${APP_URL}?step=voice_generation`, { waitUntil: "domcontentloaded" });
     await page.waitForSelector('.voice-card[data-voice-mode="male_clear_teacher"]');
@@ -183,6 +216,10 @@ async function main() {
       routeBehaviorTitle: await text(page, "#routeBehaviorTitle"),
       routeBehaviorNote: await text(page, "#routeBehaviorNote"),
       providerStrategyCount: await page.locator(".provider-strategy-card").count(),
+      auditionTarget: await text(page, "#voiceAuditionTargetLabel"),
+      appliedTarget: await text(page, "#voiceAppliedTargetLabel"),
+      customReferenceState: await text(page, "#customVoiceReferenceStateLabel"),
+      finalRoute: await text(page, "#voiceFinalRouteLabel"),
     };
     assert.equal(result.gatePanels.voiceGeneration.providerStrategyCount, 3);
     assert.match(result.gatePanels.voiceGeneration.voiceRole, /主链路|产线|兜底/);
@@ -190,6 +227,10 @@ async function main() {
     assert.match(result.gatePanels.voiceGeneration.voiceSaasFit, /SaaS|本地生产|worker/);
     assert.match(result.gatePanels.voiceGeneration.routeBehaviorTitle, /路线/);
     assert.match(result.gatePanels.voiceGeneration.routeBehaviorNote, /试听|任务创建后|工作台/);
+    assert.match(result.gatePanels.voiceGeneration.auditionTarget, /暂未试听/);
+    assert.match(result.gatePanels.voiceGeneration.appliedTarget, /男声教练沉稳/);
+    assert.match(result.gatePanels.voiceGeneration.customReferenceState, /还没有上传|暂未启用/);
+    assert.match(result.gatePanels.voiceGeneration.finalRoute, /默认中文解说路线|第一阶段默认主链路/);
 
     await page.locator('.provider-strategy-card[data-provider-id="f5-tts"]').click();
     await page.waitForFunction(() => {
@@ -208,6 +249,8 @@ async function main() {
     const selectedVoice = await page.locator("#voiceMode").inputValue();
     assert.equal(selectedVoice, "male_clear_teacher");
     assert.equal(await page.locator("#ttsProviderId").inputValue(), "cosyvoice-mlx");
+    assert.match(await text(page, "#voiceAppliedTargetLabel"), /男声老师清晰/);
+    assert.match(await text(page, "#voiceFinalRouteLabel"), /默认中文解说路线|第一阶段默认主链路/);
     console.log("[e2e] voice applied");
 
     const previewResponsePromise = page.waitForResponse((response) =>
@@ -220,6 +263,7 @@ async function main() {
     assert.equal(previewPayload.isPreviewPlaceholder, false);
     assert.match(previewPayload.previewUrl, /\.wav$/);
     await waitForEventContains(page, "正在试听", 15000);
+    assert.match(await text(page, "#voiceAuditionTargetLabel"), /男声老师清晰.*预设声音试听/);
     result.voicePreview = {
       voiceMode: previewPayload.voiceMode,
       previewUrl: previewPayload.previewUrl,
@@ -236,9 +280,18 @@ async function main() {
     const customUploadPayload = await customUploadResponse.json();
     assert.equal(customUploadPayload.ok, true);
     assert.match(customUploadPayload.filename, /\.wav$/);
+    assert.match(await text(page, "#customVoiceReferenceStateLabel"), /已准备参考音频/);
 
     await page.locator("#applyCustomVoiceBtn").click();
     assert.equal(await page.locator("#voiceMode").inputValue(), "custom_reference");
+    await page.waitForFunction(() => {
+      return /已应用你的声音/.test(document.querySelector("#voiceAppliedTargetLabel")?.textContent || "");
+    }, { timeout: 10000 });
+    await page.waitForFunction(() => {
+      return /自定义声音克隆路线/.test(document.querySelector("#voiceFinalRouteLabel")?.textContent || "");
+    }, { timeout: 10000 });
+    assert.match(await text(page, "#voiceAppliedTargetLabel"), /已应用你的声音/);
+    assert.match(await text(page, "#voiceFinalRouteLabel"), /自定义声音克隆路线/);
 
     const customPreviewResponsePromise = page.waitForResponse((response) =>
       response.url().includes("/api/voice-preview?voiceMode=custom_reference"),
@@ -250,33 +303,24 @@ async function main() {
     assert.equal(customPreviewPayload.voiceMode, "custom_reference");
     assert.match(customPreviewPayload.previewUrl, /\/api\/custom-voice-reference\/file\//);
     await waitForEventContains(page, "正在试听：自定义声音", 15000);
+    await page.waitForFunction(() => {
+      return /你的声音.*参考音频试听/.test(document.querySelector("#voiceAuditionTargetLabel")?.textContent || "");
+    }, { timeout: 10000 });
+    await page.waitForFunction(() => {
+      return /已应用自定义参考/.test(document.querySelector("#customVoiceReferenceStateLabel")?.textContent || "");
+    }, { timeout: 10000 });
+    assert.match(await text(page, "#voiceAuditionTargetLabel"), /你的声音.*参考音频试听/);
+    assert.match(await text(page, "#customVoiceReferenceStateLabel"), /已应用自定义参考/);
     result.voicePreview.customReference = {
       filename: customUploadPayload.filename,
       previewUrl: customPreviewPayload.previewUrl,
     };
     console.log("[e2e] custom voice upload and preview connected");
 
-    const createJobResponsePromise = page.waitForResponse((response) =>
-      response.url().includes("/api/jobs") && response.request().method() === "POST",
-    );
-    await page.locator("#createJobBtn").click();
+    const createJobPayload = await createCompletedJob(page);
     console.log("[e2e] create job clicked");
-
-    const createJobResponse = await createJobResponsePromise;
-    const createJobPayload = await createJobResponse.json();
-    assert.equal(createJobPayload.ok, true);
-    assert.match(createJobPayload.job.id, /^job-/);
-
-    await page.waitForFunction(
-      (jobId) => {
-        return document.querySelector("#currentTaskChip")?.textContent?.trim() === jobId;
-      },
-      createJobPayload.job.id,
-      { timeout: 15000 },
-    );
     console.log("[e2e] job id visible");
 
-    await waitForJsonJobState(page, "COMPLETED", 30000);
     console.log("[e2e] completed event observed");
 
     const eventTexts = await collectEventTexts(page);
@@ -358,6 +402,139 @@ async function main() {
     assert.ok(result.ttsStrategySummary.some((item) => item.includes("TTS 引擎：")), "missing tts provider summary");
     assert.ok(result.ttsStrategySummary.some((item) => item.includes("音色策略：")), "missing tts cloning summary");
     assert.ok(result.ttsStrategySummary.some((item) => item.includes("部署策略：")), "missing tts deployment summary");
+
+    await page.goto(`${APP_URL}?step=voice_generation`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector('.voice-card[data-voice-mode="female_energetic_creator"]');
+    await page.locator("#ttsProviderIdVisible").selectOption("f5-tts");
+    await page.waitForFunction(() => document.querySelector("#ttsProviderId")?.value === "f5-tts", { timeout: 10000 });
+    await page.locator('.voice-card[data-voice-mode="female_energetic_creator"] .voice-apply-btn').click();
+    await page.waitForFunction(() => document.querySelector("#voiceMode")?.value === "female_energetic_creator", { timeout: 10000 });
+    const secondJobPayload = await createCompletedJob(page);
+    assert.notEqual(secondJobPayload.job.id, createJobPayload.job.id);
+
+    await page.goto(`${APP_URL}jobs`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".job-group", { timeout: 30000 });
+    const jobGroups = await page.locator(".job-group").evaluateAll((nodes) =>
+      nodes.map((group) => ({
+        title: group.querySelector(".job-group-title span:last-child")?.textContent?.trim() ?? "",
+        hint: group.querySelector(".job-group-hint")?.textContent?.trim() ?? "",
+        count: group.querySelectorAll(".job-row").length,
+      })),
+    );
+    const readyLanes = await page.locator(".job-ready-lane").evaluateAll((nodes) =>
+      nodes.map((lane) => ({
+        title: lane.querySelector(".job-ready-lane-title")?.textContent?.trim() ?? "",
+        hint: lane.querySelector(".job-ready-lane-hint")?.textContent?.trim() ?? "",
+        count: lane.querySelectorAll(".job-row").length,
+      })),
+    );
+    const prioritySignals = (await page.locator(".job-priority-signal").allInnerTexts()).map((item) => item.trim());
+    const reviewModeLabels = (await page.locator(".job-mode-chip").allInnerTexts()).map((item) => item.trim());
+    const summaryChipTexts = (await page.locator(".job-summary-chip").allInnerTexts()).map((item) => item.trim());
+    const leadPick = {
+      title: await text(page, "#leadPickTitle"),
+      rank: await text(page, "#leadPickRank"),
+      mode: await text(page, "#leadPickMode"),
+      reason: await text(page, "#leadPickReason"),
+      firstCheck: await text(page, "#leadPickFirstCheck"),
+      priority: await text(page, "#leadPickPriority"),
+      relationTitleOnLead: "",
+      relationBodyOnLead: "",
+      relationTitleOnFollowup: "",
+      relationBodyOnFollowup: "",
+    };
+    await page.locator("#leadPickCard").click();
+    await page.waitForFunction(() => {
+      const leadTitle = document.querySelector("#leadPickTitle")?.textContent?.trim();
+      const titleValue = document.querySelector("#detailTitleValue")?.textContent?.trim();
+      return Boolean(leadTitle && titleValue);
+    }, { timeout: 30000 });
+    leadPick.detailTitleAfterClick = await page.locator("#detailTitleValue").innerText();
+    leadPick.relationTitleOnLead = await text(page, "#acceptanceRelationTitle");
+    leadPick.relationBodyOnLead = await text(page, "#acceptanceRelationBody");
+    const jobRowCount = await page.locator(".job-row").count();
+    assert.ok(jobRowCount > 1, "expected multiple job rows so followup banner can be exercised");
+    await page.locator(".job-row").nth(1).click();
+    await page.waitForSelector("#leadFollowupBanner.active", { timeout: 30000 });
+    leadPick.followupVisible = await page.locator("#leadFollowupBanner").isVisible();
+    leadPick.relationTitleOnFollowup = await text(page, "#acceptanceRelationTitle");
+    leadPick.relationBodyOnFollowup = await text(page, "#acceptanceRelationBody");
+    await page.locator("#leadFollowupBtn").click();
+    await page.waitForFunction(() => {
+      const leadTitle = document.querySelector("#leadPickTitle")?.textContent?.trim();
+      const detailTitle = document.querySelector("#detailTitleValue")?.textContent?.trim();
+      return Boolean(leadTitle && detailTitle && leadTitle === detailTitle);
+    }, { timeout: 30000 });
+    leadPick.detailTitleAfterFollowup = await page.locator("#detailTitleValue").innerText();
+    const acceptanceHero = {
+      title: await text(page, "#acceptanceHeroTitle"),
+      mode: await text(page, "#acceptanceModeChip"),
+      chip: await text(page, "#acceptanceHeroChip"),
+      body: await text(page, "#acceptanceHeroBody"),
+      primaryAction: await text(page, "#acceptancePrimaryAction"),
+      secondaryAction: await text(page, "#acceptanceSecondaryAction"),
+      checks: (await page.locator("#acceptanceChecks .acceptance-check-item").allInnerTexts()).map((item) => item.trim()),
+      blocker: await text(page, "#acceptanceBlocker"),
+      nextAction: await text(page, "#acceptanceNextAction"),
+    };
+    const reviewContextSummary = (await page.locator("#reviewContextSummary .summary-item").allInnerTexts()).map((item) => item.trim());
+    const focusCardCount = await page.locator(".job-focus-card").count();
+    const focusTexts = (await page.locator(".job-focus-text").allInnerTexts()).map((item) => item.trim());
+    result.jobsDashboard = {
+      groups: jobGroups,
+      readyLanes,
+      prioritySignals,
+      reviewModeLabels,
+      summaryChipTexts,
+      leadPick,
+      reviewContextSummary,
+      acceptanceHero,
+      focusCardCount,
+      focusTexts,
+    };
+    assert.ok(jobGroups.length >= 1, "expected at least one grouped jobs section");
+    assert.ok(jobGroups.some((item) => item.title === "可验收"), "expected a ready-for-review group");
+    assert.ok(jobGroups.every((item) => item.count >= 1), "expected every visible group to contain jobs");
+    assert.ok(readyLanes.length >= 1, "expected ready-for-review lanes inside jobs dashboard");
+    assert.ok(readyLanes.some((item) => item.title === "优先人工验收"), "expected a priority review lane");
+    assert.ok(readyLanes.every((item) => item.count >= 1), "expected each visible ready lane to contain jobs");
+    assert.ok(prioritySignals.length >= 1, "expected visible priority reason signals");
+    assert.ok(prioritySignals.some((item) => /自定义声音|正式产线|高质量档位/.test(item)), "expected recognizable priority reason signal");
+    assert.ok(reviewModeLabels.length >= 1, "expected visible review mode labels on job cards");
+    assert.ok(reviewModeLabels.some((item) => /自定义声音验收|正式发布验收|常规验收模式|谨慎验收模式/.test(item)), "expected meaningful review mode labels");
+    assert.ok(reviewModeLabels.some((item) => /优先人工验收第 \d+ 位|普通验收第 \d+ 位/.test(item)), "expected visible review rank labels on job cards");
+    assert.match(leadPick.title, /\S+/);
+    assert.match(leadPick.rank, /优先人工验收第 \d+ 位|普通验收第 \d+ 位/);
+    assert.match(leadPick.mode, /自定义声音验收|正式发布验收|常规验收模式|谨慎验收模式|进度观察模式|故障处理模式/);
+    assert.match(leadPick.reason, /因为/);
+    assert.match(leadPick.firstCheck, /第一眼先验：/);
+    assert.match(leadPick.priority, /当前优先级：/);
+    assert.equal(leadPick.detailTitleAfterClick.trim(), leadPick.title.trim());
+    assert.equal(leadPick.followupVisible, true);
+    assert.equal(leadPick.detailTitleAfterFollowup.trim(), leadPick.title.trim());
+    assert.match(leadPick.relationTitleOnLead, /推荐优先验收任务/);
+    assert.match(leadPick.relationBodyOnLead, /优先人工验收第 1 位|第一眼先验/);
+    assert.match(leadPick.relationTitleOnFollowup, /不是推荐任务/);
+    assert.match(leadPick.relationBodyOnFollowup, /系统推荐先看的是|优先人工验收第 1 位/);
+    assert.ok(summaryChipTexts.some((item) => /第一眼先验：/.test(item)), "expected visible first-check summary chip");
+    assert.ok(summaryChipTexts.some((item) => /当前优先级：/.test(item)), "expected visible review-priority summary chip");
+    assert.ok(reviewContextSummary.some((item) => /当前分组：/.test(item)), "expected right-side review context bucket summary");
+    assert.ok(reviewContextSummary.some((item) => /当前分道：/.test(item)), "expected right-side review context lane summary");
+    assert.ok(reviewContextSummary.some((item) => /当前顺位：/.test(item)), "expected right-side review rank summary");
+    assert.ok(reviewContextSummary.some((item) => /第一眼先验：/.test(item)), "expected right-side first-check summary");
+    assert.ok(reviewContextSummary.some((item) => /当前优先级：/.test(item)), "expected right-side review-priority summary");
+    assert.match(acceptanceHero.title, /建议现在优先人工验收|可以开始人工验收|可以人工验收，但要谨慎/);
+    assert.match(acceptanceHero.mode, /自定义声音验收|正式发布验收|常规验收模式|谨慎验收模式|进度观察模式|故障处理模式/);
+    assert.match(acceptanceHero.chip, /可验收判断|先处理问题|先看进度/);
+    assert.match(acceptanceHero.primaryAction, /先听声音|先看成片|先修音频|先查错误|先看进度/);
+    assert.match(acceptanceHero.secondaryAction, /再看成片|再听细节|再决定是否重跑|再回看成片|再等成片落地/);
+    assert.ok(acceptanceHero.checks.length >= 2, "expected at least two acceptance checks");
+    assert.match(acceptanceHero.nextAction, /下一步建议/);
+    assert.ok(focusCardCount >= 1, "expected at least one acceptance focus card");
+    assert.ok(
+      focusTexts.some((item) => /人工验收|声音|音色|fallback|成片|节奏/.test(item)),
+      "expected at least one visible acceptance focus summary",
+    );
 
     for (const item of [
       { stepId: "asset_intake", title: "素材收集" },
